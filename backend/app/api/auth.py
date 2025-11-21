@@ -1,3 +1,10 @@
+"""
+    Roteiro OAuth2 para conectar Google Calendar via FastAPI.
+    Passo 1: /auth/login -> Redireciona para o Google
+    Passo 2: /auth/callback -> Google redireciona de volta para cá
+    Armazenamos o refresh_token no Supabase.
+"""
+
 import os
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import RedirectResponse

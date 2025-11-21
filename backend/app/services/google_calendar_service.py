@@ -1,3 +1,8 @@
+"""
+    Serviço para interagir com o Google Calendar usando tokens armazenados no Supabase.
+    Busca o refresh_token da clínica, monta as credenciais e permite listar/criar eventos.
+"""
+
 import os
 import datetime as dt
 from supabase import create_client, Client
@@ -82,18 +87,41 @@ class GoogleCalendarService:
         )
 
         return creds
+    
+    def listar_calendarios(self):
+        """
+        Útil para o Onboarding: Lista todos os calendários da conta conectada.
+        A recepcionista usa isso para saber qual ID pertence a qual médico.
+        """
+        page_token = None
+        calendars = []
+        
+        while True:
+            calendar_list = self.service.calendarList().list(pageToken=page_token).execute()
+            
+            for calendar_list_entry in calendar_list['items']:
+                calendars.append({
+                    'id': calendar_list_entry['id'],
+                    'summary': calendar_list_entry['summary']
+                })
+            page_token = calendar_list.get('nextPageToken')
+            
+            if not page_token:
+                break
+            
+        return calendars
 
-    def listar_eventos(self, max_results=5):
+    def listar_eventos(self, calendar_id='primary', max_results=5):
         now = dt.datetime.now(dt.UTC).isoformat()
         events_result = self.service.events().list(
-            calendarId='primary', timeMin=now,
+            calendarId=calendar_id, timeMin=now,
             maxResults=max_results, singleEvents=True,
             orderBy='startTime'
         ).execute()
         
         return events_result.get('items', [])
 
-    def criar_evento(self, resumo, inicio_dt: dt.datetime):
+    def criar_evento(self, calendar_id, resumo, inicio_dt: dt.datetime):
         # inicio_dt deve ser um objeto datetime
         fim_dt = inicio_dt + dt.timedelta(hours=1)
         
@@ -106,4 +134,4 @@ class GoogleCalendarService:
             'end': {'dateTime': fim_dt.isoformat(), 'timeZone': TIMEZONE},
         }
         
-        return self.service.events().insert(calendarId='primary', body=evento).execute()
+        return self.service.events().insert(calendarId=calendar_id, body=evento).execute()

@@ -1,3 +1,7 @@
+"""
+    Módulo de segurança para criptografia e descriptografia de tokens usando Fernet.
+"""
+
 import os
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv

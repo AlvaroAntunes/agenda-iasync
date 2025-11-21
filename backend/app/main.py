@@ -1,7 +1,13 @@
+"""
+    API Principal do IA Clínicas usando FastAPI.
+    Inclui rotas de autenticação e testes de integração com Google Calendar.
+"""
+
 from fastapi import FastAPI
 from app.services.google_calendar_service import GoogleCalendarService
 import datetime as dt
 from app.api.auth import router as auth_router
+from supabase import create_client, Client
 
 app = FastAPI(title="IA Clinicas API")
 
@@ -11,16 +17,31 @@ app.include_router(auth_router, tags=["Autenticação"])
 def root():
     return {"message": "API IA Clínicas rodando!"}
 
-# Rota de Teste: Cria evento (simulando o IA)
-@app.get("/agenda/criar/{clinic_id}")
-def criar_teste(clinic_id: str):
-    service = GoogleCalendarService(clinic_id=clinic_id)
-    # Marca para amanhã às 15h
-    amanha = dt.datetime.now() + dt.timedelta(days=1)
-    horario = amanha.replace(hour=15, minute=0, second=0, microsecond=0)
+"""
+# Exemplo de Rota Atualizada
+@app.post("/agenda/criar/{clinic_id}")
+def criar_teste_medico(clinic_id: str, medico_id: str): # Recebe o ID do médico (do seu banco)
     
-    novo_evento = service.criar_evento("[Via API] Teste FastAPI", horario)
-    return {"status": "criado", "link": novo_evento.get('htmlLink')}
+    # 1. Busca os dados do médico no Supabase para pegar o gcal_calendar_id
+    # (Supondo que você tenha uma função ou faça a query aqui)
+    response = supabase.table('medicos').select('gcal_calendar_id').eq('id', medico_id).single().execute()
+    calendar_id_google = response.data['gcal_calendar_id']
+
+    # 2. Inicializa o serviço (autentica com a conta da clínica)
+    service = GoogleCalendarService(clinic_id=clinic_id)
+    
+    # 3. Cria o evento no calendário ESPECÍFICO daquele médico
+    amanha = dt.datetime.now() + dt.timedelta(days=1)
+    horario = amanha.replace(hour=10, minute=0, second=0, microsecond=0)
+    
+    novo_evento = service.criar_evento(
+        calendar_id=calendar_id_google, # <--- Passa o ID correto ('primary', 'c_123...', etc)
+        resumo="[IA] Consulta com Dr. João",
+        inicio_dt=horario
+    )
+    
+    return {"status": "criado", "medico": medico_id, "link": novo_evento.get('htmlLink')}
+"""
 
 # Rota de Teste: Ler agenda de uma clínica específica
 @app.get("/agenda/{clinic_id}")
@@ -30,5 +51,16 @@ def ler_agenda(clinic_id: str):
         service = GoogleCalendarService(clinic_id=clinic_id)
         eventos = service.listar_eventos()
         return {"eventos": eventos}
+    except Exception as e:
+        return {"erro": str(e)}
+    
+@app.get("/config/calendarios/{clinic_id}")
+def get_calendarios_disponiveis(clinic_id: str):
+    # Retorna a lista de calendários do Google para preencher o Dropdown da recepcionista.
+    try:
+        service = GoogleCalendarService(clinic_id=clinic_id)
+        # Retorna lista de dicts: [{'id': '...', 'summary': 'Dra. Ana'}, ...]
+        calendarios = service.listar_calendarios() 
+        return calendarios
     except Exception as e:
         return {"erro": str(e)}
