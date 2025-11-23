@@ -110,12 +110,27 @@ class GoogleCalendarService:
                 break
             
         return calendars
+    
+    def listar_eventos(self, data:dt.datetime, calendar_id='primary'):
+        # 1. Extrai apenas a data (remove horas/minutos/segundos)
+        dia_apenas = data.date() 
+        
+        # 2. Cria o intervalo de 00:00 até 23:59 desse dia
+        start_of_day = dt.datetime.combine(dia_apenas, dt.time.min)
+        end_of_day = dt.datetime.combine(dia_apenas, dt.time.max)
 
-    def listar_eventos(self, calendar_id='primary', max_results=5):
-        now = dt.datetime.now(dt.UTC).isoformat()
+        # 3. Preservar o Fuso Horário (Muito Importante)
+        # Se o seu data tem fuso (tzinfo), aplicamos ao intervalo para a busca ser correta.
+        if data.tzinfo:
+            start_of_day = start_of_day.replace(tzinfo=data.tzinfo)
+            end_of_day = end_of_day.replace(tzinfo=data.tzinfo)
+            
         events_result = self.service.events().list(
-            calendarId=calendar_id, timeMin=now,
-            maxResults=max_results, singleEvents=True,
+            calendarId=calendar_id,
+            timeMin=start_of_day.isoformat(),
+            timeMax=end_of_day.isoformat(),
+            maxResults=3000,
+            singleEvents=True,
             orderBy='startTime'
         ).execute()
         

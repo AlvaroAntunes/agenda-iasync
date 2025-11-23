@@ -102,6 +102,7 @@ tqdm==4.67.1
 traitlets @ file:///home/conda/feedstock_root/build_artifacts/traitlets_1733367359838/work
 typing-inspection==0.4.2
 typing_extensions @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_typing_extensions_1756220668/work
+Unidecode==1.4.0
 uritemplate==4.2.0
 urllib3==2.5.0
 uvicorn==0.38.0
