@@ -1,3 +1,9 @@
+"""
+    Serviço do Agente de Agendamento para Clínicas.
+    Utiliza LangChain para criar um agente que interage com o usuário,
+    Verifica disponibilidade e realiza agendamentos no Google Calendar.
+"""
+
 import os
 import datetime as dt
 from typing import List, Optional
@@ -50,8 +56,6 @@ class AgenteClinica:
         - data: string no formato dd/mm/aaaa.
         - nome_profissional: (Opcional) Nome do médico/dentista. Se não informado, verifica todos.
         """
-        # Lógica simplificada: Vamos listar os eventos do dia para o agente saber o que está ocupado
-        # O Agente (LLM) é inteligente o suficiente para ver os buracos livres.
         
         print(f"--- TOOL: Verificando disponibilidade para {data} ---")
         
