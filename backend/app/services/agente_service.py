@@ -11,13 +11,13 @@ from pydantic import BaseModel, Field
 from unidecode import unidecode
 from zoneinfo import ZoneInfo 
 from dotenv import load_dotenv
+from langchain_core.pydantic_v1 import BaseModel, Field
 
 # LangChain Imports
 from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.tools import tool
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.tools import StructuredTool
 
 # Seus serviços
 from app.services.factory import get_calendar_service
@@ -31,6 +31,19 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# --- 1. DEFINIÇÃO DOS SCHEMAS (O que o Robô vê) ---
+# Isso garante que o LLM nunca tente enviar 'self'
+
+class VerificaDisponibilidade(BaseModel):
+    data: str = Field(description="Data para verificar no formato DD/MM/AAAA")
+    nome_profissional: Optional[str] = Field(default=None, description="Nome do médico ou especialista")
+
+class RealizaAgendamento(BaseModel):
+    nome_paciente: str = Field(description="Nome completo do paciente")
+    telefone: str = Field(description="Telefone com DDD")
+    data_hora: str = Field(description="Data e hora ISO (ex: 2024-11-25T14:30:00)")
+    nome_profissional: str = Field(description="Nome do médico escolhido")
+    
 class AgenteClinica:
     def __init__(self, clinic_id: str, session_id: str):
         self.clinic_id = clinic_id
@@ -72,8 +85,7 @@ class AgenteClinica:
 
     # --- DEFINIÇÃO DAS FERRAMENTAS (TOOLS) ---
     
-    @tool
-    def verificar_disponibilidade(self, data: str, nome_profissional: Optional[str] = None):
+    def _logic_verificar_disponibilidade(self, data: str, nome_profissional: Optional[str] = None):
         """
         Verifica a agenda.
         Input: 
@@ -108,8 +120,7 @@ class AgenteClinica:
         lista_ocupada = [f"{formatar_hora(e['start'].get('dateTime'))} até {formatar_hora(e['end'].get('dateTime'))} - Ocupado" for e in eventos]
         return f"Horários OCUPADOS em {data}:\n" + "\n".join(lista_ocupada)
 
-    @tool
-    def realizar_agendamento(self, nome_paciente: str, telefone: str, data_hora: str, nome_profissional: str):
+    def _logic_realizar_agendamento(self, nome_paciente: str, telefone: str, data_hora: str, nome_profissional: str):
         """
         Realiza o agendamento final.
         Input:
@@ -163,11 +174,11 @@ class AgenteClinica:
         try:
             dt_inicio = dt.datetime.fromisoformat(data_hora)
             
-            if dt_inicio.tzinfo is None:
-                br_timezone = ZoneInfo("America/Sao_Paulo")
-                dt_inicio = dt_inicio.replace(tzinfo=br_timezone)
+            # if dt_inicio.tzinfo is None:
+            #     br_timezone = ZoneInfo("America/Sao_Paulo")
+            #     dt_inicio = dt_inicio.replace(tzinfo=br_timezone)
                 
-            horario_iso_com_fuso = dt_inicio.isoformat()
+            # horario_iso_com_fuso = dt_inicio.isoformat()
 
             evento_cal = self.calendar_service.criar_evento(
                 calendar_id=prof_data['external_calendar_id'],
@@ -183,7 +194,7 @@ class AgenteClinica:
             'clinic_id': self.clinic_id,
             'paciente_id': paciente_id,
             'profissional_id': prof_data['id'],
-            'horario_consulta': horario_iso_com_fuso,
+            'horario_consulta': dt_inicio.isoformat(),
             'status': 'AGENDADA',
             'origem_agendamento': 'IA',
             'external_event_id': evento_cal.get('id')
@@ -206,8 +217,24 @@ class AgenteClinica:
         llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=os.getenv("OPENAI_API_KEY"))
 
         # 2. Bind das Ferramentas (Vincula as funções ao LLM)
-        tools = [self.verificar_disponibilidade, self.realizar_agendamento]
-        
+        # --- CRIAÇÃO DAS TOOLS DE FORMA EXPLÍCITA ---
+        # Aqui nós ligamos o método da classe (func) ao Schema Pydantic (args_schema)
+        # O LangChain entende que 'self' já está incluso no método bound.
+        tools = [
+            StructuredTool.from_function(
+                func=self._logic_verificar_disponibilidade,
+                name="verificar_disponibilidade",
+                description="Verifica se existem horários livres na agenda para uma data.",
+                args_schema=VerificaDisponibilidade
+            ),
+            StructuredTool.from_function(
+                func=self._logic_realizar_agendamento,
+                name="realizar_agendamento",
+                description="Realiza o agendamento final da consulta no calendário.",
+                args_schema=RealizaAgendamento
+            )
+        ]
+
         # 3. Criar o Prompt do Sistema
         # Injetamos a data atual para ele não se perder no tempo
         data_hoje = dt.datetime.now().strftime("%A, %d de %B de %Y")
@@ -235,7 +262,7 @@ class AgenteClinica:
             """
 
         system_prompt = f"""
-        Você é a recepcionista virtual da {self.clinic_data['nome_da_clinica']}.
+        Você é a recepcionista da {self.clinic_data['nome_da_clinica']}.
         
         DATA DE HOJE: {data_hoje}.
         PROFISSIONAIS DISPONÍVEIS: {lista_profs}.
@@ -256,6 +283,8 @@ class AgenteClinica:
         6. Caso no dia solicitado não haja disponibilidade, ofereça datas alternativas próximas.
         7. Use o formato dd/mm/aaaa para datas e Data e hora ISO (ex: 2024-11-25T14:30:00) para agendamentos.
         8. Seja sempre educada e profissional.
+        9. Responda em português.
+        10. Responda com textos menores, pois o cliente deve ter uma experiência rápida e objetiva.
         """
         
         prompt = ChatPromptTemplate.from_messages([

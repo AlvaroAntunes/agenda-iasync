@@ -46,9 +46,9 @@ class HistoryService:
             
             for msg in mensagens_db:
                 if msg['quem_enviou'] == 'user':
-                    historico.append(HumanMessage(conteudo=msg['conteudo']))
+                    historico.append(HumanMessage(content=msg['conteudo']))
                 elif msg['quem_enviou'] == 'ai':
-                    historico.append(AIMessage(conteudo=msg['conteudo']))
+                    historico.append(AIMessage(content=msg['conteudo']))
             
             return historico
 
