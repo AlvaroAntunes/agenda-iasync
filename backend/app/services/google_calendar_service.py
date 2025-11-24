@@ -140,18 +140,25 @@ class GoogleCalendarService(CalendarService):
         
         return events_result.get('items', [])
 
-    def criar_evento(self, calendar_id, resumo, inicio_dt: dt.datetime):
+    def criar_evento(self, calendar_id, resumo, inicio_dt: dt.datetime, descricao: str = None):
         # inicio_dt deve ser um objeto datetime
         fim_dt = inicio_dt + dt.timedelta(hours=1)
+        texto_descricao = descricao if descricao else ""
         
         # Fuso horário fixo por enquanto (ideal: pegar da tabela clinicas)
         TIMEZONE = 'America/Sao_Paulo'
         
         evento = {
             'summary': resumo,
-            'start': {'dateTime': inicio_dt.isoformat(), 'timeZone': TIMEZONE},
-            'end': {'dateTime': fim_dt.isoformat(), 'timeZone': TIMEZONE},
-            'description': 'Agendamento criado via sistema de agendamento automático.'
+            'start': {
+                'dateTime': inicio_dt.isoformat(), 
+                'timeZone': TIMEZONE
+            },
+            'end': {
+                'dateTime': fim_dt.isoformat(), 
+                'timeZone': TIMEZONE
+            },
+            'description': texto_descricao
         }
         
         return self.service.events().insert(calendarId=calendar_id, body=evento).execute()

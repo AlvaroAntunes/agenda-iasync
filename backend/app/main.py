@@ -5,12 +5,16 @@
 
 import os
 from fastapi import FastAPI
+from pydantic import BaseModel
 import datetime as dt
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
+
 from app.api.auth import router as auth_router
 from app.services.factory import get_calendar_service
+from app.services.history_service import HistoryService, mensagens_contexto
+from app.services.agente_service import AgenteClinica
 
 load_dotenv()  # Carrega variáveis do .env
 
@@ -72,3 +76,37 @@ def get_calendarios_disponiveis(clinic_id: str):
         return calendarios
     except Exception as e:
         return {"erro": str(e)}
+
+class ChatRequest(BaseModel):
+    clinic_id: str
+    session_id: str
+    message: str
+    
+@app.post("/chat")
+def chat_endpoint(request: ChatRequest):
+    try:
+        # 1. Instancia o Serviço de Histórico
+        history_service = HistoryService(clinic_id=request.clinic_id, session_id=request.session_id)
+        
+        # 2. Salva a mensagem que acabou de chegar do usuário
+        history_service.add_user_message(request.message)
+        
+        # 3. Recupera o histórico (ex: últimas 10 trocas) para dar contexto ao robô
+        historico_langchain = history_service.get_langchain_history(limit=mensagens_contexto)
+        
+        # 4. Inicializa e Executa o Agente
+        agente = AgenteClinica(clinic_id=request.clinic_id, session_id=request.session_id)
+        
+        resposta_ia = agente.executar(
+            mensagem_usuario=request.message,
+            historico_conversa=historico_langchain # <--- Passamos o histórico real aqui
+        )
+        
+        # 5. Salva a resposta da IA no banco
+        history_service.add_ai_message(resposta_ia)
+        
+        return {"response": resposta_ia}
+        
+    except Exception as e:
+        print(f"Erro no Chat: {e}")
+        return {"error": "Erro interno"}

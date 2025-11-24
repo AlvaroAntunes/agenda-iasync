@@ -9,6 +9,8 @@ import datetime as dt
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from unidecode import unidecode
+from zoneinfo import ZoneInfo 
+from dotenv import load_dotenv
 
 # LangChain Imports
 from langchain_openai import ChatOpenAI
@@ -21,6 +23,8 @@ from langchain_core.messages import HumanMessage, AIMessage
 from app.services.factory import get_calendar_service
 from supabase import create_client, Client
 from app.utils.date_utils import formatar_hora
+
+load_dotenv()  # Carrega variáveis do .env
 
 # Configuração do Supabase 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -36,6 +40,7 @@ class AgenteClinica:
         # Carregar dados da clínica (Nome, Prompt, Profissionais)
         self.clinic_data = self._carregar_dados_clinica()
         self.profissionais = self._carregar_profissionais()
+        self.dados_paciente = self._identificar_paciente()
 
     def _carregar_dados_clinica(self):
         response = supabase.table('clinicas').select('*').eq('id', self.clinic_id).single().execute()
@@ -45,6 +50,25 @@ class AgenteClinica:
         # Trazemos os profissionais para injetar no prompt do sistema
         response = supabase.table('profissionais').select('id, nome, especialidade, external_calendar_id').eq('clinic_id', self.clinic_id).execute()
         return response.data
+    
+    def _identificar_paciente(self):
+        """
+        Busca se esse telefone (session_id) já é um paciente cadastrado.
+        """
+        # Limpa o session_id para garantir que só tem números
+        telefone_busca = ''.join(filter(str.isdigit, self.session_id))
+        
+        try:
+            response = supabase.table('pacientes')\
+                .select('nome')\
+                .eq('clinic_id', self.clinic_id)\
+                .eq('telefone', telefone_busca)\
+                .maybe_single()\
+                .execute()
+            
+            return response.data # Retorna o dict {nome: 'João'} ou None
+        except Exception:
+            return None
 
     # --- DEFINIÇÃO DAS FERRAMENTAS (TOOLS) ---
     
@@ -94,13 +118,14 @@ class AgenteClinica:
         - data_hora: Data e hora ISO (ex: 2024-11-25T14:30:00).
         - nome_profissional: Nome do médico/especialista.
         """
+            
         print(f"--- TOOL: Agendando para {nome_paciente} ---")
         
         # 1. Identificar Profissional e Calendar ID
-        prof_data = next((p for p in self.profissionais if nome_profissional.lower() in p['nome'].lower()), None)
+        prof_data = next((p for p in self.profissionais if unidecode(nome_profissional).lower() in unidecode(p['nome']).lower()), None)
         
         if not prof_data:
-            return "Erro: Profissional não encontrado. Peça para o usuário confirmar o nome do médico."
+            return "Erro: Profissional não encontrado. Peça para o usuário confirmar o nome do profissional."
 
         # 2. Verificar/Criar Paciente no Supabase (Upsert)
         # Primeiro buscamos se existe pelo telefone
@@ -118,12 +143,37 @@ class AgenteClinica:
             paciente_id = novo_paciente.data[0]['id']
 
         # 3. Criar no Calendar
+        
+        telefone_limpo = ''.join(filter(str.isdigit, telefone))
+        
+        if len(telefone_limpo) <= 11: 
+            telefone_link = f"55{telefone_limpo}"
+        else:
+            telefone_link = telefone_limpo
+        
+        descricao_formatada = f"""
+        === 📋 DADOS DO CLIENTE ===
+        👤 NOME: {nome_paciente}
+        📱 TELEFONE: {telefone}
+
+        === ⚡ AÇÕES RÁPIDAS ===
+        🔗 WHATSAPP: https://wa.me/{telefone_link}
+        🤖 CANAL: Agendamento via IA
+        """
         try:
             dt_inicio = dt.datetime.fromisoformat(data_hora)
-            evento_gcal = self.calendar_service.criar_evento(
+            
+            if dt_inicio.tzinfo is None:
+                br_timezone = ZoneInfo("America/Sao_Paulo")
+                dt_inicio = dt_inicio.replace(tzinfo=br_timezone)
+                
+            horario_iso_com_fuso = dt_inicio.isoformat()
+
+            evento_cal = self.calendar_service.criar_evento(
                 calendar_id=prof_data['external_calendar_id'],
                 resumo=f"Consulta: {nome_paciente} ({telefone})",
-                inicio_dt=dt_inicio
+                inicio_dt=dt_inicio,
+                descricao=descricao_formatada
             )
         except Exception as e:
             return f"Erro ao conectar com o Calendar: {str(e)}"
@@ -133,10 +183,10 @@ class AgenteClinica:
             'clinic_id': self.clinic_id,
             'paciente_id': paciente_id,
             'profissional_id': prof_data['id'],
-            'horario_consulta': data_hora,
+            'horario_consulta': horario_iso_com_fuso,
             'status': 'AGENDADA',
             'origem_agendamento': 'IA',
-            'gcal_event_id': evento_gcal.get('id')
+            'external_event_id': evento_cal.get('id')
         }).execute()
 
         # 5. Logar Sucesso (KPI)
@@ -152,7 +202,7 @@ class AgenteClinica:
 
     def executar(self, mensagem_usuario: str, historico_conversa: List = []):
         
-        # 1. Configurar LLM 
+        # 1. Configurar LLM  
         llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=os.getenv("OPENAI_API_KEY"))
 
         # 2. Bind das Ferramentas (Vincula as funções ao LLM)
@@ -162,24 +212,52 @@ class AgenteClinica:
         # Injetamos a data atual para ele não se perder no tempo
         data_hoje = dt.datetime.now().strftime("%A, %d de %B de %Y")
         lista_profs = ", ".join([f"{p['nome']} ({p['especialidade']})" for p in self.profissionais])
-        
+                
+        # Lógica de Contexto do Paciente
+        if self.dados_paciente:
+            bloco_paciente = f"""
+            VOCÊ ESTÁ FALANDO COM UM PACIENTE RECORRENTE.
+            Nome: {self.dados_paciente['nome']}
+            Status: Já cadastrado no sistema.
+            
+            IMPORTANTE:
+            - Chame-o pelo nome ({self.dados_paciente['nome']}).
+            - NÃO pergunte o nome dele novamente, pois você já sabe.
+            - Se ele quiser agendar, você já pode usar o nome '{self.dados_paciente['nome']}' na ferramenta.
+            """
+        else:
+            bloco_paciente = """
+            VOCÊ ESTÁ FALANDO COM UM PACIENTE NOVO (OU NÃO IDENTIFICADO).
+            Status: Não cadastrado.
+            
+            IMPORTANTE:
+            - Se ele quiser agendar, você PRECISA perguntar o nome dele primeiro.
+            """
+
         system_prompt = f"""
         Você é a recepcionista virtual da {self.clinic_data['nome_da_clinica']}.
         
         DATA DE HOJE: {data_hoje}.
         PROFISSIONAIS DISPONÍVEIS: {lista_profs}.
         
-        SUAS INSTRUÇÕES:
+        --- CONTEXTO DO USUÁRIO ---
+        {bloco_paciente}
+        ---------------------------
+        
+        SUAS INSTRUÇÕES GERAIS:
         {self.clinic_data.get('prompt_ia', 'Seja educada e ajude a agendar.')}
         
         REGRAS DE AGENDAMENTO:
         1. Antes de agendar, VERIFIQUE a disponibilidade usando a ferramenta 'verificar_disponibilidade'.
         2. SÓ agende se o horário estiver livre.
-        3. Para agendar, você PRECISA coletar: Nome, Telefone e Qual Profissional.
+        3. Para agendar, você PRECISA coletar: Nome e Telefone.
         4. Se o usuário não disser o profissional, sugira os disponíveis.
         5. Sempre confirme a data e hora final antes de chamar a ferramenta de agendamento.
+        6. Caso no dia solicitado não haja disponibilidade, ofereça datas alternativas próximas.
+        7. Use o formato dd/mm/aaaa para datas e Data e hora ISO (ex: 2024-11-25T14:30:00) para agendamentos.
+        8. Seja sempre educada e profissional.
         """
-
+        
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
