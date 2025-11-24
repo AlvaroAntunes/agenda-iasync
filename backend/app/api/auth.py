@@ -98,7 +98,7 @@ def callback_google(request: Request):
         encrypted_refresh_token = encrypt_token(refresh_token)
         
         data, count = supabase.table('clinicas').update({
-            'gcal_refresh_token': encrypted_refresh_token 
+            'calendar_refresh_token': encrypted_refresh_token 
         }).eq('id', clinic_id).execute()
 
         # Redirecionar de volta para o Frontend (Dashboard)

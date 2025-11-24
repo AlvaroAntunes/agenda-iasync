@@ -43,12 +43,12 @@ class GoogleCalendarService(CalendarService):
 
     def _get_credentials_from_db(self):
         
-        # Busca o gcal_refresh_token no banco e reconstrói o objeto Credentials.
+        # Busca o calendar_refresh_token no banco e reconstrói o objeto Credentials.
         
         # 1. Buscar no Supabase
         try:
             response = self.supabase.table('clinicas')\
-                .select('gcal_refresh_token')\
+                .select('calendar_refresh_token')\
                 .eq('id', self.clinic_id)\
                 .single()\
                 .execute()
@@ -58,7 +58,7 @@ class GoogleCalendarService(CalendarService):
         if not response.data:
             raise Exception(f"Clínica {self.clinic_id} não encontrada.")
 
-        refresh_token_encrypted = response.data.get('gcal_refresh_token')
+        refresh_token_encrypted = response.data.get('calendar_refresh_token')
 
         if not refresh_token_encrypted:
             raise Exception(f"A clínica {self.clinic_id} ainda não conectou o Google Calendar.")
@@ -124,11 +124,15 @@ class GoogleCalendarService(CalendarService):
         if data.tzinfo:
             start_of_day = start_of_day.replace(tzinfo=data.tzinfo)
             end_of_day = end_of_day.replace(tzinfo=data.tzinfo)
+        else:
+            # Se a data é "naive" (sem fuso), adicionamos 'Z' manualmente para indicar UTC
+            time_min = start_of_day.isoformat() + 'Z'
+            time_max = end_of_day.isoformat() + 'Z'
             
         events_result = self.service.events().list(
             calendarId=calendar_id,
-            timeMin=start_of_day.isoformat(),
-            timeMax=end_of_day.isoformat(),
+            timeMin=time_min,
+            timeMax=time_max,
             maxResults=3000,
             singleEvents=True,
             orderBy='startTime'

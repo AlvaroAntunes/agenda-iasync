@@ -31,9 +31,9 @@ def root():
 @app.get("/agenda/criar/{clinic_id}/medico/{medico_id}")
 def criar_teste_medico(clinic_id: str, medico_id: str): # Recebe o ID do médico (do seu banco)
     
-    # 1. Busca os dados do médico no Supabase para pegar o gcal_calendar_id
-    response = supabase.table('profissionais').select('gcal_calendar_id').eq('id', medico_id).single().execute()
-    calendar_id_google = response.data['gcal_calendar_id']
+    # 1. Busca os dados do médico no Supabase para pegar o external_calendar_id
+    response = supabase.table('profissionais').select('external_calendar_id').eq('id', medico_id).single().execute()
+    calendar_id = response.data['external_calendar_id']
 
     # 2. Inicializa o serviço (autentica com a conta da clínica)
     service = get_calendar_service(clinic_id=clinic_id)
@@ -43,7 +43,7 @@ def criar_teste_medico(clinic_id: str, medico_id: str): # Recebe o ID do médico
     horario = amanha.replace(hour=10, minute=0, second=0, microsecond=0)
     
     novo_evento = service.criar_evento(
-        calendar_id=calendar_id_google, 
+        calendar_id=calendar_id, 
         resumo="[IA] Consulta com Dr. João",
         inicio_dt=horario
     )
@@ -55,8 +55,9 @@ def criar_teste_medico(clinic_id: str, medico_id: str): # Recebe o ID do médico
 def ler_agenda(clinic_id: str):
     # Instancia o serviço JÁ apontando para a clínica certa
     try:
+        data = dt.datetime.now() + dt.timedelta(days=1)
         service = get_calendar_service(clinic_id=clinic_id)
-        eventos = service.listar_eventos()
+        eventos = service.listar_eventos(data=data)
         return {"eventos": eventos}
     except Exception as e:
         return {"erro": str(e)}

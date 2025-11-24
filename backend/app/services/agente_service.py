@@ -43,7 +43,7 @@ class AgenteClinica:
 
     def _carregar_profissionais(self):
         # Trazemos os profissionais para injetar no prompt do sistema
-        response = supabase.table('profissionais').select('id, nome, especialidade, gcal_calendar_id').eq('clinic_id', self.clinic_id).execute()
+        response = supabase.table('profissionais').select('id, nome, especialidade, external_calendar_id').eq('clinic_id', self.clinic_id).execute()
         return response.data
 
     # --- DEFINIÇÃO DAS FERRAMENTAS (TOOLS) ---
@@ -66,7 +66,7 @@ class AgenteClinica:
             # Procura o ID do calendário baseado no nome (busca simples)
             for prof in self.profissionais:
                 if unidecode(nome_profissional).lower() in unidecode(prof['nome']).lower():
-                    calendar_id = prof['gcal_calendar_id']
+                    calendar_id = prof['external_calendar_id']
                     break
         
         # Converte string para datetime para busca
@@ -121,7 +121,7 @@ class AgenteClinica:
         try:
             dt_inicio = dt.datetime.fromisoformat(data_hora)
             evento_gcal = self.calendar_service.criar_evento(
-                calendar_id=prof_data['gcal_calendar_id'],
+                calendar_id=prof_data['external_calendar_id'],
                 resumo=f"Consulta: {nome_paciente} ({telefone})",
                 inicio_dt=dt_inicio
             )
