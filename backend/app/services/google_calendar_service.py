@@ -10,11 +10,11 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
 from app.core.security import decrypt_token 
-
+from app.services.interfaces import CalendarService
 
 load_dotenv()  # Carrega variáveis do .env
 
-class GoogleCalendarService:
+class GoogleCalendarService(CalendarService):
     SCOPES = ['https://www.googleapis.com/auth/calendar']
 
     def __init__(self, clinic_id: str):
@@ -147,6 +147,7 @@ class GoogleCalendarService:
             'summary': resumo,
             'start': {'dateTime': inicio_dt.isoformat(), 'timeZone': TIMEZONE},
             'end': {'dateTime': fim_dt.isoformat(), 'timeZone': TIMEZONE},
+            'description': 'Agendamento criado via sistema de agendamento automático.'
         }
         
         return self.service.events().insert(calendarId=calendar_id, body=evento).execute()

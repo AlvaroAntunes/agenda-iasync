@@ -1,7 +1,7 @@
 """
     Serviço do Agente de Agendamento para Clínicas.
     Utiliza LangChain para criar um agente que interage com o usuário,
-    Verifica disponibilidade e realiza agendamentos no Google Calendar.
+    Verifica disponibilidade e realiza agendamentos no Calendar.
 """
 
 import os
@@ -18,7 +18,7 @@ from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage, AIMessage
 
 # Seus serviços
-from app.services.google_calendar_service import GoogleCalendarService
+from app.services.factory import get_calendar_service
 from supabase import create_client, Client
 from app.utils.date_utils import formatar_hora
 
@@ -31,7 +31,7 @@ class AgenteClinica:
     def __init__(self, clinic_id: str, session_id: str):
         self.clinic_id = clinic_id
         self.session_id = session_id
-        self.calendar_service = GoogleCalendarService(clinic_id)
+        self.calendar_service = get_calendar_service(clinic_id)
         
         # Carregar dados da clínica (Nome, Prompt, Profissionais)
         self.clinic_data = self._carregar_dados_clinica()
@@ -71,7 +71,7 @@ class AgenteClinica:
         
         # Converte string para datetime para busca
         try:
-            data_dt = dt.datetime.strptime(data, "%d-%m-%Y")
+            data_dt = dt.datetime.strptime(data, "%d/%m/%Y")
         except ValueError:
             return "Formato de data inválido. Use dd/mm/aaaa."
 
@@ -117,7 +117,7 @@ class AgenteClinica:
             }).execute()
             paciente_id = novo_paciente.data[0]['id']
 
-        # 3. Criar no Google Calendar
+        # 3. Criar no Calendar
         try:
             dt_inicio = dt.datetime.fromisoformat(data_hora)
             evento_gcal = self.calendar_service.criar_evento(
@@ -126,7 +126,7 @@ class AgenteClinica:
                 inicio_dt=dt_inicio
             )
         except Exception as e:
-            return f"Erro ao conectar com Google Calendar: {str(e)}"
+            return f"Erro ao conectar com o Calendar: {str(e)}"
 
         # 4. Salvar Consulta no Supabase
         supabase.table('consultas').insert({

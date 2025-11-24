@@ -10,7 +10,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 
 from app.api.auth import router as auth_router
-from app.services.google_calendar_service import GoogleCalendarService
+from app.services.factory import get_calendar_service
 
 load_dotenv()  # Carrega variáveis do .env
 
@@ -36,7 +36,7 @@ def criar_teste_medico(clinic_id: str, medico_id: str): # Recebe o ID do médico
     calendar_id_google = response.data['gcal_calendar_id']
 
     # 2. Inicializa o serviço (autentica com a conta da clínica)
-    service = GoogleCalendarService(clinic_id=clinic_id)
+    service = get_calendar_service(clinic_id=clinic_id)
     
     # 3. Cria o evento no calendário ESPECÍFICO daquele médico
     amanha = dt.datetime.now() + dt.timedelta(days=1)
@@ -55,7 +55,7 @@ def criar_teste_medico(clinic_id: str, medico_id: str): # Recebe o ID do médico
 def ler_agenda(clinic_id: str):
     # Instancia o serviço JÁ apontando para a clínica certa
     try:
-        service = GoogleCalendarService(clinic_id=clinic_id)
+        service = get_calendar_service(clinic_id=clinic_id)
         eventos = service.listar_eventos()
         return {"eventos": eventos}
     except Exception as e:
@@ -63,9 +63,9 @@ def ler_agenda(clinic_id: str):
     
 @app.get("/config/calendarios/{clinic_id}")
 def get_calendarios_disponiveis(clinic_id: str):
-    # Retorna a lista de calendários do Google para preencher o Dropdown da recepcionista.
+    # Retorna a lista de calendários para preencher o Dropdown da recepcionista.
     try:
-        service = GoogleCalendarService(clinic_id=clinic_id)
+        service = get_calendar_service(clinic_id=clinic_id)
         # Retorna lista de dicts: [{'id': '...', 'summary': 'Dra. Ana'}, ...]
         calendarios = service.listar_calendarios() 
         return calendarios
