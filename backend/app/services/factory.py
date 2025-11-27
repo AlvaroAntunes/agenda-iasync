@@ -1,3 +1,7 @@
+"""
+    Decide qual implementação retornar baseado no calendário da clínica.
+"""
+
 import os
 from supabase import create_client, Client
 from app.services.interfaces import CalendarService

@@ -1,1 +1,3 @@
-1 - Clínica conectará o calendário diretamente no dashboard
+1 - A recepcionista conectará o calendário diretamente no dashboard
+2 - A recepcionista cadastrará o profissional (mesmo que seja apenas um) no supabase
+3 - A recepcionista conectará o whatsapp pelo dashboard

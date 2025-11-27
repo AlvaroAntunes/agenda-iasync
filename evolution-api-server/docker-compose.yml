@@ -1,0 +1,90 @@
+version: '3.3'
+
+services:
+  evolution-api:
+    container_name: evolution_api
+    image: atendai/evolution-api:v1.8.2 # Versão estável
+    restart: always
+    ports:
+      - "8081:8080" # Porta Externa (8081) : Porta Interna (8080)
+    environment:
+      # --- SUA CREDENCIAL MESTRA ---
+      - AUTHENTICATION_API_KEY=ia-clinicas-saas-secret
+      
+      # --- Configurações do Webhook Global (Opcional agora, útil depois) ---
+      # - WEBHOOK_GLOBAL_URL=http://host.docker.internal:8000/webhook/evolution
+      # - WEBHOOK_GLOBAL_ENABLED=true
+      
+      # --- Outras Configs Padrão ---
+      - AUTHENTICATION_TYPE=apikey
+      - LOG_LEVEL=ERROR # Menos lixo no terminal
+      - DEL_INSTANCE=false # Não deletar instância se fechar
+
+
+
+# Criar uma Instância (Clínica) e Pegar o QR Code
+
+# **Requisição para Criar Instância:**
+
+# * **Método:** `POST`
+# * **URL:** `http://localhost:8081/instance/create`
+# * **Headers:**
+#     * `Content-Type`: `application/json`
+#     * `apikey`: `ia-clinicas-saas-secret`
+# * **Body (JSON):**
+
+# ```json
+# {
+#     "instanceName": "clinica_id_do_supabase_aqui", 
+#     "token": "token_seguranca_desta_clinica",
+#     "qrcode": true
+# }
+# ```
+
+# **Exemplo de comando CURL para rodar no terminal:**
+
+# ```bash
+# curl --request POST \
+#   --url http://localhost:8081/instance/create \
+#   --header 'Content-Type: application/json' \
+#   --header 'apikey: ia-clinicas-saas-secret' \
+#   --data '{
+#     "instanceName": "clinica-teste-01",
+#     "qrcode": true
+#   }'
+# ```
+
+
+
+# Ler o QR Code
+
+# A resposta do comando acima será um JSON gigante. Procure o campo **`base64`** dentro de `qrcode`.
+
+# 1.  Copie o textão que começa com `data:image/png;base64,iVBOR...`.
+# 2.  Cole no navegador (na barra de endereço) ou use um site "Base64 to Image".
+# 3.  **O QR Code aparecerá.**
+# 4.  Pegue o celular (WhatsApp) -> Aparelhos Conectados -> Conectar Aparelho -> Leia o QR Code.
+
+# **Sucesso!** A instância `clinica-teste-01` está conectada.
+
+# ---
+
+# ### Passo 6: Configurar o Webhook (Ligar ao seu Python)
+
+# Agora que a clínica está conectada, você precisa dizer para a Evolution: *"Quando chegar mensagem, manda pro meu Python"*.
+
+# * **Método:** `POST`
+# * **URL:** `http://localhost:8081/webhook/set/clinica-teste-01`
+# * **Headers:** `apikey: ia-clinicas-saas-secret`
+# * **Body:**
+
+# ```json
+# {
+#     "enabled": true,
+#     "url": "http://host.docker.internal:8000/webhook/evolution",
+#     "webhookByEvents": true,
+#     "events": [
+#         "MESSAGES_UPSERT"
+#     ]
+# }
+
