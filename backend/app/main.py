@@ -10,7 +10,6 @@ import datetime as dt
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
-
 from app.api.auth import router as auth_router
 from app.services.factory import get_calendar_service
 from app.services.history_service import HistoryService, mensagens_contexto
