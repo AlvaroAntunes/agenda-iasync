@@ -44,9 +44,15 @@ async def evolution_webhook(request: Request):
         # Na Evolution, o nome da instância PODE ser o ID da clínica (Estratégia Multi-tenant)
         clinic_id = payload.get("instance") 
         
-        # O 'remoteJid' é o número do cliente (ex: 5511999998888@s.whatsapp.net)
-        remote_jid = key.get("remoteJid")
-        telefone_cliente = remote_jid.split("@")[0]
+        # O 'remoteJid' é o número do cliente (ex: 5511999998888@s.whatsapp.net). O campo "sender" também pode trazer o número.
+        raw_id = data.get("sender") or key.get("remoteJid")
+        
+        if "@" in raw_id:
+            telefone_cliente = raw_id.split("@")[0]
+        else:
+            telefone_cliente = raw_id
+            
+        remote_jid = raw_id
         
         # Extrair Texto
         message_content = data.get("message", {})
@@ -117,7 +123,7 @@ def enviar_mensagem_whatsapp(instance_name, remote_jid, text):
     body = {
         "number": remote_jid,
         "options": {
-            "delay": 4000, # Simula digitação (4s)
+            "delay": 2000, # Simula digitação (2s)
             "presence": "composing"
         },
         "textMessage": {

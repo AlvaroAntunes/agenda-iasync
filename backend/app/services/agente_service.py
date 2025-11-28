@@ -76,10 +76,13 @@ class AgenteClinica:
                 .select('nome')\
                 .eq('clinic_id', self.clinic_id)\
                 .eq('telefone', telefone_busca)\
-                .maybe_single()\
+                .limit(1)\
                 .execute()
+                
+            if response.data and len(response.data) > 0:
+                return response.data[0]
             
-            return response.data # Retorna o dict {nome: 'João'} ou None
+            return None 
         except Exception:
             return None
 
