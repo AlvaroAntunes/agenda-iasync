@@ -2,6 +2,7 @@
     Webhook para receber mensagens da Evolution API (WhatsApp) e responder via IA.
 """
 
+import json
 import os
 import requests
 from fastapi import APIRouter, Request, HTTPException
@@ -35,6 +36,12 @@ async def evolution_webhook(request: Request):
 
         data = payload.get("data", {})
         key = data.get("key", {})
+        
+                # ... dentro da função ...
+        print("--- DEBUG JSON COMPLETO ---")
+        print(json.dumps(data, indent=2, default=str)) # Imprime tudo bonitinho
+        print(json.dumps(key, indent=2, default=str))
+        print("---------------------------")
         
         # Ignorar mensagens enviadas por MIM mesmo (pelo bot)
         if key.get("fromMe"):
