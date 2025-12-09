@@ -25,7 +25,7 @@ services:
 
   # --- EVOLUTION API ---
   evolution-api:
-    image: atendai/evolution-api:v1.8.2
+    image: evoapicloud/evolution-api:v2.3.7
     container_name: evolution_api
     restart: always
     ports:
@@ -37,6 +37,18 @@ services:
       - AUTHENTICATION_TYPE=apikey
       - SERVER_URL=https://api-wpp.seudominio.com # (Opcional, útil se usar domínio)
 
+      # BANCO DE DADOS 
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      # Substitua pela sua URL do Supabase (Transaction Mode - Porta 6543)
+      - DATABASE_CONNECTION_URI=postgresql://postgres.pofrnfocqclvqbrkuqyh:CoreSystem019%40@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&schema=evolution&pgbouncer=true
+
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+      - DATABASE_SAVE_MESSAGE_UPDATE=true
+      - DATABASE_SAVE_DATA_CONTACTS=true
+      - DATABASE_SAVE_DATA_CHATS=true
+
   # --- EVOLUTION MANAGER (Opcional em Prod, mas útil) ---
   evolution-manager:
     image: atendai/evolution-manager:latest
@@ -45,7 +57,7 @@ services:
     ports:
       - "3001:80"
     environment:
-      - VITE_API_URL=http://SEU_IP_DO_SERVIDOR:8081
+      - VITE_API_URL=http://147.93.15.244:8081
 
 volumes:
   evolution_store:
