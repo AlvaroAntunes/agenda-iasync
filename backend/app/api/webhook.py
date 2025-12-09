@@ -37,11 +37,8 @@ async def evolution_webhook(request: Request):
         data = payload.get("data", {})
         key = data.get("key", {})
         
-                # ... dentro da função ...
-        print("--- DEBUG JSON COMPLETO ---")
-        print(json.dumps(data, indent=2, default=str)) # Imprime tudo bonitinho
-        print(json.dumps(key, indent=2, default=str))
-        print("---------------------------")
+        print("\n--- DEBUG PAYLOAD COMPLETO ---")
+        print(json.dumps(payload, indent=2, default=str))
         
         # Ignorar mensagens enviadas por MIM mesmo (pelo bot)
         if key.get("fromMe"):
