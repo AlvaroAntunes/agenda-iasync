@@ -34,6 +34,10 @@ services:
       - evolution_store:/evolution/store # IMPORTANTE: Persistir as sessões do WhatsApp
     environment:
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      # --- ADICIONE ISTO PARA O LOGIN FUNCIONAR ---
+      - CORS_ORIGIN=*
+      - CORS_METHODS=POST,GET,PUT,DELETE
+      - CORS_CREDENTIALS=true
       - AUTHENTICATION_TYPE=apikey
       - SERVER_URL=https://api-wpp.seudominio.com # (Opcional, útil se usar domínio)
 
@@ -41,7 +45,7 @@ services:
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
       # Substitua pela sua URL do Supabase (Transaction Mode - Porta 6543)
-      - DATABASE_CONNECTION_URI=postgresql://postgres.pofrnfocqclvqbrkuqyh:CoreSystem019%40@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&schema=evolution&pgbouncer=true
+      - DATABASE_CONNECTION_URI=postgresql://postgres.pofrnfocqclvqbrkuqyh:CoreSystem019%40@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require&schema=evolution&pgbouncer=true
 
       - DATABASE_SAVE_DATA_INSTANCE=true
       - DATABASE_SAVE_DATA_NEW_MESSAGE=true
@@ -51,13 +55,15 @@ services:
 
   # --- EVOLUTION MANAGER (Opcional em Prod, mas útil) ---
   evolution-manager:
-    image: atendai/evolution-manager:v2.0.0
+    build: ./evolution-manager-v2
     container_name: evolution_manager
     restart: always
     ports:
       - "3001:80"
     environment:
       - VITE_API_URL=http://147.93.15.244:8081
+    volumes:
+      - ${PWD}/evolution-manager-v2/nginx.conf:/etc/nginx/conf.d/nginx.conf
 
 volumes:
   evolution_store:
