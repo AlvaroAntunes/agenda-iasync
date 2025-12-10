@@ -23,6 +23,15 @@ services:
    # env_file:
     #  - ./frontend/.env
 
+  # --- NOVO SERVIÇO: REDIS ---
+  redis:
+    image: redis:7.2-alpine
+    container_name: evolution_redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "redis_senha_secreta"]
+    volumes:
+      - redis_data:/data
+
   # --- EVOLUTION API ---
   evolution-api:
     image: evoapicloud/evolution-api:v2.3.7
@@ -32,28 +41,37 @@ services:
       - "8081:8080"
     volumes:
       - evolution_store:/evolution/store # IMPORTANTE: Persistir as sessões do WhatsApp
+    depends_on:
+      - redis
     environment:
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
-      # --- ADICIONE ISTO PARA O LOGIN FUNCIONAR ---
+
+      # PARA O LOGIN FUNCIONAR
       - CORS_ORIGIN=*
       - CORS_METHODS=POST,GET,PUT,DELETE
       - CORS_CREDENTIALS=true
       - AUTHENTICATION_TYPE=apikey
       - SERVER_URL=https://api-wpp.seudominio.com # (Opcional, útil se usar domínio)
 
-      # BANCO DE DADOS 
+      # BANCO DE DADOS (SUPABASE)
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
-      # Substitua pela sua URL do Supabase (Transaction Mode - Porta 6543)
       - DATABASE_CONNECTION_URI=postgresql://postgres.pofrnfocqclvqbrkuqyh:CoreSystem019%40@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require&schema=evolution&pgbouncer=true
-
       - DATABASE_SAVE_DATA_INSTANCE=true
       - DATABASE_SAVE_DATA_NEW_MESSAGE=true
       - DATABASE_SAVE_MESSAGE_UPDATE=true
       - DATABASE_SAVE_DATA_CONTACTS=true
       - DATABASE_SAVE_DATA_CHATS=true
 
-  # --- EVOLUTION MANAGER (Opcional em Prod, mas útil) ---
+      # --- CONFIGURAÇÃO DO REDIS (CRÍTICO) ---
+      - CACHE_REDIS_ENABLED=true
+      # URI: redis://:SENHA@NOME_DO_SERVICO:PORTA/DB
+      - CACHE_REDIS_URI=redis://:redis_senha_secreta@redis:6379/0
+      - CACHE_REDIS_PREFIX_KEY=evolution
+      - CACHE_REDIS_SAVE_INSTANCES=true
+      - CACHE_LOCAL_ENABLED=false # Desativa cache local para forçar Redis
+
+  # --- EVOLUTION MANAGER  ---
   evolution-manager:
     build: ./evolution-manager-v2
     container_name: evolution_manager
@@ -67,3 +85,4 @@ services:
 
 volumes:
   evolution_store:
+  redis_data:
