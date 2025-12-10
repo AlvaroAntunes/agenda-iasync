@@ -34,7 +34,7 @@ services:
 
   # --- EVOLUTION API ---
   evolution-api:
-    image: evoapicloud/evolution-api:v2.3.7
+    image: evoapicloud/evolution-api:v2.3.6
     container_name: evolution_api
     restart: always
     ports:
@@ -59,7 +59,7 @@ services:
       # BANCO DE DADOS (SUPABASE)
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://postgres.pofrnfocqclvqbrkuqyh:CoreSystem019%40@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require&schema=evolution&connection_limit=3&pool_timeout=20
+      - DATABASE_CONNECTION_URI=postgresql://postgres.pofrnfocqclvqbrkuqyh:CoreSystem019%40@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require&schema=evolution&connection_limit=3&pool_timeout=60
       - DATABASE_SAVE_DATA_INSTANCE=true
       - DATABASE_SAVE_DATA_NEW_MESSAGE=true
       - DATABASE_SAVE_MESSAGE_UPDATE=true
