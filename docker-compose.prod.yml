@@ -43,6 +43,9 @@ services:
       - evolution_store:/evolution/store # IMPORTANTE: Persistir as sessões do WhatsApp
     depends_on:
       - redis
+    dns:
+    - 8.8.8.8
+    - 8.8.4.4
     environment:
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
 
@@ -56,7 +59,7 @@ services:
       # BANCO DE DADOS (SUPABASE)
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://postgres.pofrnfocqclvqbrkuqyh:CoreSystem019%40@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require&schema=evolution&pgbouncer=true
+      - DATABASE_CONNECTION_URI=postgresql://postgres.pofrnfocqclvqbrkuqyh:CoreSystem019%40@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require&schema=evolution&connection_limit=3&pool_timeout=20
       - DATABASE_SAVE_DATA_INSTANCE=true
       - DATABASE_SAVE_DATA_NEW_MESSAGE=true
       - DATABASE_SAVE_MESSAGE_UPDATE=true
