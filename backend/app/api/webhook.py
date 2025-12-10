@@ -43,7 +43,8 @@ async def evolution_webhook(request: Request):
         if key.get("fromMe"):
             return {"status": "ignored_from_me"}
         
-        if data.get("messageStubType") and data.get("messageStubType") > 0:
+        stub = data.get("messageStubType")
+        if stub and stub not in [2]:  # ignore tudo exceto o 2
             return {"status": "ignored_stub"}
 
         if not data.get("message"):
