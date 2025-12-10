@@ -114,7 +114,7 @@ async def evolution_webhook(request: Request):
 
         # --- 5. ENVIAR RESPOSTA (Endpoint V2) ---
         # Enviamos para o target_response_jid (que pode ser LID ou Phone) para manter a thread
-        enviar_mensagem_v2(clinic_id, target_response_jid, resposta_ia)
+        enviar_mensagem_v2(clinic_id, telefone_cliente, resposta_ia)
 
         return {"status": "processed"}
 
@@ -122,7 +122,7 @@ async def evolution_webhook(request: Request):
         print(f"❌ Erro no Webhook V2: {e}")
         return {"status": "error", "detail": str(e)}
 
-def enviar_mensagem_v2(instance_name, remote_jid, text):
+def enviar_mensagem_v2(instance_name, telefone_cliente, text):
     """
     Envia mensagem usando os endpoints da Evolution API v2.
     Endpoint: POST /message/send/text
@@ -139,17 +139,16 @@ def enviar_mensagem_v2(instance_name, remote_jid, text):
     # 'instance' agora vai no corpo da requisição
     body = {
         "instance": instance_name,
-        "number": remote_jid,
+        "number": telefone_cliente,
         "text": text,
-        "options": {
-            "delay": 2000,
-            "presence": "composing"
-        }
+        "delay": 2000,
+        "linkPreview": False
     }
     
     try:
         response = requests.post(url, json=body, headers=headers)
-        if response.status_code != 201: # 201 Created é o sucesso na v2
+        
+        if response.status_code not in [200, 201]:
             print(f"⚠️ Erro ao enviar (V2): {response.text}")
     except Exception as e:
         print(f"⚠️ Erro de conexão envio (V2): {e}")
