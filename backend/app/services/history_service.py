@@ -19,7 +19,7 @@ SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 class HistoryService:
-    def __init__(self, clinic_id: str, session_id: str, lid: str):
+    def __init__(self, clinic_id: str, session_id: str):
         self.clinic_id = clinic_id
         self.session_id = session_id
 
