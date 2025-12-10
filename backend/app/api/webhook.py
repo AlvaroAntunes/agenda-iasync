@@ -105,13 +105,6 @@ async def evolution_webhook(request: Request):
         # Filtros básicos de mensagens
         if key.get("fromMe"):
             return {"status": "ignored_from_me"}
-        
-        stub = data.get("messageStubType")
-        if stub and stub not in [2]:  # ignore tudo exceto o 2
-            return {"status": "ignored_stub"}
-
-        if not data.get("message"):
-            return {"status": "ignored_empty"}
 
         clinic_id = payload.get("instance")
         
