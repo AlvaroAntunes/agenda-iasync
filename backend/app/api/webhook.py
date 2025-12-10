@@ -119,7 +119,8 @@ async def evolution_webhook(request: Request):
         
         remote_jid = key.get("remoteJid") # ID da conversa (onde vamos responder)
         sender_pn = key.get("senderPn") # Quem enviou 
-        lid = key.get("previousRemoteJid")
+        lid_full = key.get("previousRemoteJid")
+        lid = lid_full if lid_full else remote_jid
         
         telefone_cliente = resolver_jid_cliente(clinic_id=clinic_id, remote_jid=remote_jid, sender_pn=sender_pn, lid=lid)
         print(f"📩 Webhook V2: Instância {clinic_id} | Cliente: {telefone_cliente}")
@@ -158,7 +159,7 @@ async def evolution_webhook(request: Request):
         # --- 4. EXECUTAR AGENTE ---
         
         # Histórico (Baseado no telefone real)
-        history_service = HistoryService(clinic_id=clinic_id, session_id=telefone_cliente)
+        history_service = HistoryService(clinic_id=clinic_id, session_id=lid)
         history_service.add_user_message(texto_usuario)
         historico = history_service.get_langchain_history(limit=mensagens_contexto)
         
