@@ -158,7 +158,7 @@ async def evolution_webhook(request: Request):
         # --- 4. EXECUTAR AGENTE ---
         
         # Histórico (Baseado no telefone real)
-        history_service = HistoryService(clinic_id=clinic_id, session_id=telefone_cliente, lid=lid)
+        history_service = HistoryService(clinic_id=clinic_id, session_id=telefone_cliente)
         history_service.add_user_message(texto_usuario)
         historico = history_service.get_langchain_history(limit=mensagens_contexto)
         
