@@ -26,6 +26,8 @@ async def evolution_webhook(request: Request):
     """
     try:
         payload = await request.json()
+        print("\n--- DEBUG PAYLOAD COMPLETO ---")
+        print(json.dumps(payload, indent=2, default=str))
         
         # 1. Filtro de Evento
         event_type = payload.get("event")
@@ -36,8 +38,6 @@ async def evolution_webhook(request: Request):
         data = payload.get("data", {})
         key = data.get("key", {})
         
-        print("\n--- DEBUG PAYLOAD COMPLETO ---")
-        print(json.dumps(payload, indent=2, default=str))
         
         # Ignorar mensagens enviadas pelo próprio bot
         if key.get("fromMe"):
