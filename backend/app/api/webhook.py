@@ -11,13 +11,76 @@ from app.services.agente_service import AgenteClinica
 from app.services.history_service import HistoryService, mensagens_contexto
 from dotenv import load_dotenv
 from app.services.audio_service import AudioService
+from supabase import create_client
 
 load_dotenv()
+
+# Config Supabase (Service quem_enviou para ter acesso total)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 router = APIRouter()
 
 EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL")
 AUTHENTICATION_API_KEY = os.getenv("AUTHENTICATION_API_KEY")
+
+def salvar_lid_cache(clinic_id: str, lid: str, phone: str):
+    """
+    Salva o mapeamento LID -> Telefone no banco para consultas futuras rápidas.
+    Tabela: public.lids (lid text, phone_number text, clinic_id uuid)
+    """
+    try:
+        # Upsert garante que se já existir, atualiza/ignora
+        supabase.table('lids').upsert({
+            'clinic_id': clinic_id,
+            'lid': lid,
+            'phone_number': phone
+        }, on_conflict='clinic_id,lid').execute()
+        print(f"💾 LID cacheado com sucesso: {lid} -> {phone}")
+    except Exception as e:
+        print(f"⚠️ Erro ao salvar cache LID (Tabela 'lids' existe?): {e}")
+        
+def resolver_jid_cliente(clinic_id: str, remote_jid: str, sender_pn: str, lid: str) -> str:
+    """
+    Descobre o número real do cliente (JID).
+    Fluxo: SenderPn -> SenderRoot -> RemoteJid -> Cache(LIDs) -> API
+    """
+
+    # 1. Prioridade Máxima: O WhatsApp já mandou o número no senderPn (v2.3+)
+    if sender_pn and "@s.whatsapp.net" in sender_pn:
+        numero = sender_pn.split("@")[0]
+        salvar_lid_cache(clinic_id, lid, numero)
+        return numero
+
+    # 2. Prioridade Média: remoteJid já é número
+    if remote_jid and "@s.whatsapp.net" in remote_jid:
+        numero = remote_jid.split("@")[0]
+        salvar_lid_cache(clinic_id, lid, numero)
+        return numero
+
+    # 3. Caso LID: Tentar Cache Local -> API
+    if lid and "@lid" in lid:        
+        # --- BUSCA NO CACHE (Tabela 'lids') ---
+        try:
+            # print(f"🕵️ Buscando LID {lid} no banco...")
+            lid_supabase = supabase.table('lids')\
+                .select('phone_number')\
+                .eq('clinic_id', clinic_id)\
+                .eq('lid', lid)\
+                .limit(1)\
+                .execute()
+                
+            if lid_supabase.data and len(lid_supabase.data) > 0:
+                phone_found = lid_supabase.data[0]['phone_number']
+                print(f"✅ LID encontrado no Cache (DB): {phone_found}")
+                return phone_found
+        except Exception as e:
+            # Se der erro (ex: tabela não existe), logamos mas não travamos
+            print(f"⚠️ Erro leitura cache LID: {e}")
+
+    # Fallback: Se tudo falhar, retorna o remoteJid para não perder a msg
+    return remote_jid if remote_jid else "unknown"
 
 @router.post("/webhook/evolution")
 async def evolution_webhook(request: Request):
@@ -55,24 +118,10 @@ async def evolution_webhook(request: Request):
         # --- 2. IDENTIFICAÇÃO DO CLIENTE (Lógica V2) ---
         
         remote_jid = key.get("remoteJid") # ID da conversa (onde vamos responder)
-        sender_root = key.get("senderPn") # Quem enviou 
+        sender_pn = key.get("senderPn") # Quem enviou 
+        lid = key.get("previousRemoteJid")
         
-        telefone_cliente = "unknown"
-        target_response_jid = remote_jid
-
-        # Prioridade 1: Sender da Raiz (Se for número válido)
-        if sender_root and "@s.whatsapp.net" in sender_root:
-            telefone_cliente = sender_root.split("@")[0]
-            
-        # Prioridade 2: RemoteJid (Se for número válido)
-        elif remote_jid and "@s.whatsapp.net" in remote_jid:
-            telefone_cliente = remote_jid.split("@")[0]
-            
-        # Prioridade 3: LID (Se só tivermos isso)
-        else:
-            # Se for LID, usamos o número do LID mesmo para não perder o histórico
-            telefone_cliente = remote_jid.split("@")[0] if remote_jid else "unknown"
-
+        telefone_cliente = resolver_jid_cliente(clinic_id=clinic_id, remote_jid=remote_jid, sender_pn=sender_pn, lid=lid)
         print(f"📩 Webhook V2: Instância {clinic_id} | Cliente: {telefone_cliente}")
 
         # --- 3. CONTEÚDO DA MENSAGEM ---
@@ -93,9 +142,9 @@ async def evolution_webhook(request: Request):
             
             if not texto_transcrito or texto_transcrito.startswith("[Erro"):
                 enviar_mensagem_v2(
-                    clinic_id, 
-                    target_response_jid, 
-                    "Desculpe, tive um problema técnico para ouvir o áudio. Pode escrever?"
+                    clinic_id=clinic_id, 
+                    telefone_cliente=telefone_cliente, 
+                    text="Desculpe, tive um problema técnico para ouvir o áudio. Pode escrever?"
                 )
                 return {"status": "audio_error"}
             
@@ -109,7 +158,7 @@ async def evolution_webhook(request: Request):
         # --- 4. EXECUTAR AGENTE ---
         
         # Histórico (Baseado no telefone real)
-        history_service = HistoryService(clinic_id=clinic_id, session_id=telefone_cliente)
+        history_service = HistoryService(clinic_id=clinic_id, session_id=telefone_cliente, lid=lid)
         history_service.add_user_message(texto_usuario)
         historico = history_service.get_langchain_history(limit=mensagens_contexto)
         

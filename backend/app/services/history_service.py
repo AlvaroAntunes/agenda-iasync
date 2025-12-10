@@ -19,9 +19,10 @@ SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 class HistoryService:
-    def __init__(self, clinic_id: str, session_id: str):
+    def __init__(self, clinic_id: str, session_id: str, lid: str):
         self.clinic_id = clinic_id
         self.session_id = session_id
+        self.lid = lid
 
     def get_langchain_history(self, limit=mensagens_contexto) -> List:
         """
@@ -66,6 +67,7 @@ class HistoryService:
         supabase.table('chat_messages').insert({
             'clinic_id': self.clinic_id,
             'session_id': self.session_id,
+            'lid': self.lid,
             'quem_enviou': quem_enviou,
             'conteudo': conteudo
         }).execute()
