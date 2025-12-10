@@ -38,7 +38,6 @@ async def evolution_webhook(request: Request):
         data = payload.get("data", {})
         key = data.get("key", {})
         
-        
         # Ignorar mensagens enviadas pelo próprio bot
         if key.get("fromMe"):
             return {"status": "ignored_from_me"}
@@ -48,7 +47,7 @@ async def evolution_webhook(request: Request):
         # --- 2. IDENTIFICAÇÃO DO CLIENTE (Lógica V2) ---
         
         remote_jid = key.get("remoteJid") # ID da conversa (onde vamos responder)
-        sender_root = payload.get("sender") # Quem enviou (na raiz do payload)
+        sender_root = key.get("senderPn") # Quem enviou 
         
         telefone_cliente = "unknown"
         target_response_jid = remote_jid
@@ -66,7 +65,7 @@ async def evolution_webhook(request: Request):
             # Se for LID, usamos o número do LID mesmo para não perder o histórico
             telefone_cliente = remote_jid.split("@")[0] if remote_jid else "unknown"
 
-        print(f"📩 Webhook V2: Instância {clinic_id} | Cliente: {telefone_cliente} | Chat: {target_response_jid}")
+        print(f"📩 Webhook V2: Instância {clinic_id} | Cliente: {telefone_cliente}")
 
         # --- 3. CONTEÚDO DA MENSAGEM ---
         
