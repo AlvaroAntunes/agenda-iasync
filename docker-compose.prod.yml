@@ -34,7 +34,7 @@ services:
 
   # --- EVOLUTION API ---
   evolution-api:
-    image: evoapicloud/evolution-api:v2.2.2
+    image: evoapicloud/evolution-api:v2.3.1
     container_name: evolution_api
     restart: always
     ports:
@@ -54,7 +54,7 @@ services:
       - CORS_METHODS=POST,GET,PUT,DELETE
       - CORS_CREDENTIALS=true
       - AUTHENTICATION_TYPE=apikey
-      - SERVER_URL=https://api-wpp.seudominio.com # (Opcional, útil se usar domínio)
+     #  - SERVER_URL=https://api-wpp.seudominio.com # (Opcional, útil se usar domínio)
 
       # BANCO DE DADOS (SUPABASE)
       - DATABASE_ENABLED=true
