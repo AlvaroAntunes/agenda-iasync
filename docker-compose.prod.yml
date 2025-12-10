@@ -67,12 +67,12 @@ services:
       - DATABASE_SAVE_DATA_CHATS=true
 
       # --- CONFIGURAÇÃO DO REDIS (CRÍTICO) ---
-      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_ENABLED=false
       # URI: redis://:SENHA@NOME_DO_SERVICO:PORTA/DB
       - CACHE_REDIS_URI=redis://:redis_senha_secreta@redis:6379/0
       - CACHE_REDIS_PREFIX_KEY=evolution
       - CACHE_REDIS_SAVE_INSTANCES=true
-      - CACHE_LOCAL_ENABLED=false # Desativa cache local para forçar Redis
+      - CACHE_LOCAL_ENABLED=true # Desativa cache local para forçar Redis
 
   # --- EVOLUTION MANAGER  ---
   evolution-manager:
