@@ -34,7 +34,7 @@ services:
 
   # --- EVOLUTION API ---
   evolution-api:
-    image: evoapicloud/evolution-api:v2.3.6
+    image: evoapicloud/evolution-api:v2.2.2
     container_name: evolution_api
     restart: always
     ports:
