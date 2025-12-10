@@ -125,10 +125,9 @@ async def evolution_webhook(request: Request):
 def enviar_mensagem_v2(instance_name, telefone_cliente, text):
     """
     Envia mensagem usando os endpoints da Evolution API v2.
-    Endpoint: POST /message/send/text
+    Endpoint: POST /message/sendText/{instance_name}
     """
-    # NOVA URL DA V2
-    url = f"{EVOLUTION_API_URL}/message/send/text"
+    url = f"{EVOLUTION_API_URL}/message/sendText/{instance_name}"
     
     headers = {
         "apikey": AUTHENTICATION_API_KEY,
