@@ -31,16 +31,23 @@ async def evolution_webhook(request: Request):
         
         # 1. Filtro de Evento
         event_type = payload.get("event")
+
         if event_type != "messages.upsert":
-            return {"status": "ignored"}
+            return {"status": "ignored_event"}
 
         # Na v2, dados principais estão em 'data'
         data = payload.get("data", {})
         key = data.get("key", {})
         
-        # Ignorar mensagens enviadas pelo próprio bot
+        # Filtros básicos de mensagens
         if key.get("fromMe"):
             return {"status": "ignored_from_me"}
+        
+        if data.get("messageStubType") and data.get("messageStubType") > 0:
+            return {"status": "ignored_stub"}
+
+        if not data.get("message"):
+            return {"status": "ignored_empty"}
 
         clinic_id = payload.get("instance")
         
