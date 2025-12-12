@@ -240,7 +240,7 @@ class AgenteClinica:
 
         # 3. Criar o Prompt do Sistema
         # Injetamos a data atual para ele não se perder no tempo
-        data_hoje = dt.datetime.now().strftime("%A, %d de %B de %Y")
+        data_hora_hoje = dt.datetime.now().strftime("%A, %d de %B de %Y - %H:%M")
         lista_profs = ", ".join([f"{p['nome']} ({p['especialidade']})" for p in self.profissionais])
                 
         # Lógica de Contexto do Paciente
@@ -253,7 +253,7 @@ class AgenteClinica:
             IMPORTANTE:
             - Chame-o pelo nome ({self.dados_paciente['nome']}).
             - NÃO pergunte o nome dele novamente, pois você já sabe.
-            - Se ele quiser agendar, você já pode usar o nome '{self.dados_paciente['nome']}' na ferramenta.
+            - Se ele quiser agendar, você já pode usar o nome '{self.dados_paciente['nome']}' na ferramenta. Se ele tiver consulta agendada, avise-o.
             """
         else:
             bloco_paciente = """
@@ -263,31 +263,26 @@ class AgenteClinica:
             IMPORTANTE:
             - Se ele quiser agendar, você PRECISA perguntar o nome dele primeiro.
             """
-
+        
         system_prompt = f"""
+        {self.clinic_data.get('prompt_ia', '')}
+        
+        --- DADOS DE CONTEXTO EM TEMPO REAL ---
+        DATA/HORA ATUAL: {data_hora_hoje}
+        PROFISSIONAIS DISPONÍVEIS HOJE: {lista_profs}
+
+        --- DADOS DO PACIENTE ATUAL ---
+        {bloco_paciente}
+        
+        
         Você é a recepcionista da {self.clinic_data['nome_da_clinica']}.
         
-        DATA DE HOJE: {data_hoje}.
+        DATA DE HOJE: {data_hora_hoje}.
         PROFISSIONAIS DISPONÍVEIS: {lista_profs}.
         
         --- CONTEXTO DO USUÁRIO ---
         {bloco_paciente}
         ---------------------------
-        
-        SUAS INSTRUÇÕES GERAIS:
-        {self.clinic_data.get('prompt_ia', 'Seja educada e ajude a agendar.')}
-        
-        REGRAS DE AGENDAMENTO:
-        1. Antes de agendar, VERIFIQUE a disponibilidade usando a ferramenta 'verificar_disponibilidade'.
-        2. SÓ agende se o horário estiver livre.
-        3. Para agendar, você PRECISA coletar: Nome e Telefone.
-        4. Se o usuário não disser o profissional, sugira os disponíveis.
-        5. Sempre confirme a data e hora final antes de chamar a ferramenta de agendamento.
-        6. Caso no dia solicitado não haja disponibilidade, ofereça datas alternativas próximas.
-        7. Use o formato dd/mm/aaaa para datas e Data e hora ISO (ex: 2024-11-25T14:30:00) para agendamentos.
-        8. Seja sempre educada e profissional.
-        9. Responda em português.
-        10. Responda com textos menores, pois o cliente deve ter uma experiência rápida e objetiva.
         """
         
         prompt = ChatPromptTemplate.from_messages([
