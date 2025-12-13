@@ -3,6 +3,6 @@ import ConnectCalendarButton from "./components/ConnectCalendarButton";
 
 export default function Home() {
   return (
-    <ConnectCalendarButton clinicId="fd2faa18-32be-4393-a31a-c424fe26d89c" />
+    <ConnectCalendarButton clinicId="11485b9f-b909-4eba-9399-da5aacaef51a" />
   );
 }

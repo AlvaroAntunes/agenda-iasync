@@ -87,18 +87,7 @@ async def evolution_webhook(request: Request):
     """
     Recebe eventos da Evolution API v2.
     """
-    try:
-        
-        ia_ativa = supabase.table('clinicas')\
-                .select('ia_ativa')\
-                .eq('id', clinic_id)\
-                .limit(1)\
-                .execute()
-                
-        if not ia_ativa.data or len(ia_ativa.data) <= 0 or not ia_ativa.data[0]['ia_ativa']:
-            print(f"⚠️ IA desativada para clínica {clinic_id}. Ignorando webhook.")
-            return {"status": "ia_disabled"}
-                
+    try:        
         payload = await request.json()
         
         print("\n--- DEBUG PAYLOAD COMPLETO ---")
@@ -119,6 +108,15 @@ async def evolution_webhook(request: Request):
             return {"status": "ignored_from_me"}
 
         clinic_id = payload.get("instance")
+        
+        ia_ativa = supabase.table('clinicas')\
+                .select('ia_ativa')\
+                .eq('id', clinic_id)\
+                .execute()
+                
+        if not ia_ativa.data or len(ia_ativa.data) <= 0 or not ia_ativa.data[0]['ia_ativa']:
+            print(f"⚠️ IA desativada para clínica {clinic_id}. Ignorando webhook.")
+            return {"status": "ia_disabled"}
         
         # --- 2. IDENTIFICAÇÃO DO CLIENTE (Lógica V2) ---
         
