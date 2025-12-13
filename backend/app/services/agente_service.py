@@ -6,6 +6,7 @@
 
 import os
 import datetime as dt
+import holidays
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from unidecode import unidecode
@@ -51,7 +52,7 @@ class AgenteClinica:
         self.calendar_service = get_calendar_service(clinic_id)
         
         # Carregar dados da clínica (Nome, Prompt, Profissionais)
-        self.clinic_data = self._carregar_dados_clinica()
+        self.dados_clinica = self._carregar_dados_clinica()
         self.profissionais = self._carregar_profissionais()
         self.dados_paciente = self._identificar_paciente()
 
@@ -123,17 +124,51 @@ class AgenteClinica:
         lista_ocupada = [f"{formatar_hora(e['start'].get('dateTime'))} até {formatar_hora(e['end'].get('dateTime'))} - Ocupado" for e in eventos]
         return f"Horários OCUPADOS em {data}:\n" + "\n".join(lista_ocupada)
 
-    def _logic_realizar_agendamento(self, nome_paciente: str, telefone: str, data_hora: str, nome_profissional: str):
+    def _logic_realizar_agendamento(self, nome_paciente: str, data_hora: str, nome_profissional: str):
         """
         Realiza o agendamento final.
         Input:
         - nome_paciente: Nome completo.
-        - telefone: Telefone com DDD.
         - data_hora: Data e hora ISO (ex: 2024-11-25T14:30:00).
         - nome_profissional: Nome do médico/especialista.
         """
+        
+        telefone = self.session_id
             
-        print(f"--- TOOL: Agendando para {nome_paciente} ---")
+        print(f"--- TOOL: Tentativa de agendamento para {nome_paciente} em {data_hora} ---")
+
+        # ==============================================================================
+        # 0. BLOCO DE SEGURANÇA: Validação de Data (Feriados e Fim de Semana)
+        # ==============================================================================
+        try:
+            dt_inicio = dt.datetime.fromisoformat(data_hora)
+        except ValueError:
+            return "Erro: Data fornecida em formato inválido. Use ISO (YYYY-MM-DDTHH:MM:SS)."
+
+        # Configura feriados do Brasil (MG por exemplo, ajuste conforme o estado da clínica)
+        feriados = holidays.BR(state=self.dados_clinica.get('uf', 'MG'), years=[dt_inicio.year])
+        
+        # Pegando feriados municipais (se houver)
+        lista_fechada = self.dados_clinica.get('clinica_fechada', [])
+        
+        # A. Verifica se é Feriado
+        if dt_inicio.date() in feriados:
+            nome_feriado = feriados.get(dt_inicio.date())
+            return f"NEGADO: A data solicitada ({dt_inicio.strftime('%d/%m')}) é feriado de {nome_feriado}. A clínica não abre."
+        
+        for item in lista_fechada:
+            if item['dia'] == dt_inicio.day and item['mes'] == dt_inicio.month:
+                # Pega o motivo (se não tiver, usa genérico)
+                motivo = item.get('descricao', 'Data sem expediente')
+                return f"NEGADO: Na data solicitada ({dt_inicio.strftime('%d/%m')}) a clínica não abre. Motivo: {motivo}."
+
+        # B. Verifica se é Fim de Semana (0=Seg, 5=Sab, 6=Dom)
+        # Se sua clínica abre sábado, mude para: if dt_inicio.weekday() == 6:
+        if dt_inicio.weekday() >= 5: 
+            dia_semana = "Sábado" if dt_inicio.weekday() == 5 else "Domingo"
+            return f"NEGADO: A data solicitada cai em um {dia_semana} e a clínica não funciona."
+
+        # ==============================================================================
         
         # 1. Identificar Profissional e Calendar ID
         prof_data = next((p for p in self.profissionais if unidecode(nome_profissional).lower() in unidecode(p['nome']).lower()), None)
@@ -158,25 +193,16 @@ class AgenteClinica:
 
         # 3. Criar no Calendar
         
-        telefone_limpo = ''.join(filter(str.isdigit, telefone))
-        
-        if len(telefone_limpo) <= 11: 
-            telefone_link = f"55{telefone_limpo}"
-        else:
-            telefone_link = telefone_limpo
-        
         descricao_formatada = f"""
         === 📋 DADOS DO CLIENTE ===
         👤 NOME: {nome_paciente}
         📱 TELEFONE: {telefone}
 
         === ⚡ AÇÕES RÁPIDAS ===
-        🔗 WHATSAPP: https://wa.me/{telefone_link}
+        🔗 WHATSAPP: https://wa.me/{telefone}
         🤖 CANAL: Agendamento via IA
         """
-        try:
-            dt_inicio = dt.datetime.fromisoformat(data_hora)
-            
+        try:            
             # if dt_inicio.tzinfo is None:
             #     br_timezone = ZoneInfo("America/Sao_Paulo")
             #     dt_inicio = dt_inicio.replace(tzinfo=br_timezone)
@@ -265,7 +291,7 @@ class AgenteClinica:
             """
         
         system_prompt = f"""
-        {self.clinic_data.get('prompt_ia', '')}
+        {self.dados_clinica.get('prompt_ia', '')}
         
         --- DADOS DE CONTEXTO EM TEMPO REAL ---
         DATA/HORA ATUAL: {data_hora_hoje}
@@ -275,7 +301,7 @@ class AgenteClinica:
         {bloco_paciente}
         
         
-        Você é a recepcionista da {self.clinic_data['nome_da_clinica']}.
+        Você é a recepcionista da {self.dados_clinica['nome_da_clinica']}.
         
         DATA DE HOJE: {data_hora_hoje}.
         PROFISSIONAIS DISPONÍVEIS: {lista_profs}.

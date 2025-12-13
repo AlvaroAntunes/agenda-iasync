@@ -10,6 +10,7 @@ apscheduler
 requests
 pydantic
 unidecode
+holidays
 # LangChain (Sem fixar sub-dependências como 'core')
 langchain==0.2.1
 langchain-community==0.2.1
