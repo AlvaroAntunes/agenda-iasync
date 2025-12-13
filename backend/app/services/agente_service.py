@@ -41,7 +41,6 @@ class VerificaDisponibilidade(BaseModel):
 
 class RealizaAgendamento(BaseModel):
     nome_paciente: str = Field(description="Nome completo do paciente")
-    telefone: str = Field(description="Telefone com DDD")
     data_hora: str = Field(description="Data e hora ISO (ex: 2024-11-25T14:30:00)")
     nome_profissional: str = Field(description="Nome do médico escolhido")
     
@@ -99,6 +98,39 @@ class AgenteClinica:
         
         print(f"--- TOOL: Verificando disponibilidade para {data} ---")
         
+        # ==============================================================================
+        # 0. BLOCO DE SEGURANÇA: Validação de Data (Feriados e Fim de Semana)
+        # ==============================================================================
+        try:
+            dt_inicio = dt.datetime.strptime(data, "%d/%m/%Y")
+        except ValueError:
+            return "Erro: Data fornecida em formato inválido. Use ISO (YYYY-MM-DDTHH:MM:SS)."
+
+        # Configura feriados do Brasil (MG por exemplo, ajuste conforme o estado da clínica)
+        feriados = holidays.BR(state=self.dados_clinica.get('uf', 'MG'), years=[dt_inicio.year])
+        
+        # Pegando feriados municipais (se houver)
+        lista_fechada = self.dados_clinica.get('clinica_fechada', [])
+        
+        # A. Verifica se é Feriado
+        if dt_inicio.date() in feriados:
+            nome_feriado = feriados.get(dt_inicio.date())
+            return f"NEGADO: A data solicitada ({dt_inicio.strftime('%d/%m')}) é feriado de {nome_feriado}. A clínica não abre."
+        
+        for item in lista_fechada:
+            if item['dia'] == dt_inicio.day and item['mes'] == dt_inicio.month:
+                # Pega o motivo (se não tiver, usa genérico)
+                motivo = item.get('descricao', 'Data sem expediente')
+                return f"NEGADO: Na data solicitada ({dt_inicio.strftime('%d/%m')}) a clínica não abre. Motivo: {motivo}."
+
+        # B. Verifica se é Fim de Semana (0=Seg, 5=Sab, 6=Dom)
+        # Se sua clínica abre sábado, mude para: if dt_inicio.weekday() == 6:
+        if dt_inicio.weekday() >= 5: 
+            dia_semana = "Sábado" if dt_inicio.weekday() == 5 else "Domingo"
+            return f"NEGADO: A data solicitada cai em um {dia_semana} e a clínica não funciona."
+
+        # ==============================================================================
+        
         # Se o usuário não especificou médico, pegamos o primeiro (ou lógica de rodízio)
         calendar_id = 'primary'
         
@@ -136,39 +168,6 @@ class AgenteClinica:
         telefone = self.session_id
             
         print(f"--- TOOL: Tentativa de agendamento para {nome_paciente} em {data_hora} ---")
-
-        # ==============================================================================
-        # 0. BLOCO DE SEGURANÇA: Validação de Data (Feriados e Fim de Semana)
-        # ==============================================================================
-        try:
-            dt_inicio = dt.datetime.fromisoformat(data_hora)
-        except ValueError:
-            return "Erro: Data fornecida em formato inválido. Use ISO (YYYY-MM-DDTHH:MM:SS)."
-
-        # Configura feriados do Brasil (MG por exemplo, ajuste conforme o estado da clínica)
-        feriados = holidays.BR(state=self.dados_clinica.get('uf', 'MG'), years=[dt_inicio.year])
-        
-        # Pegando feriados municipais (se houver)
-        lista_fechada = self.dados_clinica.get('clinica_fechada', [])
-        
-        # A. Verifica se é Feriado
-        if dt_inicio.date() in feriados:
-            nome_feriado = feriados.get(dt_inicio.date())
-            return f"NEGADO: A data solicitada ({dt_inicio.strftime('%d/%m')}) é feriado de {nome_feriado}. A clínica não abre."
-        
-        for item in lista_fechada:
-            if item['dia'] == dt_inicio.day and item['mes'] == dt_inicio.month:
-                # Pega o motivo (se não tiver, usa genérico)
-                motivo = item.get('descricao', 'Data sem expediente')
-                return f"NEGADO: Na data solicitada ({dt_inicio.strftime('%d/%m')}) a clínica não abre. Motivo: {motivo}."
-
-        # B. Verifica se é Fim de Semana (0=Seg, 5=Sab, 6=Dom)
-        # Se sua clínica abre sábado, mude para: if dt_inicio.weekday() == 6:
-        if dt_inicio.weekday() >= 5: 
-            dia_semana = "Sábado" if dt_inicio.weekday() == 5 else "Domingo"
-            return f"NEGADO: A data solicitada cai em um {dia_semana} e a clínica não funciona."
-
-        # ==============================================================================
         
         # 1. Identificar Profissional e Calendar ID
         prof_data = next((p for p in self.profissionais if unidecode(nome_profissional).lower() in unidecode(p['nome']).lower()), None)

@@ -88,7 +88,19 @@ async def evolution_webhook(request: Request):
     Recebe eventos da Evolution API v2.
     """
     try:
+        
+        ia_ativa = supabase.table('clinicas')\
+                .select('ia_ativa')\
+                .eq('id', clinic_id)\
+                .limit(1)\
+                .execute()
+                
+        if not ia_ativa.data or len(ia_ativa.data) <= 0 or not ia_ativa.data[0]['ia_ativa']:
+            print(f"⚠️ IA desativada para clínica {clinic_id}. Ignorando webhook.")
+            return {"status": "ia_disabled"}
+                
         payload = await request.json()
+        
         print("\n--- DEBUG PAYLOAD COMPLETO ---")
         print(json.dumps(payload, indent=2, default=str))
         
