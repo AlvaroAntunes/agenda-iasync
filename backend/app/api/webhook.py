@@ -4,6 +4,7 @@
 """
 
 import json
+import asyncio
 import os
 import requests
 from fastapi import APIRouter, Request
@@ -24,6 +25,46 @@ router = APIRouter()
 
 EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL")
 AUTHENTICATION_API_KEY = os.getenv("AUTHENTICATION_API_KEY")
+
+message_buffers = {}
+BUFFER_DELAY = 10  # Segundos de espera
+
+async def processar_mensagem_acumulada(clinic_id: str, telefone_cliente: str, target_response_jid: str):
+    """
+    Função que roda APÓS o tempo de espera.
+    Pega todas as mensagens, junta e manda para a IA.
+    """
+    buffer_key = f"{clinic_id}:{telefone_cliente}"
+    
+    if buffer_key not in message_buffers:
+        return
+
+    # 1. Recupera e limpa o buffer
+    mensagens = message_buffers[buffer_key]["msgs"]
+    # Remove do buffer global para liberar memória
+    del message_buffers[buffer_key]
+    
+    # 2. Junta os textos (Ex: "Oi" + "Tudo bem?" = "Oi. Tudo bem?")
+    texto_completo = ". ".join(mensagens)
+    
+    print(f"🤖 IA Processando bloco para {telefone_cliente}: {texto_completo}")
+
+    try:        
+        # Histórico
+        history_service = HistoryService(clinic_id=clinic_id, session_id=telefone_cliente)
+        history_service.add_user_message(texto_completo)
+        historico = history_service.get_langchain_history(limit=mensagens_contexto)
+        
+        # Agente
+        agente = AgenteClinica(clinic_id=clinic_id, session_id=telefone_cliente)
+        resposta_ia = agente.executar(texto_completo, historico)
+        
+        # Salvar e Responder
+        history_service.add_ai_message(resposta_ia)
+        enviar_mensagem_v2(clinic_id, target_response_jid, resposta_ia)
+        
+    except Exception as e:
+        print(f"❌ Erro no processamento assíncrono: {e}")
 
 def salvar_lid_cache(clinic_id: str, lid: str, phone: str):
     """
@@ -127,6 +168,13 @@ async def evolution_webhook(request: Request):
         
         telefone_cliente = resolver_jid_cliente(clinic_id=clinic_id, remote_jid=remote_jid, sender_pn=sender_pn, lid=lid)
         print(f"📩 Webhook V2: Instância {clinic_id} | Cliente: {telefone_cliente}")
+        
+        if sender_pn: 
+            target_response_jid = sender_pn
+        elif telefone_cliente != "unknown" and "@" not in telefone_cliente:
+            target_response_jid = f"{telefone_cliente}@s.whatsapp.net"
+        else: 
+            target_response_jid = remote_jid
 
         # --- 3. CONTEÚDO DA MENSAGEM ---
         
@@ -159,30 +207,44 @@ async def evolution_webhook(request: Request):
 
         print(f"💬 Mensagem Processada: {texto_usuario}")
 
-        # --- 4. EXECUTAR AGENTE ---
+        # --- LÓGICA DO BUFFER (DEBOUNCE) ---
         
-        # Histórico (Baseado no telefone real)
-        history_service = HistoryService(clinic_id=clinic_id, session_id=lid)
-        history_service.add_user_message(texto_usuario)
-        historico = history_service.get_langchain_history(limit=mensagens_contexto)
+        buffer_key = f"{clinic_id}:{telefone_cliente}"
         
-        # Agente
-        agente = AgenteClinica(clinic_id=clinic_id, session_id=telefone_cliente)
-        resposta_ia = agente.executar(texto_usuario, historico)
+        # 1. Se já existe um timer rodando para esse cliente, cancela!
+        if buffer_key in message_buffers:
+            message_buffers[buffer_key]["task"].cancel()
+        else:
+            message_buffers[buffer_key] = {"msgs": []}
+            
+        # 2. Adiciona a nova mensagem na lista
+        message_buffers[buffer_key]["msgs"].append(texto_usuario)
         
-        # Salvar resposta
-        history_service.add_ai_message(resposta_ia)
+        # 3. Cria um novo timer de 10s
+        # O asyncio.create_task roda em background sem travar o servidor
+        task = asyncio.create_task(esperar_e_processar(clinic_id, telefone_cliente, target_response_jid))
+        message_buffers[buffer_key]["task"] = task
 
-        # --- 5. ENVIAR RESPOSTA (Endpoint V2) ---
-        # Enviamos para o target_response_jid (que pode ser LID ou Phone) para manter a thread
-        enviar_mensagem_v2(clinic_id, telefone_cliente, resposta_ia)
-
-        return {"status": "processed"}
+        return {"status": "buffered"}
 
     except Exception as e:
         print(f"❌ Erro no Webhook V2: {e}")
         return {"status": "error", "detail": str(e)}
 
+async def esperar_e_processar(clinic_id, telefone_cliente, target_jid):
+    """
+    Wrapper assíncrono que espera e depois chama o processador.
+    """
+    try:
+        await asyncio.sleep(BUFFER_DELAY) # Espera 10 segundos
+        
+        # Se chegou aqui sem ser cancelado, processa!
+        await processar_mensagem_acumulada(clinic_id, telefone_cliente, target_jid)
+        
+    except asyncio.CancelledError:
+        # Se foi cancelado (porque chegou outra msg), não faz nada.
+        print(f"⏳ Timer cancelado para {telefone_cliente} (nova msg chegou)")
+    
 def enviar_mensagem_v2(instance_name, telefone_cliente, text):
     """
     Envia mensagem usando os endpoints da Evolution API v2.
@@ -206,7 +268,7 @@ def enviar_mensagem_v2(instance_name, telefone_cliente, text):
         "instance": instance_name,
         "number": remote_jid,
         "text": text,
-        "delay": 2000,
+        "delay": 1000,
         "linkPreview": False
     }
     
