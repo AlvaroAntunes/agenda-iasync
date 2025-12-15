@@ -9,6 +9,7 @@ from supabase import create_client, Client
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
+from zoneinfo import ZoneInfo
 from app.core.security import decrypt_token 
 from app.services.interfaces import CalendarService
 
@@ -111,29 +112,31 @@ class GoogleCalendarService(CalendarService):
             
         return calendars
     
-    def listar_eventos(self, data:dt.datetime, calendar_id='primary'):
-        # 1. Extrai apenas a data (remove horas/minutos/segundos)
-        dia_apenas = data.date() 
+    def listar_eventos(self, data: dt.datetime, calendar_id='primary'):
+        # 1. Extrai apenas a data
+        dia_apenas = data.date()
         
-        # 2. Cria o intervalo de 00:00 até 23:59 desse dia
-        start_of_day = dt.datetime.combine(dia_apenas, dt.time.min)
-        end_of_day = dt.datetime.combine(dia_apenas, dt.time.max)
+        # 2. Define o Fuso Horário do Brasil
+        # (Futuramente, isso pode vir do banco de dados da clínica)
+        tz_brasil = ZoneInfo("America/Sao_Paulo")
 
-        # 3. Preservar o Fuso Horário (Muito Importante)
-        # Se o seu data tem fuso (tzinfo), aplicamos ao intervalo para a busca ser correta.
-        if data.tzinfo:
-            start_of_day = start_of_day.replace(tzinfo=data.tzinfo)
-            end_of_day = end_of_day.replace(tzinfo=data.tzinfo)
-        else:
-            # Se a data é "naive" (sem fuso), adicionamos 'Z' manualmente para indicar UTC
-            time_min = start_of_day.isoformat() + 'Z'
-            time_max = end_of_day.isoformat() + 'Z'
-            
+        # 3. Cria o intervalo com Fuso Horário CORRETO
+        # Em vez de Z (UTC), usamos o fuso local (-03:00)
+        # Isso garante que 00:00 seja meia-noite no Brasil, não em Londres.
+        
+        start_of_day = dt.datetime.combine(dia_apenas, dt.time.min, tzinfo=tz_brasil)
+        end_of_day = dt.datetime.combine(dia_apenas, dt.time.max, tzinfo=tz_brasil)
+
+        # O isoformat() agora vai gerar algo como "2025-12-17T00:00:00-03:00"
+        # O Google entende isso perfeitamente.
+        
+        print(f"🔍 Buscando eventos entre {start_of_day} e {end_of_day}")
+
         events_result = self.service.events().list(
             calendarId=calendar_id,
-            timeMin=time_min,
-            timeMax=time_max,
-            maxResults=3000,
+            timeMin=start_of_day.isoformat(),
+            timeMax=end_of_day.isoformat(),
+            maxResults=2500,
             singleEvents=True,
             orderBy='startTime'
         ).execute()

@@ -147,13 +147,36 @@ class AgenteClinica:
         except ValueError:
             return "Formato de data inválido. Use dd/mm/aaaa."
 
-        eventos = self.calendar_service.listar_eventos(calendar_id=calendar_id, data=data_dt)
+        eventos = self.calendar_service.listar_eventos(data=data_dt,calendar_id=calendar_id)
         
         if not eventos:
             return f"A agenda para {data} está completamente livre."
         
-        # Formata para o LLM ler fácil
-        lista_ocupada = [f"{formatar_hora(e['start'].get('dateTime'))} até {formatar_hora(e['end'].get('dateTime'))} - Ocupado" for e in eventos]
+        lista_ocupada = []
+        
+        for e in eventos:
+            # Tenta pegar horário específico (dateTime)
+            start_dt = e['start'].get('dateTime')
+            end_dt = e['end'].get('dateTime')
+            
+            if start_dt and end_dt:
+                # Caso 1: É uma consulta/reunião com hora marcada
+                try:
+                    # formatar_hora deve tratar o ISO string
+                    inicio = formatar_hora(start_dt) 
+                    fim = formatar_hora(end_dt)
+                    lista_ocupada.append(f"{inicio} até {fim} - Ocupado")
+                except:
+                    lista_ocupada.append("Horário Indisponível")
+            else:
+                # Caso 2: É um evento de dia inteiro (Bloqueio, Folga, Feriado no GCal)
+                # O Google manda 'date' em vez de 'dateTime'
+                start_date = e['start'].get('date')
+                summary = e.get('summary', 'Bloqueio')
+                
+                if start_date:
+                    lista_ocupada.append(f"Dia Todo ({summary}) - Ocupado")
+
         return f"Horários OCUPADOS em {data}:\n" + "\n".join(lista_ocupada)
 
     def _logic_realizar_agendamento(self, nome_paciente: str, data_hora: str, nome_profissional: str):
