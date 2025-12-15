@@ -225,6 +225,7 @@ class AgenteClinica:
         🤖 CANAL: Agendamento via IA
         """
         try:            
+            dt_inicio = dt.datetime.fromisoformat(data_hora)
             # if dt_inicio.tzinfo is None:
             #     br_timezone = ZoneInfo("America/Sao_Paulo")
             #     dt_inicio = dt_inicio.replace(tzinfo=br_timezone)
@@ -265,7 +266,7 @@ class AgenteClinica:
     def executar(self, mensagem_usuario: str, historico_conversa: List = []):
         
         # 1. Configurar LLM  
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2, api_key=os.getenv("OPENAI_API_KEY"))
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1, api_key=os.getenv("OPENAI_API_KEY"))
 
         # 2. Bind das Ferramentas (Vincula as funções ao LLM)
         # --- CRIAÇÃO DAS TOOLS DE FORMA EXPLÍCITA ---
