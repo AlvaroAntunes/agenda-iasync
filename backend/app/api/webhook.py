@@ -195,11 +195,16 @@ def enviar_mensagem_v2(instance_name, telefone_cliente, text):
         "Content-Type": "application/json"
     }
     
+    remote_jid = str(telefone_cliente)
+    
+    if "@" not in remote_jid:
+        remote_jid = f"{remote_jid}@s.whatsapp.net"
+    
     # NOVO PAYLOAD DA V2
     # 'instance' agora vai no corpo da requisição
     body = {
         "instance": instance_name,
-        "number": telefone_cliente,
+        "number": remote_jid,
         "text": text,
         "delay": 2000,
         "linkPreview": False
