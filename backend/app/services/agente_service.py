@@ -58,7 +58,7 @@ class AgenteClinica:
         self.dados_clinica = self._carregar_dados_clinica()
         self.profissionais = self._carregar_profissionais()
         self.dados_paciente = self._identificar_paciente()
-        self.dia_hoje = self._obter_hoje_extenso()
+        self.dia_hoje = self._formatar_data_extenso(dt.datetime.now(ZoneInfo("America/Sao_Paulo")))
         
     def _carregar_dados_clinica(self):
         response = supabase.table('clinicas').select('*').eq('id', self.clinic_id).single().execute()
@@ -101,7 +101,7 @@ class AgenteClinica:
             
         return None
     
-    def _obter_hoje_extenso(self):
+    def _formatar_data_extenso(self, data: dt.datetime) -> str:
         mapa_dias = {
             0: "Segunda-feira",
             1: "Terça-feira",
@@ -112,15 +112,10 @@ class AgenteClinica:
             6: "Domingo"
         }
         
-        # Define o fuso horário do Brasil
-        fuso_br = ZoneInfo("America/Sao_Paulo")
-        
-        # Pega o momento atual JÁ com o fuso correto aplicado
-        agora = dt.datetime.now(fuso_br)
-        dia_semana = mapa_dias[agora.weekday()]
+        dia_semana = mapa_dias[data.weekday()]
         
         # Formata: Quarta-feira, 17/12/2025 - 14:30
-        return f"{dia_semana}, {agora.strftime('%d/%m/%Y - %H:%M')}"
+        return f"{dia_semana}, {data.strftime('%d/%m/%Y - %H:%M')}"
         
     # --- DEFINIÇÃO DAS FERRAMENTAS (TOOLS) ---
     
@@ -403,7 +398,8 @@ class AgenteClinica:
         
         Você é a recepcionista da {self.dados_clinica['nome_da_clinica']}.
         
-        DATA DE HOJE: {self.dia_hoje} - .
+        DATA DE HOJE: {self.dia_hoje}.
+        - Amanhã é: {self._formatar_data_extenso(dt.datetime.now(ZoneInfo("America/Sao_Paulo")) + dt.timedelta(days=1))}.
         PROFISSIONAIS DISPONÍVEIS: {lista_profs}.
         
         --- CONTEXTO DO USUÁRIO ---
