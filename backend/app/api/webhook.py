@@ -66,20 +66,20 @@ async def processar_mensagem_acumulada(clinic_id: str, telefone_cliente: str, ta
     except Exception as e:
         print(f"❌ Erro no processamento assíncrono: {e}")
 
-def salvar_lid_cache(clinic_id: str, lid: str, phone: str, nome: str = "Desconhecido"):
+def salvar_lid_cache(clinic_id: str, lid: str, telefone: str, nome: str = "Desconhecido"):
     """
     Salva o mapeamento LID -> Telefone no banco para consultas futuras rápidas.
-    Tabela: public.lids (lid text, phone_number text, nome text, clinic_id uuid)
+    Tabela: public.lids (lid text, telefone text, nome text, clinic_id uuid)
     """
     try:
         # Upsert garante que se já existir, atualiza/ignora
         supabase.table('lids').upsert({
             'clinic_id': clinic_id,
             'lid': lid,
-            'phone_number': phone,
+            'telefone': telefone,
             'nome': nome
         }, on_conflict='clinic_id,lid').execute()
-        print(f"💾 LID cacheado com sucesso: {lid} -> {phone}")
+        print(f"💾 LID cacheado com sucesso: {lid} -> {telefone}")
     except Exception as e:
         print(f"⚠️ Erro ao salvar cache LID (Tabela 'lids' existe?): {e}")
         
@@ -107,16 +107,16 @@ def resolver_jid_cliente(clinic_id: str, remote_jid: str, sender_pn: str, lid: s
         try:
             # print(f"🕵️ Buscando LID {lid} no banco...")
             lid_supabase = supabase.table('lids')\
-                .select('phone_number')\
+                .select('telefone')\
                 .eq('clinic_id', clinic_id)\
                 .eq('lid', lid)\
                 .limit(1)\
                 .execute()
                 
             if lid_supabase.data and len(lid_supabase.data) > 0:
-                phone_found = lid_supabase.data[0]['phone_number']
-                print(f"✅ LID encontrado no Cache (DB): {phone_found}")
-                return phone_found
+                telefone_found = lid_supabase.data[0]['telefone']
+                print(f"✅ LID encontrado no Cache (DB): {telefone_found}")
+                return telefone_found
         except Exception as e:
             # Se der erro (ex: tabela não existe), logamos mas não travamos
             print(f"⚠️ Erro leitura cache LID: {e}")

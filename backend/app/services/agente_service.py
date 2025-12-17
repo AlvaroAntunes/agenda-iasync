@@ -60,8 +60,6 @@ class AgenteClinica:
         self.dados_paciente = self._identificar_paciente()
         self.dia_hoje = self._obter_hoje_extenso()
         
-        self.nome_cliente = self._obter_nome_cliente()
-
     def _carregar_dados_clinica(self):
         response = supabase.table('clinicas').select('*').eq('id', self.clinic_id).single().execute()
         return response.data
@@ -79,7 +77,7 @@ class AgenteClinica:
         telefone_busca = ''.join(filter(str.isdigit, self.session_id))
         
         try:
-            response = supabase.table('pacientes')\
+            response = supabase.table('lids')\
                 .select('nome')\
                 .eq('clinic_id', self.clinic_id)\
                 .eq('telefone', telefone_busca)\
@@ -123,27 +121,6 @@ class AgenteClinica:
         
         # Formata: Quarta-feira, 17/12/2025 - 14:30
         return f"{dia_semana}, {agora.strftime('%d/%m/%Y - %H:%M')}"
-
-    def _obter_nome_cliente(self):
-        """
-        Tenta obter o nome do cliente baseado no telefone (session_id).
-        """
-        telefone_busca = ''.join(filter(str.isdigit, self.session_id))
-        
-        try:
-            response = supabase.table('lids')\
-                .select('nome')\
-                .eq('clinic_id', self.clinic_id)\
-                .eq('phone_number', telefone_busca)\
-                .limit(1)\
-                .execute()
-                
-            if response.data and len(response.data) > 0:
-                return response.data[0]['nome']
-            
-            return "Desconhecido"
-        except Exception:
-            return "Desconhecido"
         
     # --- DEFINIÇÃO DAS FERRAMENTAS (TOOLS) ---
     
@@ -259,16 +236,17 @@ class AgenteClinica:
 
         # 2. Verificar/Criar Paciente no Supabase (Upsert)
         # Primeiro buscamos se existe pelo telefone
-        paciente_response = supabase.table('pacientes').select('id').eq('clinic_id', self.clinic_id).eq('telefone', telefone).execute()
+        paciente_response = supabase.table('lids').select('id').eq('clinic_id', self.clinic_id).eq('telefone', telefone).execute()
         
         if paciente_response.data:
             paciente_id = paciente_response.data[0]['id']
         else:
             # Cria novo
-            novo_paciente = supabase.table('pacientes').insert({
+            novo_paciente = supabase.table('lids').insert({
                 'clinic_id': self.clinic_id,
-                'nome': nome_paciente,
-                'telefone': telefone
+                'lid': telefone, 
+                'telefone': telefone,
+                'nome': nome_paciente
             }).execute()
             paciente_id = novo_paciente.data[0]['id']
 
@@ -332,7 +310,7 @@ class AgenteClinica:
         print(f"--- TOOL: Verificando consultas existentes para {nome_paciente} ---")
         
         # 1. Identificar Paciente no Supabase
-        paciente_response = supabase.table('pacientes').select('id').eq('clinic_id', self.clinic_id).eq('telefone', telefone).execute()
+        paciente_response = supabase.table('lids').select('id').eq('clinic_id', self.clinic_id).eq('telefone', telefone).execute()
         
         if not paciente_response.data:
             return "Nenhum paciente encontrado com esse telefone."
@@ -393,16 +371,16 @@ class AgenteClinica:
         lista_profs = ", ".join([f"{p['nome']} ({p['especialidade']})" for p in self.profissionais])
                 
         # Lógica de Contexto do Paciente
-        if self.nome_cliente and self.nome_cliente != "Desconhecido":
+        if self.dados_paciente:
             bloco_paciente = f"""
             VOCÊ ESTÁ FALANDO COM UM PACIENTE RECORRENTE.
-            Nome: {self.nome_cliente}
+            Nome: {self.dados_paciente['nome']}
             Status: Já cadastrado no sistema.
             
             IMPORTANTE:
-            - Chame-o pelo nome ({self.nome_cliente.strip().split(' ')[0]}).
+            - Chame-o pelo nome ({self.dados_paciente['nome'].strip().split(' ')[0]}).
             - NÃO pergunte o nome dele novamente, pois você já sabe.
-            - Se ele quiser agendar, você já pode usar o nome '{self.nome_cliente}' na ferramenta. Se ele tiver consulta agendada, avise-o.
+            - Se ele quiser agendar, você já pode usar o nome '{self.dados_paciente['nome']}' na ferramenta. Se ele tiver consulta agendada, avise-o.
             """
         else:
             bloco_paciente = """
