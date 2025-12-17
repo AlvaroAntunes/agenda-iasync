@@ -66,23 +66,24 @@ async def processar_mensagem_acumulada(clinic_id: str, telefone_cliente: str, ta
     except Exception as e:
         print(f"❌ Erro no processamento assíncrono: {e}")
 
-def salvar_lid_cache(clinic_id: str, lid: str, phone: str):
+def salvar_lid_cache(clinic_id: str, lid: str, phone: str, nome: str = "Desconhecido"):
     """
     Salva o mapeamento LID -> Telefone no banco para consultas futuras rápidas.
-    Tabela: public.lids (lid text, phone_number text, clinic_id uuid)
+    Tabela: public.lids (lid text, phone_number text, nome text, clinic_id uuid)
     """
     try:
         # Upsert garante que se já existir, atualiza/ignora
         supabase.table('lids').upsert({
             'clinic_id': clinic_id,
             'lid': lid,
-            'phone_number': phone
+            'phone_number': phone,
+            'nome': nome
         }, on_conflict='clinic_id,lid').execute()
         print(f"💾 LID cacheado com sucesso: {lid} -> {phone}")
     except Exception as e:
         print(f"⚠️ Erro ao salvar cache LID (Tabela 'lids' existe?): {e}")
         
-def resolver_jid_cliente(clinic_id: str, remote_jid: str, sender_pn: str, lid: str) -> str:
+def resolver_jid_cliente(clinic_id: str, remote_jid: str, sender_pn: str, lid: str, nome: str = "Desconhecido") -> str:
     """
     Descobre o número real do cliente (JID).
     Fluxo: SenderPn -> SenderRoot -> RemoteJid -> Cache(LIDs) -> API
@@ -91,13 +92,13 @@ def resolver_jid_cliente(clinic_id: str, remote_jid: str, sender_pn: str, lid: s
     # 1. Prioridade Máxima: O WhatsApp já mandou o número no senderPn (v2.3+)
     if sender_pn and "@s.whatsapp.net" in sender_pn:
         numero = sender_pn.split("@")[0]
-        salvar_lid_cache(clinic_id, lid, numero)
+        salvar_lid_cache(clinic_id, lid, numero, nome)
         return numero
 
     # 2. Prioridade Média: remoteJid já é número
     if remote_jid and "@s.whatsapp.net" in remote_jid:
         numero = remote_jid.split("@")[0]
-        salvar_lid_cache(clinic_id, lid, numero)
+        salvar_lid_cache(clinic_id, lid, numero, nome)
         return numero
 
     # 3. Caso LID: Tentar Cache Local -> API
@@ -165,8 +166,9 @@ async def evolution_webhook(request: Request):
         sender_pn = key.get("senderPn") # Quem enviou 
         lid_full = key.get("previousRemoteJid")
         lid = lid_full if lid_full else remote_jid
+        nome = data.get("pushName", "Desconhecido")
         
-        telefone_cliente = resolver_jid_cliente(clinic_id=clinic_id, remote_jid=remote_jid, sender_pn=sender_pn, lid=lid)
+        telefone_cliente = resolver_jid_cliente(clinic_id=clinic_id, remote_jid=remote_jid, sender_pn=sender_pn, lid=lid, nome=nome)
         print(f"📩 Webhook V2: Instância {clinic_id} | Cliente: {telefone_cliente}")
         
         if sender_pn: 

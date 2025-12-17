@@ -59,6 +59,8 @@ class AgenteClinica:
         self.profissionais = self._carregar_profissionais()
         self.dados_paciente = self._identificar_paciente()
         self.dia_hoje = self._obter_hoje_extenso()
+        
+        self.nome_cliente = self._obter_nome_cliente()
 
     def _carregar_dados_clinica(self):
         response = supabase.table('clinicas').select('*').eq('id', self.clinic_id).single().execute()
@@ -122,6 +124,27 @@ class AgenteClinica:
         # Formata: Quarta-feira, 17/12/2025 - 14:30
         return f"{dia_semana}, {agora.strftime('%d/%m/%Y - %H:%M')}"
 
+    def _obter_nome_cliente(self):
+        """
+        Tenta obter o nome do cliente baseado no telefone (session_id).
+        """
+        telefone_busca = ''.join(filter(str.isdigit, self.session_id))
+        
+        try:
+            response = supabase.table('lids')\
+                .select('nome')\
+                .eq('clinic_id', self.clinic_id)\
+                .eq('phone_number', telefone_busca)\
+                .limit(1)\
+                .execute()
+                
+            if response.data and len(response.data) > 0:
+                return response.data[0]['nome']
+            
+            return "Desconhecido"
+        except Exception:
+            return "Desconhecido"
+        
     # --- DEFINIÇÃO DAS FERRAMENTAS (TOOLS) ---
     
     def _logic_verificar_disponibilidade(self, data: str, nome_profissional: Optional[str] = None):
@@ -370,16 +393,16 @@ class AgenteClinica:
         lista_profs = ", ".join([f"{p['nome']} ({p['especialidade']})" for p in self.profissionais])
                 
         # Lógica de Contexto do Paciente
-        if self.dados_paciente:
+        if self.nome_cliente and self.nome_cliente != "Desconhecido":
             bloco_paciente = f"""
             VOCÊ ESTÁ FALANDO COM UM PACIENTE RECORRENTE.
-            Nome: {self.dados_paciente['nome']}
+            Nome: {self.nome_cliente}
             Status: Já cadastrado no sistema.
             
             IMPORTANTE:
-            - Chame-o pelo nome ({self.dados_paciente['nome'].strip().split(' ')[0]}).
+            - Chame-o pelo nome ({self.nome_cliente.strip().split(' ')[0]}).
             - NÃO pergunte o nome dele novamente, pois você já sabe.
-            - Se ele quiser agendar, você já pode usar o nome '{self.dados_paciente['nome']}' na ferramenta. Se ele tiver consulta agendada, avise-o.
+            - Se ele quiser agendar, você já pode usar o nome '{self.nome_cliente}' na ferramenta. Se ele tiver consulta agendada, avise-o.
             """
         else:
             bloco_paciente = """
