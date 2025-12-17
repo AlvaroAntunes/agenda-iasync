@@ -58,6 +58,7 @@ class AgenteClinica:
         self.dados_clinica = self._carregar_dados_clinica()
         self.profissionais = self._carregar_profissionais()
         self.dados_paciente = self._identificar_paciente()
+        self.dia_hoje = self._obter_hoje_extenso()
 
     def _carregar_dados_clinica(self):
         response = supabase.table('clinicas').select('*').eq('id', self.clinic_id).single().execute()
@@ -99,6 +100,23 @@ class AgenteClinica:
                 return prof['nome']
             
         return None
+    
+    def _obter_hoje_extenso(self):
+        mapa_dias = {
+            0: "Segunda-feira",
+            1: "Terça-feira",
+            2: "Quarta-feira",
+            3: "Quinta-feira",
+            4: "Sexta-feira",
+            5: "Sábado",
+            6: "Domingo"
+        }
+        
+        agora = dt.datetime.now()
+        dia_semana = mapa_dias[agora.weekday()]
+        
+        # Formata: Quarta-feira, 17/12/2025 - 14:30
+        return f"{dia_semana}, {agora.strftime('%d/%m/%Y - %H:%M')}"
 
     # --- DEFINIÇÃO DAS FERRAMENTAS (TOOLS) ---
     
@@ -312,23 +330,6 @@ class AgenteClinica:
             return f"O paciente {nome_paciente} já possui {len(consultas_response.data)} consulta(s) agendada(s) para {data} com o profissional {self._identificar_profissional(consultas_response.data[0]['profissional_id'])}."
         else:
             return f"O paciente {nome_paciente} não possui consultas agendadas para {data}."
-        
-    def obter_hoje_extenso():
-        mapa_dias = {
-            0: "Segunda-feira",
-            1: "Terça-feira",
-            2: "Quarta-feira",
-            3: "Quinta-feira",
-            4: "Sexta-feira",
-            5: "Sábado",
-            6: "Domingo"
-        }
-        
-        agora = dt.datetime.now()
-        dia_semana = mapa_dias[agora.weekday()]
-        
-        # Formata: Quarta-feira, 17/12/2025 - 14:30
-        return f"{dia_semana}, {agora.strftime('%d/%m/%Y - %H:%M')}"
 
     # --- O CÉREBRO (AGENTE) ---
 
@@ -389,7 +390,7 @@ class AgenteClinica:
         {self.dados_clinica.get('prompt_ia', '')}
         
         --- DADOS DE CONTEXTO EM TEMPO REAL ---
-        DATA/HORA ATUAL: {self.obter_hoje_extenso()}
+        DATA/HORA ATUAL: {self.dia_hoje}
         PROFISSIONAIS DISPONÍVEIS HOJE: {lista_profs}
 
         --- DADOS DO PACIENTE ATUAL ---
@@ -397,7 +398,7 @@ class AgenteClinica:
         
         Você é a recepcionista da {self.dados_clinica['nome_da_clinica']}.
         
-        DATA DE HOJE: {self.obter_hoje_extenso()} - .
+        DATA DE HOJE: {self.dia_hoje} - .
         PROFISSIONAIS DISPONÍVEIS: {lista_profs}.
         
         --- CONTEXTO DO USUÁRIO ---
