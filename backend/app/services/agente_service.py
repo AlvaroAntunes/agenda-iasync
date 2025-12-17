@@ -112,7 +112,11 @@ class AgenteClinica:
             6: "Domingo"
         }
         
-        agora = dt.datetime.now()
+        # Define o fuso horário do Brasil
+        fuso_br = ZoneInfo("America/Sao_Paulo")
+        
+        # Pega o momento atual JÁ com o fuso correto aplicado
+        agora = dt.datetime.now(fuso_br)
         dia_semana = mapa_dias[agora.weekday()]
         
         # Formata: Quarta-feira, 17/12/2025 - 14:30
