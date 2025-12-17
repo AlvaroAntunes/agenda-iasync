@@ -44,6 +44,10 @@ class RealizaAgendamento(BaseModel):
     data_hora: str = Field(description="Data e hora ISO (ex: 2024-11-25T14:30:00)")
     nome_profissional: str = Field(description="Nome do médico escolhido")
     
+class VerificaConsultasExistentes(BaseModel):
+    data: str = Field(description="Data para verificar no formato DD/MM/AAAA")
+    nome_paciente: str = Field(description="Nome completo do paciente")
+    
 class AgenteClinica:
     def __init__(self, clinic_id: str, session_id: str):
         self.clinic_id = clinic_id
@@ -85,6 +89,16 @@ class AgenteClinica:
             return None 
         except Exception:
             return None
+        
+    def _identificar_profissional(self, id: str):
+        """
+        Busca o profissional pelo id.
+        """
+        for prof in self.profissionais:
+            if prof['id'] == id:
+                return prof['nome']
+            
+        return None
 
     # --- DEFINIÇÃO DAS FERRAMENTAS (TOOLS) ---
     
@@ -260,11 +274,65 @@ class AgenteClinica:
         }).execute()
 
         return "Agendamento realizado com sucesso! Confirme para o usuário."
+    
+    def _logic_verificar_consultas_existentes(self, nome_paciente: str, data: str):
+        """
+        Verifica se o paciente já tem consultas agendadas.
+        Input:
+        - nome_paciente: Nome completo.
+        - data: Data para verificar no formato DD/MM/AAAA.
+        """
+        telefone = self.session_id
+        
+        print(f"--- TOOL: Verificando consultas existentes para {nome_paciente} ---")
+        
+        # 1. Identificar Paciente no Supabase
+        paciente_response = supabase.table('pacientes').select('id').eq('clinic_id', self.clinic_id).eq('telefone', telefone).execute()
+        
+        if not paciente_response.data:
+            return "Nenhum paciente encontrado com esse telefone."
+
+        paciente_id = paciente_response.data[0]['id']
+
+        # 2. Buscar Consultas Futuras
+        agora_data = dt.datetime.strptime(data, "%d/%m/%Y").date()
+        inicio_dia = f"{agora_data.isoformat()}T00:00:00+00:00"
+        fim_dia = f"{agora_data.isoformat()}T23:59:59+00:00"
+
+        consultas_response = supabase.table('consultas')\
+            .select('status')\
+            .eq('clinic_id', self.clinic_id)\
+            .eq('paciente_id', paciente_id)\
+            .eq('status', 'AGENDADA')\
+            .gte('horario_consulta', inicio_dia)\
+            .lte('horario_consulta', fim_dia)\
+            .execute()
+        
+        if consultas_response.data and len(consultas_response.data) > 0:
+            return f"O paciente {nome_paciente} já possui {len(consultas_response.data)} consulta(s) agendada(s) para {data} com o profissional {self._identificar_profissional(consultas_response.data[0]['profissional_id'])}."
+        else:
+            return f"O paciente {nome_paciente} não possui consultas agendadas para {data}."
+        
+    def obter_hoje_extenso():
+        mapa_dias = {
+            0: "Segunda-feira",
+            1: "Terça-feira",
+            2: "Quarta-feira",
+            3: "Quinta-feira",
+            4: "Sexta-feira",
+            5: "Sábado",
+            6: "Domingo"
+        }
+        
+        agora = dt.datetime.now()
+        dia_semana = mapa_dias[agora.weekday()]
+        
+        # Formata: Quarta-feira, 17/12/2025 - 14:30
+        return f"{dia_semana}, {agora.strftime('%d/%m/%Y - %H:%M')}"
 
     # --- O CÉREBRO (AGENTE) ---
 
     def executar(self, mensagem_usuario: str, historico_conversa: List = []):
-        
         # 1. Configurar LLM  
         llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1, api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -284,12 +352,16 @@ class AgenteClinica:
                 name="realizar_agendamento",
                 description="Realiza o agendamento final da consulta no calendário.",
                 args_schema=RealizaAgendamento
+            ),
+            StructuredTool.from_function(
+                func=self._logic_verificar_consultas_existentes,
+                name="verificar_consultas_existentes",
+                description="Verifica se o paciente já tem consultas agendadas para uma data específica.",
+                args_schema=VerificaConsultasExistentes
             )
         ]
 
         # 3. Criar o Prompt do Sistema
-        # Injetamos a data atual para ele não se perder no tempo
-        data_hora_hoje = dt.datetime.now().strftime("%A, %d de %B de %Y - %H:%M")
         lista_profs = ", ".join([f"{p['nome']} ({p['especialidade']})" for p in self.profissionais])
                 
         # Lógica de Contexto do Paciente
@@ -300,7 +372,7 @@ class AgenteClinica:
             Status: Já cadastrado no sistema.
             
             IMPORTANTE:
-            - Chame-o pelo nome ({self.dados_paciente['nome']}).
+            - Chame-o pelo nome ({self.dados_paciente['nome'].strip().split(' ')[0]}).
             - NÃO pergunte o nome dele novamente, pois você já sabe.
             - Se ele quiser agendar, você já pode usar o nome '{self.dados_paciente['nome']}' na ferramenta. Se ele tiver consulta agendada, avise-o.
             """
@@ -317,16 +389,15 @@ class AgenteClinica:
         {self.dados_clinica.get('prompt_ia', '')}
         
         --- DADOS DE CONTEXTO EM TEMPO REAL ---
-        DATA/HORA ATUAL: {data_hora_hoje}
+        DATA/HORA ATUAL: {self.obter_hoje_extenso()}
         PROFISSIONAIS DISPONÍVEIS HOJE: {lista_profs}
 
         --- DADOS DO PACIENTE ATUAL ---
         {bloco_paciente}
         
-        
         Você é a recepcionista da {self.dados_clinica['nome_da_clinica']}.
         
-        DATA DE HOJE: {data_hora_hoje}.
+        DATA DE HOJE: {self.obter_hoje_extenso()} - .
         PROFISSIONAIS DISPONÍVEIS: {lista_profs}.
         
         --- CONTEXTO DO USUÁRIO ---
