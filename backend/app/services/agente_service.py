@@ -305,7 +305,15 @@ class AgenteClinica:
         print(f"--- TOOL: Verificando consultas existentes para {nome_paciente} ---")
         
         # 1. Identificar Paciente no Supabase
-        paciente_response = supabase.table('lids').select('id').eq('clinic_id', self.clinic_id).eq('telefone', telefone).execute()
+        try:
+            paciente_response = supabase.table('lids')\
+                .select('id')\
+                .eq('clinic_id', self.clinic_id)\
+                .eq('telefone', telefone)\
+                .limit(1)\
+                .execute()
+        except Exception as e:
+            return f"Erro ao buscar paciente: {str(e)}"
         
         if not paciente_response.data:
             return "Nenhum paciente encontrado com esse telefone."
@@ -318,7 +326,7 @@ class AgenteClinica:
         fim_dia = f"{agora_data.isoformat()}T23:59:59+00:00"
 
         consultas_response = supabase.table('consultas')\
-            .select('status')\
+            .select('status', 'profissional_id')\
             .eq('clinic_id', self.clinic_id)\
             .eq('paciente_id', paciente_id)\
             .eq('status', 'AGENDADA')\
