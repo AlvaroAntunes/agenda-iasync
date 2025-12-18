@@ -78,7 +78,7 @@ class AgenteClinica:
         
         try:
             response = supabase.table('lids')\
-                .select('nome')\
+                .select('nome', 'id')\
                 .eq('clinic_id', self.clinic_id)\
                 .eq('telefone', telefone_busca)\
                 .limit(1)\
