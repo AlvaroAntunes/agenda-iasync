@@ -116,6 +116,33 @@ class AgenteClinica:
         
         # Formata: Quarta-feira, 17/12/2025 - 14:30
         return f"{dia_semana}, {data.strftime('%d/%m/%Y - %H:%M')}"
+    
+    def _gerar_bloco_paciente(self, paciente_id):
+        consultas = supabase.table('consultas').select('*').eq('paciente_id', paciente_id).execute().data
+        
+        texto_consultas = ""
+        agora = dt.datetime.now(ZoneInfo("America/Sao_Paulo"))
+
+        for c in consultas:
+            # Converte string ISO para objeto datetime com fuso
+            data_cons = dt.datetime.fromisoformat(c['horario_consulta'])
+            
+            # Se o objeto não tiver fuso, adiciona
+            if data_cons.tzinfo is None:
+                data_cons = data_cons.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+
+            if data_cons < agora:
+                status_tempo = "(JÁ OCORREU/PASSADO)"
+                status_emoji = "✅"
+            else:
+                status_tempo = "(AGENDADO/FUTURO)"
+                status_emoji = "🗓️"
+
+            # Formata para o texto que vai pro prompt
+            data_fmt = data_cons.strftime('%d/%m/%Y às %H:%M')
+            texto_consultas += f"- {data_fmt} {status_tempo} {status_emoji}\n"
+
+        return f"Histórico de Consultas:\n{texto_consultas}"
         
     # --- DEFINIÇÃO DAS FERRAMENTAS (TOOLS) ---
     
@@ -372,47 +399,43 @@ class AgenteClinica:
 
         # 3. Criar o Prompt do Sistema
         lista_profs = ", ".join([f"{p['nome']} ({p['especialidade']})" for p in self.profissionais])
-                
-        # Lógica de Contexto do Paciente
+        
+        # 1. Lógica do Paciente (Mantida e está ótima)
         if self.dados_paciente:
-            bloco_paciente = f"""
-            VOCÊ ESTÁ FALANDO COM UM PACIENTE RECORRENTE.
-            Nome: {self.dados_paciente['nome']}
-            Status: Já cadastrado no sistema.
+            historico_consultas = self._gerar_bloco_paciente(self.dados_paciente['id'])
             
-            IMPORTANTE:
-            - Chame-o pelo nome ({self.dados_paciente['nome'].strip().split(' ')[0]}).
-            - NÃO pergunte o nome dele novamente, pois você já sabe.
-            - Se ele quiser agendar, você já pode usar o nome '{self.dados_paciente['nome']}' na ferramenta. Se ele tiver consulta agendada, avise-o.
+            bloco_paciente = f"""
+            --- PACIENTE IDENTIFICADO ---
+            NOME: {self.dados_paciente['nome']}
+            STATUS: Já cadastrado no sistema.
+            
+            INSTRUÇÕES ESPECÍFICAS:
+            1. Trate-o pelo primeiro nome ({self.dados_paciente['nome'].strip().split(' ')[0]}).
+            2. NÃO pergunte o nome novamente.
+            3. HISTÓRICO DE CONSULTAS (Analise se são passadas ou futuras):
+            {historico_consultas}
             """
         else:
             bloco_paciente = """
-            VOCÊ ESTÁ FALANDO COM UM PACIENTE NOVO (OU NÃO IDENTIFICADO).
-            Status: Não cadastrado.
+            --- PACIENTE NÃO IDENTIFICADO ---
+            STATUS: Novo ou não logado.
             
-            IMPORTANTE:
-            - Se ele quiser agendar, você PRECISA perguntar o nome dele primeiro.
+            INSTRUÇÕES:
+            1. Antes de qualquer agendamento, você DEVE perguntar o nome.
             """
-        
+
+        # 2. System Prompt Limpo (Sem repetições)
         system_prompt = f"""
         {self.dados_clinica.get('prompt_ia', '')}
-        
-        --- DADOS DE CONTEXTO EM TEMPO REAL ---
-        DATA/HORA ATUAL: {self.dia_hoje}
-        PROFISSIONAIS DISPONÍVEIS HOJE: {lista_profs}
 
-        --- DADOS DO PACIENTE ATUAL ---
+        --- DADOS DE CONTEXTO EM TEMPO REAL ---
+        MOMENTO ATUAL: {self.dia_hoje}
+        AMANHÃ SERÁ: {self._formatar_data_extenso(dt.datetime.now(ZoneInfo("America/Sao_Paulo")) + dt.timedelta(days=1))}
+
+        --- DISPONIBILIDADE DA EQUIPE ---
+        PROFISSIONAIS HOJE: {lista_profs}
+
         {bloco_paciente}
-        
-        Você é a recepcionista da {self.dados_clinica['nome_da_clinica']}.
-        
-        DATA DE HOJE: {self.dia_hoje}.
-        - Amanhã é: {self._formatar_data_extenso(dt.datetime.now(ZoneInfo("America/Sao_Paulo")) + dt.timedelta(days=1))}.
-        PROFISSIONAIS DISPONÍVEIS: {lista_profs}.
-        
-        --- CONTEXTO DO USUÁRIO ---
-        {bloco_paciente}
-        ---------------------------
         """
         
         prompt = ChatPromptTemplate.from_messages([
