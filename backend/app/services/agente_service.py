@@ -304,6 +304,37 @@ class AgenteClinica:
         
         if not prof_data:
             return "Erro: Profissional não encontrado. Peça para o usuário confirmar o nome do profissional."
+        
+        # Tratamento de Data e Hora
+        try:
+            dt_inicio = dt.datetime.fromisoformat(data_hora)
+            
+            if dt_inicio.tzinfo is None:
+                br_timezone = ZoneInfo("America/Sao_Paulo")
+                dt_inicio = dt_inicio.replace(tzinfo=br_timezone)
+            
+            # Formato ISO com fuso para o banco (timestamptz)
+            horario_iso = dt_inicio.isoformat()
+            
+        except ValueError:
+            return "Erro: Formato de data inválido."
+        
+        # Verifica se já existe consulta neste horário para este médico e que NÃO esteja cancelada
+        try:
+            conflito = supabase.table('consultas')\
+                .select('id')\
+                .eq('clinic_id', self.clinic_id)\
+                .eq('profissional_id', prof_data['id'])\
+                .eq('horario_consulta', horario_iso)\
+                .neq('status', 'CANCELADO')\
+                .execute()
+            
+            if conflito.data and len(conflito.data) > 0:
+                print(f"⚠️ CONFLITO DETECTADO: Já existe consulta em {horario_iso}")
+                return f"NEGADO: O horário de {dt_inicio.strftime('%H:%M')} no dia {dt_inicio.strftime('%d/%m')} infelizmente já está ocupado. Por favor, escolha outro horário."
+                
+        except Exception as e:
+            return f"Erro ao verificar disponibilidade no banco: {str(e)}"
 
         # 2. Verificar/Criar Paciente no Supabase (Upsert)
         # Primeiro buscamos se existe pelo telefone
