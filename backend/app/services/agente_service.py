@@ -281,7 +281,8 @@ class AgenteClinica:
         except Exception as e:
             return f"Erro técnico ao consultar Google Calendar: {str(e)}"
         
-        text = f"O cliente quer agendar uma consulta na data {data} com {f"o profissional {nome_profissional}" if nome_profissional else 'QUALQUER PROFISSIONAL'}. NÃO OFEREÇA para o cliente agendar em um horário que já está ocupado. Se o profissional escolhido estiver ocupado, dê opções para outro profissional, caso exista.\n\n"
+        profissional = nome_profissional or "QUALQUER PROFISSIONAL"
+        text = f"O cliente quer agendar uma consulta na data {data} com {profissional}. NÃO OFEREÇA para o cliente agendar em um horário que já está ocupado. Se o profissional escolhido estiver ocupado, dê opções para outro profissional, caso exista.\n\n"
 
         return f"{text}Status da Agenda para {data}:\n\n" + "\n\n".join(relatorio_final)
 
