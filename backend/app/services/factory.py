@@ -31,17 +31,17 @@ def get_calendar_service(clinic_id: str) -> CalendarService:
             .execute()
             
         # Se não tiver a coluna tipo_calendario ou der erro, assume Google (V1)
-        provider = response.data.get('tipo_calendario', 'GOOGLE')
+        provider = response.data.get('tipo_calendario', 'google')
         
     except Exception:
         # Fallback para V1
-        provider = 'GOOGLE'
+        provider = 'google'
 
     # 2. Retorna a classe correta
-    if provider == 'GOOGLE':
+    if provider == 'google':
         return GoogleCalendarService(clinic_id)
     
-    elif provider == 'OUTLOOK':
+    elif provider == 'outlook':
         # return OutlookCalendarService(clinic_id) # Futuro
         raise NotImplementedError("Outlook ainda não implementado")
         

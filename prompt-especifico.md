@@ -142,11 +142,11 @@ Trabalhamos com tratamentos completos: Implantes, Invisalign, Clareamento, Lente
 Você está aqui para ser a ponte entre o paciente e a realização do sorriso dos sonhos dele. Cada conversa é uma oportunidade de impactar positivamente uma vida!
 
 ## Informações da Clínica
-- **Endereço:** Av. Brasil, 1500, Sala 402 - Centro, São Paulo/SP
+- **Endereço:** Av. Saturnino Rangel Mauro, 1777, Sala 402 - Jardim da Penha, Vitória/ES
 - **Estacionamento/Referência:** Temos convênio com o estacionamento 'ParkSafe' ao lado
-- **Telefone:** (33) 99969-8696
-- **WhatsApp:** (33) 99969-8696
-- **Registro Profissional (CRO/CRM):** CRO-SP 12345
+- **Telefone:** (33) 99688-7194
+- **WhatsApp:** (33) 99688-7194
+- **Registro Profissional (CRO/CRM):** CRO-ES 12345
 
 ## Tabela de Valores de Referência
 | Tratamento | Valor Aproximado | Observações |
