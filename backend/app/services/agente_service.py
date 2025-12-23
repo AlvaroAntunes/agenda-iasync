@@ -240,23 +240,19 @@ class AgenteClinica:
             
             for prof in self.profissionais:
                 if term_busca in unidecode(prof['nome']).lower():
-                    calendarios_alvo.append({
-                        'nome': prof['nome'],
-                        'id': prof['external_calendar_id']
-                    })
                     encontrado = True
                     break
             
             if not encontrado:
                 nomes_disponiveis = ", ".join([p['nome'] for p in self.profissionais])
                 return f"Erro: O profissional '{nome_profissional}' não foi encontrado. Médicos disponíveis: {nomes_disponiveis}."
-        else:
-            # Busca Geral (Todos)
-            for prof in self.profissionais:
-                calendarios_alvo.append({
-                    'nome': prof['nome'],
-                    'id': prof['external_calendar_id']
-                })
+            
+        # Busca Geral (Todos)
+        for prof in self.profissionais:
+            calendarios_alvo.append({
+                'nome': prof['nome'],
+                'id': prof['external_calendar_id']
+            })
 
         if not calendarios_alvo:
             return "Erro configuração: Nenhum calendário profissional encontrado no sistema."
@@ -284,8 +280,10 @@ class AgenteClinica:
 
         except Exception as e:
             return f"Erro técnico ao consultar Google Calendar: {str(e)}"
+        
+        text = f"O cliente quer agendar uma consulta na data {data} com {f"o profissional {nome_profissional}" if nome_profissional else 'QUALQUER PROFISSIONAL'}. NÃO OFEREÇA para o cliente agendar em um horário que já está ocupado. Se o profissional escolhido estiver ocupado, dê opções para outro profissional, caso exista.\n\n"
 
-        return f"Status da Agenda para {data}:\n\n" + "\n\n".join(relatorio_final)
+        return f"{text}Status da Agenda para {data}:\n\n" + "\n\n".join(relatorio_final)
 
 
     def _logic_realizar_agendamento(self, nome_paciente: str, data_hora: str, nome_profissional: str):
