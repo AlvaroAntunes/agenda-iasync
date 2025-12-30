@@ -7,11 +7,13 @@ services:
     container_name: saas_backend
     restart: always
     ports:
-      - "8000:8000"
+      - "8002:8000"
     env_file:
       - ./backend/.env
+    environment:
+      - EVOLUTION_API_URL=http://evolution-api-clinicas:8080
     depends_on:
-      - evolution-api
+      - evolution-api-clinicas
 
   # --- SEU FRONTEND ---
  # frontend:
@@ -33,12 +35,12 @@ services:
       - redis_data:/data
 
   # --- EVOLUTION API ---
-  evolution-api:
+  evolution-api-clinicas:
     image: evoapicloud/evolution-api:v2.3.1
-    container_name: evolution_api
+    container_name: evolution_api_clinicas
     restart: always
     ports:
-      - "8081:8080"
+      - "8082:8080"
     volumes:
       - evolution_store:/evolution/store # IMPORTANTE: Persistir as sessões do WhatsApp
     depends_on:
@@ -82,7 +84,7 @@ services:
     ports:
       - "3001:80"
     environment:
-      - VITE_API_URL=http://147.93.15.244:8081
+      - VITE_API_URL=http://147.93.8.232:8082
     volumes:
       - ${PWD}/evolution-manager-v2/nginx.conf:/etc/nginx/conf.d/nginx.conf
 
