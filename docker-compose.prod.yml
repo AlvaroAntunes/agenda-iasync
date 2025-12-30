@@ -78,7 +78,10 @@ services:
 
   # --- EVOLUTION MANAGER  ---
   evolution-manager:
-    build: ./evolution-manager-v2
+    build: 
+      context: ./evolution-manager-v2
+      args:
+        VITE_API_URL: http://147.93.8.232:8085
     container_name: evolution_manager
     restart: always
     ports:
