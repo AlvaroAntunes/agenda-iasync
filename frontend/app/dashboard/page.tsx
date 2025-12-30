@@ -48,12 +48,13 @@ type ClinicData = {
   ia_ativa: boolean
   plano: 'basic' | 'premium' | 'enterprise'
   tipo_calendario: 'google' | 'outlook'
+  calendar_refresh_token: string | null
 }
 
 export default function ClinicDashboard() {
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
-  const [selectedDate, setSelectedDate] = useState("2025-01-15")
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(true)
   const [success, setSuccess] = useState("")
   const [clinicData, setClinicData] = useState<ClinicData | null>(null)
@@ -315,26 +316,39 @@ export default function ClinicDashboard() {
                   <div>
                     <CardTitle>Consultas de Hoje</CardTitle>
                     <CardDescription>
-                      {new Date(selectedDate).toLocaleDateString("pt-BR", {
+                      {new Date(selectedDate + 'T12:00:00').toLocaleDateString("pt-BR", {
                         weekday: "long",
                         year: "numeric",
                         month: "long",
                         day: "numeric",
+                        timeZone: "America/Sao_Paulo"
                       })}
                     </CardDescription>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      const calendarUrl = clinicData?.tipo_calendario === 'google' 
-                        ? 'https://calendar.google.com'
-                        : 'https://outlook.live.com/calendar'
-                      window.open(calendarUrl, '_blank')
-                    }}
-                  >
-                    Ver Calendário
-                  </Button>
+                  {clinicData?.calendar_refresh_token ? (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        const calendarUrl = clinicData?.tipo_calendario === 'google' 
+                          ? 'https://calendar.google.com'
+                          : 'https://outlook.live.com/calendar'
+                        window.open(calendarUrl, '_blank')
+                      }}
+                    >
+                      Ver Calendário
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="default" 
+                      size="sm"
+                      onClick={() => {
+                        window.location.href = '/auth/login'
+                      }}
+                    >
+                      Conectar Calendário
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>

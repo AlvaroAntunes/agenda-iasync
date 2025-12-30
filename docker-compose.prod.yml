@@ -15,15 +15,20 @@ services:
     depends_on:
       - evolution-api-clinicas
 
-  # --- SEU FRONTEND ---
- # frontend:
-  #  build: ./frontend
-   # container_name: saas_frontend
-    #restart: always
-   # ports:
-    #  - "3000:3000"
-   # env_file:
-    #  - ./frontend/.env
+    # --- SEU FRONTEND  ---
+  frontend:
+    build: 
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://147.93.8.232:8002
+    container_name: saas_frontend
+    restart: always
+    ports:
+      - "3002:3000"
+    env_file:
+      - ./frontend/.env
+      # Se você tiver variáveis de build (como NEXT_PUBLIC_), pode precisar passá-las em args também,
+      # mas lendo do arquivo .env geralmente funciona se configurado no Dockerfile.
 
   # --- NOVO SERVIÇO: REDIS ---
   redis:
