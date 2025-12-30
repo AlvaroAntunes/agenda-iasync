@@ -1,71 +1,199 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, User, Phone, Bot, Settings, Building2, ChevronRight } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Switch } from "@/components/ui/switch"
+import { 
+  Calendar, 
+  Clock, 
+  User, 
+  Phone, 
+  Bot, 
+  Settings, 
+  Building2, 
+  ChevronRight,
+  CheckCircle2
+} from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 
-// Mock data - will be replaced with real database queries
-const mockAppointments = [
-  {
-    id: 1,
-    patientName: "Maria Silva",
-    patientPhone: "(11) 98765-4321",
-    doctor: "Dr. João Santos",
-    date: "2025-01-15",
-    time: "14:00",
-    type: "Limpeza",
-    status: "confirmed",
-  },
-  {
-    id: 2,
-    patientName: "Carlos Oliveira",
-    patientPhone: "(11) 97654-3210",
-    doctor: "Dra. Ana Costa",
-    date: "2025-01-15",
-    time: "15:00",
-    type: "Consulta",
-    status: "pending",
-  },
-  {
-    id: 3,
-    patientName: "Fernanda Lima",
-    patientPhone: "(11) 96543-2109",
-    doctor: "Dr. João Santos",
-    date: "2025-01-15",
-    time: "16:00",
-    type: "Ortodontia",
-    status: "confirmed",
-  },
-  {
-    id: 4,
-    patientName: "Roberto Alves",
-    patientPhone: "(11) 95432-1098",
-    doctor: "Dra. Paula Mendes",
-    date: "2025-01-16",
-    time: "09:00",
-    type: "Extração",
-    status: "confirmed",
-  },
-  {
-    id: 5,
-    patientName: "Juliana Souza",
-    patientPhone: "(11) 94321-0987",
-    doctor: "Dr. João Santos",
-    date: "2025-01-16",
-    time: "10:30",
-    type: "Clareamento",
-    status: "pending",
-  },
-]
+type Appointment = {
+  id: string
+  horario_consulta: string
+  status: string
+  origem_agendamento: string
+  paciente: {
+    nome: string
+    telefone: string
+  } | null
+  profissional: {
+    nome: string
+    especialidade: string
+  } | null
+}
 
-const todayAppointments = mockAppointments.filter((apt) => apt.date === "2025-01-15")
-const upcomingAppointments = mockAppointments.filter((apt) => apt.date > "2025-01-15")
+type ClinicData = {
+  id: string
+  nome: string
+  email: string
+  telefone: string
+  endereco: string
+  uf: string
+  cidade: string
+  prompt_ia: string
+  ia_ativa: boolean
+  plano: 'basic' | 'premium' | 'enterprise'
+  tipo_calendario: 'google' | 'outlook'
+}
 
 export default function ClinicDashboard() {
+  const router = useRouter()
+  const supabase = getSupabaseBrowserClient()
   const [selectedDate, setSelectedDate] = useState("2025-01-15")
+  const [loading, setLoading] = useState(true)
+  const [success, setSuccess] = useState("")
+  const [clinicData, setClinicData] = useState<ClinicData | null>(null)
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([])
+  const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([])
+
+  useEffect(() => {
+    checkAuthAndLoadClinic()
+  }, [])
+
+  const checkAuthAndLoadClinic = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        router.push('/login/clinic')
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('clinic_id, role')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile || !profile.clinic_id || profile.role !== 'clinic_admin') {
+        router.push('/login/clinic')
+        return
+      }
+
+      // Carregar dados da clínica
+      const { data: clinic, error: clinicError } = await supabase
+        .from('clinicas')
+        .select('*')
+        .eq('id', profile.clinic_id)
+        .single()
+
+      if (clinicError) throw clinicError
+
+      setClinicData(clinic)
+      
+      // Carregar consultas da clínica
+      await loadAppointments(profile.clinic_id)
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error)
+      router.push('/login/clinic')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadAppointments = async (clinicId: string) => {
+    try {
+      const { data: appointmentsData, error: appointmentsError } = await supabase
+        .from('consultas')
+        .select(`
+          id,
+          horario_consulta,
+          status,
+          origem_agendamento,
+          paciente:lids!paciente_id (
+            nome,
+            telefone
+          ),
+          profissional:profissionais!profissional_id (
+            nome,
+            especialidade
+          )
+        `)
+        .eq('clinic_id', clinicId)
+        .order('horario_consulta', { ascending: true })
+
+      if (appointmentsError) throw appointmentsError
+
+      const appointments = appointmentsData || []
+      setAppointments(appointments)
+
+      // Filtrar consultas de hoje
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
+      const todayAppts = appointments.filter((apt: Appointment) => {
+        const aptDate = new Date(apt.horario_consulta)
+        return aptDate >= today && aptDate < tomorrow
+      })
+      setTodayAppointments(todayAppts)
+
+      // Filtrar consultas futuras (a partir de amanhã)
+      const upcomingAppts = appointments.filter((apt: Appointment) => {
+        const aptDate = new Date(apt.horario_consulta)
+        return aptDate >= tomorrow
+      })
+      setUpcomingAppointments(upcomingAppts)
+    } catch (error) {
+      console.error('Erro ao carregar consultas:', error)
+    }
+  }
+
+  const handleToggleIA = async () => {
+    if (!clinicData) return
+
+    try {
+      const newIAStatus = !clinicData.ia_ativa
+
+      const { error: updateError } = await supabase
+        .from('clinicas')
+        .update({ ia_ativa: newIAStatus })
+        .eq('id', clinicData.id)
+
+      if (updateError) throw updateError
+
+      setClinicData({ ...clinicData, ia_ativa: newIAStatus })
+      setSuccess(newIAStatus ? "IA ativada com sucesso!" : "IA desativada com sucesso!")
+      
+      setTimeout(() => {
+        setSuccess("")
+      }, 3000)
+    } catch (error: any) {
+      console.error('Erro ao atualizar status da IA:', error)
+    }
+  }
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    )
+  }
 
   const confirmedCount = todayAppointments.filter((a) => a.status === "confirmed").length
   const pendingCount = todayAppointments.filter((a) => a.status === "pending").length
@@ -84,14 +212,14 @@ export default function ClinicDashboard() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card">
-        <div className="container mx-auto px-6 py-4">
+        <div className="w-full px-4 md:px-8 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
                 <Building2 className="h-6 w-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-foreground">Clínica Dental São Paulo</h1>
+                <h1 className="text-xl font-semibold text-foreground">{clinicData?.nome || 'Carregando...'}</h1>
                 <p className="text-sm text-muted-foreground">Dashboard</p>
               </div>
             </div>
@@ -101,13 +229,21 @@ export default function ClinicDashboard() {
                   <Settings className="h-4 w-4" />
                 </Button>
               </Link>
-              <Button variant="outline">Sair</Button>
+              <Button variant="outline" onClick={handleSignOut}>Sair</Button>
             </div>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-6 py-8">
+        {/* Success Alert */}
+        {success && (
+          <Alert className="mb-6 border-green-200 bg-green-50">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-600">{success}</AlertDescription>
+          </Alert>
+        )}
+
         {/* Quick Stats */}
         <div className="mb-8 grid gap-6 md:grid-cols-4">
           <Card>
@@ -149,11 +285,23 @@ export default function ClinicDashboard() {
               <Bot className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-green-500" />
-                <span className="text-sm font-medium text-foreground">Conectado</span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className={`h-3 w-3 rounded-full ${clinicData?.ia_ativa ? 'bg-green-500' : 'bg-red-400'}`} />
+                  <span className="text-sm font-medium text-foreground">
+                    {clinicData?.ia_ativa ? 'IA Ativa' : 'IA Inativa'}
+                  </span>
+                </div>
+                <Switch
+                  checked={clinicData?.ia_ativa ?? false}
+                  onCheckedChange={handleToggleIA}
+                />
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Última sincronização: agora</p>
+              <p className="text-xs text-muted-foreground">
+                {clinicData?.ia_ativa 
+                  ? 'Bot respondendo automaticamente' 
+                  : 'Bot em modo manual'}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -175,7 +323,16 @@ export default function ClinicDashboard() {
                       })}
                     </CardDescription>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      const calendarUrl = clinicData?.tipo_calendario === 'google' 
+                        ? 'https://calendar.google.com'
+                        : 'https://outlook.live.com/calendar'
+                      window.open(calendarUrl, '_blank')
+                    }}
+                  >
                     Ver Calendário
                   </Button>
                 </div>
@@ -199,28 +356,32 @@ export default function ClinicDashboard() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-semibold text-foreground">{appointment.patientName}</h3>
+                              <h3 className="font-semibold text-foreground">{appointment.paciente?.nome || 'Paciente não identificado'}</h3>
                               {getStatusBadge(appointment.status)}
                             </div>
                             <div className="flex items-center gap-4 text-sm text-muted-foreground">
                               <span className="flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                {appointment.time}
+                                {new Date(appointment.horario_consulta).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                               </span>
-                              <span className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                {appointment.doctor}
-                              </span>
+                              {appointment.profissional && (
+                                <span className="flex items-center gap-1">
+                                  <User className="h-3 w-3" />
+                                  {appointment.profissional.nome}
+                                </span>
+                              )}
                               <span className="flex items-center gap-1">
                                 <Phone className="h-3 w-3" />
-                                {appointment.patientPhone}
+                                {appointment.paciente?.telefone || 'Sem telefone'}
                               </span>
                             </div>
-                            <div className="mt-1">
-                              <Badge variant="outline" className="text-xs">
-                                {appointment.type}
-                              </Badge>
-                            </div>
+                            {appointment.profissional?.especialidade && (
+                              <div className="mt-1">
+                                <Badge variant="outline" className="text-xs">
+                                  {appointment.profissional.especialidade}
+                                </Badge>
+                              </div>
+                            )}
                           </div>
                         </div>
                         <Button variant="ghost" size="icon">
@@ -249,14 +410,18 @@ export default function ClinicDashboard() {
                         <Calendar className="h-5 w-5 text-muted-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-foreground">{appointment.patientName}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{appointment.doctor}</p>
+                        <p className="font-medium text-sm text-foreground">{appointment.paciente?.nome || 'Paciente não identificado'}</p>
+                        {appointment.profissional && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{appointment.profissional.nome}</p>
+                        )}
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs text-muted-foreground">
-                            {new Date(appointment.date).toLocaleDateString("pt-BR")}
+                            {new Date(appointment.horario_consulta).toLocaleDateString("pt-BR")}
                           </span>
                           <span className="text-xs text-muted-foreground">•</span>
-                          <span className="text-xs text-muted-foreground">{appointment.time}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(appointment.horario_consulta).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
                         </div>
                       </div>
                     </div>

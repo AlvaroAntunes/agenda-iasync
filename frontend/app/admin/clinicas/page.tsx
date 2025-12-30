@@ -43,7 +43,9 @@ import {
   Trash2, 
   AlertCircle,
   CheckCircle2,
-  Search
+  Search,
+  Eye,
+  EyeOff
 } from "lucide-react"
 import Link from "next/link"
 
@@ -75,6 +77,7 @@ export default function ClinicsManagementPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [currentClinic, setCurrentClinic] = useState<Clinic | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState<{
     nome: string
     email: string
@@ -223,9 +226,23 @@ export default function ClinicsManagementPage() {
       setError("")
       setSuccess("")
 
+      // Enviar apenas os campos da clínica (sem campos do admin)
+      const clinicData = {
+        nome: formData.nome,
+        email: formData.email,
+        telefone: formData.telefone,
+        endereco: formData.endereco,
+        uf: formData.uf,
+        cidade: formData.cidade,
+        prompt_ia: formData.prompt_ia,
+        ia_ativa: formData.ia_ativa,
+        plano: formData.plano,
+        tipo_calendario: formData.tipo_calendario,
+      }
+
       const { error } = await supabase
         .from('clinicas')
-        .update(formData)
+        .update(clinicData)
         .eq('id', currentClinic.id)
 
       if (error) throw error
@@ -576,14 +593,30 @@ export default function ClinicsManagementPage() {
 
                         <div className="grid gap-2">
                           <Label htmlFor="admin_senha">Senha do Admin *</Label>
-                          <Input
-                            id="admin_senha"
-                            type="password"
-                            value={formData.admin_senha}
-                            onChange={(e) => setFormData({ ...formData, admin_senha: e.target.value })}
-                            placeholder="Mínimo 6 caracteres"
-                            minLength={6}
-                          />
+                          <div className="relative">
+                            <Input
+                              id="admin_senha"
+                              type={showPassword ? "text" : "password"}
+                              value={formData.admin_senha}
+                              onChange={(e) => setFormData({ ...formData, admin_senha: e.target.value })}
+                              placeholder="Mínimo 6 caracteres"
+                              minLength={6}
+                              className="pr-10"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? (
+                                <EyeOff className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <Eye className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </Button>
+                          </div>
                           <p className="text-xs text-muted-foreground">
                             O admin poderá alterar a senha após o primeiro login
                           </p>

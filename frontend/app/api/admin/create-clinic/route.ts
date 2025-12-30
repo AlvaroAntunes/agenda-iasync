@@ -120,25 +120,26 @@ export async function POST(request: Request) {
       )
     }
 
-    // 3. Criar profile do usuário
+    // 3. Atualizar o profile criado automaticamente pelo trigger
+    // O trigger on_auth_user_created já criou o profile, apenas atualizamos os dados
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .insert([{
-        id: authData.user.id,
+      .update({
         clinic_id: newClinic.id,
         full_name: admin.full_name,
         role: 'clinic_admin',
         phone: admin.phone || null,
         is_active: true,
-      }])
+      })
+      .eq('id', authData.user.id)
 
     if (profileError) {
       // Se falhar, deletar usuário e clínica
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
       await supabaseAdmin.from('clinicas').delete().eq('id', newClinic.id)
-      console.error('Erro ao criar profile:', profileError)
+      console.error('Erro ao atualizar profile:', profileError)
       return NextResponse.json(
-        { error: `Erro ao criar profile: ${profileError.message}` },
+        { error: `Erro ao atualizar profile: ${profileError.message}` },
         { status: 500 }
       )
     }

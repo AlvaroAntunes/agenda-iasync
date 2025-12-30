@@ -15,24 +15,26 @@ import {
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/20">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/20 flex flex-col">
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-              <Building2 className="h-5 w-5 text-primary-foreground" />
+        <div className="w-full px-4 md:px-8 lg:px-8">
+          <div className="flex h-16 items-center justify-between max-w-full">
+            <div className="flex items-center gap-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
+                <Building2 className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <span className="text-xl font-bold">IASync</span>
             </div>
-            <span className="text-xl font-bold">IASync</span>
+            <Link href="/login/clinic">
+              <Button>Acessar Sistema</Button>
+            </Link>
           </div>
-          <Link href="/login/clinic">
-            <Button>Acessar Sistema</Button>
-          </Link>
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="container px-4 py-24 md:py-32">
+      <section className="container mx-auto px-4 py-24 md:py-32 max-w-7xl">
         <div className="mx-auto max-w-4xl text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border bg-background/50 px-4 py-1.5 text-sm">
             <Sparkles className="h-4 w-4 text-primary" />
@@ -63,7 +65,7 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="container px-4 py-16 md:py-24">
+      <section id="features" className="container mx-auto px-4 py-16 md:py-24 max-w-7xl">
         <div className="mx-auto max-w-6xl">
           <div className="mb-12 text-center">
             <h2 className="mb-4 text-3xl font-bold md:text-4xl">Recursos Principais</h2>
@@ -149,7 +151,7 @@ export default function HomePage() {
       </section>
 
       {/* Benefits Section */}
-      <section className="container px-4 py-16 md:py-24">
+      <section className="container mx-auto px-4 py-16 md:py-24 max-w-7xl">
         <div className="mx-auto max-w-4xl">
           <div className="mb-12 text-center">
             <h2 className="mb-4 text-3xl font-bold md:text-4xl">Por que escolher IASync?</h2>
@@ -203,7 +205,7 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="container px-4 py-16 md:py-24">
+      <section className="container mx-auto px-4 py-16 md:py-24 max-w-7xl">
         <div className="mx-auto max-w-4xl">
           <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
             <CardContent className="flex flex-col items-center gap-6 p-8 text-center md:p-12">
@@ -213,14 +215,14 @@ export default function HomePage() {
               <p className="text-lg text-muted-foreground">
                 Entre em contato e descubra como podemos ajudar sua clínica a crescer
               </p>
-              <div className="flex flex-col gap-4 sm:flex-row">
+              <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
                 <Link href="/login/clinic">
-                  <Button size="lg">
+                  <Button size="lg" className="w-full sm:w-auto">
                     Acessar Sistema
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
-                <Button size="lg" variant="outline" asChild>
+                <Button size="lg" variant="outline" className="w-full sm:w-auto" asChild>
                   <a href="mailto:contato@iasync.com.br">Entre em Contato</a>
                 </Button>
               </div>
@@ -230,9 +232,9 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container px-4 py-8">
-          <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
+      <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 mt-auto">
+        <div className="w-full px-4 md:px-8 lg:px-8 py-8">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                 <Building2 className="h-4 w-4 text-primary-foreground" />
