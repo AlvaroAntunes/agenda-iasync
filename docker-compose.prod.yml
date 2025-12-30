@@ -49,7 +49,7 @@ services:
     - 8.8.8.8
     - 8.8.4.4
     environment:
-      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      - AUTHENTICATION_API_KEY=${AUTHENTICATION_API_KEY}
 
       # PARA O LOGIN FUNCIONAR
       - CORS_ORIGIN=*

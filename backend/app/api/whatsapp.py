@@ -14,8 +14,8 @@ load_dotenv()  # Carrega variáveis do .env
 router = APIRouter()
 
 EVOLUTION_URL = os.getenv("EVOLUTION_API_URL") 
-EVOLUTION_KEY = os.getenv("EVOLUTION_API_KEY")
-WEBHOOK_URL = "http://172.17.0.1:8000/webhook/evolution" # URL do seu webhook
+EVOLUTION_KEY = os.getenv("AUTHENTICATION_API_KEY")
+WEBHOOK_URL = "http://backend:8000/webhook/evolution" # URL do seu webhook
 
 def get_headers():
     return {
