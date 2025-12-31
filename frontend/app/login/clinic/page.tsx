@@ -155,9 +155,6 @@ export default function ClinicLoginPage() {
                   <input type="checkbox" className="rounded border-gray-300" />
                   <span className="text-muted-foreground">Lembrar de mim</span>
                 </label>
-                <Link href="/forgot-password" className="text-primary hover:underline">
-                  Esqueceu a senha?
-                </Link>
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Entrando..." : "Entrar"}

@@ -343,7 +343,9 @@ export default function ClinicDashboard() {
                       variant="default" 
                       size="sm"
                       onClick={() => {
-                        window.location.href = '/auth/login'
+                        if (clinicData?.id) {
+                          window.location.href = `${process.env.NEXT_PUBLIC_URL_SITE!}/auth/login?clinic_id=${clinicData.id}`
+                        }
                       }}
                     >
                       Conectar Calendário
