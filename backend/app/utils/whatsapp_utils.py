@@ -12,7 +12,7 @@ def enviar_mensagem_whatsapp(instance_name, remote_jid, text):
     Função centralizada para envio de mensagens (Evolution v2).
     Usada tanto pelo Webhook (erros) quanto pelo Celery (IA).
     """
-    url = f"{EVOLUTION_API_URL}/message/send/text/{instance_name}"
+    url = f"{EVOLUTION_API_URL}/message/send/text/"
     
     headers = {
         "apikey": AUTHENTICATION_API_KEY,
