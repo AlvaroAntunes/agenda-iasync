@@ -209,11 +209,12 @@ class AgenteClinica:
             nome_feriado = feriados.get(dt_inicio.date())
             return f"NEGADO: A data solicitada ({dt_inicio.strftime('%d/%m')}) é feriado de {nome_feriado}. A clínica não abre."
         
-        for item in lista_fechada:
-            if item['dia'] == dt_inicio.day and item['mes'] == dt_inicio.month:
-                # Pega o motivo (se não tiver, usa genérico)
-                motivo = item.get('descricao', 'Data sem expediente')
-                return f"NEGADO: Na data solicitada ({dt_inicio.strftime('%d/%m')}) a clínica não abre. Motivo: {motivo}."
+        if lista_fechada:
+            for item in lista_fechada:
+                if item['dia'] == dt_inicio.day and item['mes'] == dt_inicio.month:
+                    # Pega o motivo (se não tiver, usa genérico)
+                    motivo = item.get('descricao', 'Data sem expediente')
+                    return f"NEGADO: Na data solicitada ({dt_inicio.strftime('%d/%m')}) a clínica não abre. Motivo: {motivo}."
 
         # B. Verifica se é Fim de Semana (0=Seg, 5=Sab, 6=Dom)
         # Se sua clínica abre sábado, mude para: if dt_inicio.weekday() == 6:
@@ -451,7 +452,7 @@ class AgenteClinica:
 
     def executar(self, mensagem_usuario: str, historico_conversa: List = []):
         # 1. Configurar LLM  
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1, api_key=os.getenv("OPENAI_API_KEY"))
+        llm = ChatOpenAI(model="gpt-4o", temperature=0, api_key=os.getenv("OPENAI_API_KEY"))
 
         # 2. Bind das Ferramentas (Vincula as funções ao LLM)
         # --- CRIAÇÃO DAS TOOLS DE FORMA EXPLÍCITA ---
