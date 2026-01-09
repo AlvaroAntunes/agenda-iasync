@@ -11,6 +11,9 @@ requests
 pydantic
 unidecode
 holidays
+celery
+redis
+gevent
 # LangChain (Sem fixar sub-dependências como 'core')
 langchain==0.2.1
 langchain-community==0.2.1

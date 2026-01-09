@@ -13,6 +13,8 @@ from app.services.history_service import HistoryService, mensagens_contexto
 from dotenv import load_dotenv
 from app.services.audio_service import AudioService
 from supabase import create_client
+from app.services.tasks import processar_mensagem_ia
+from app.utils.whatsapp_utils import enviar_mensagem_whatsapp
 
 load_dotenv()
 
@@ -30,41 +32,28 @@ message_buffers = {}
 BUFFER_DELAY = 10  # Segundos de espera
 
 async def processar_mensagem_acumulada(clinic_id: str, telefone_cliente: str, target_response_jid: str):
-    """
-    Função que roda APÓS o tempo de espera.
-    Pega todas as mensagens, junta e manda para a IA.
-    """
     buffer_key = f"{clinic_id}:{telefone_cliente}"
     
     if buffer_key not in message_buffers:
         return
 
-    # 1. Recupera e limpa o buffer
+    # 1. Recupera mensagens
     mensagens = message_buffers[buffer_key]["msgs"]
-    # Remove do buffer global para liberar memória
     del message_buffers[buffer_key]
     
-    # 2. Junta os textos (Ex: "Oi" + "Tudo bem?" = "Oi. Tudo bem?")
+    # 2. Junta o texto
     texto_completo = ". ".join(mensagens)
     
-    print(f"🤖 IA Processando bloco para {telefone_cliente}: {texto_completo}")
+    print(f"🚀 Enviando bloco para o Celery: {texto_completo}")
 
-    try:        
-        # Histórico
-        history_service = HistoryService(clinic_id=clinic_id, session_id=telefone_cliente)
-        history_service.add_user_message(texto_completo)
-        historico = history_service.get_langchain_history(limit=mensagens_contexto)
-        
-        # Agente
-        agente = AgenteClinica(clinic_id=clinic_id, session_id=telefone_cliente)
-        resposta_ia = agente.executar(texto_completo, historico)
-        
-        # Salvar e Responder
-        history_service.add_ai_message(resposta_ia)
-        enviar_mensagem_v2(clinic_id, target_response_jid, resposta_ia)
-        
-    except Exception as e:
-        print(f"❌ Erro no processamento assíncrono: {e}")
+    # 3. Chama o Celery em vez de processar aqui
+    # O .delay() é instantâneo, ele só joga pro Redis e libera o servidor
+    processar_mensagem_ia.delay(
+        clinic_id, 
+        telefone_cliente, 
+        texto_completo, 
+        target_response_jid
+    )
 
 def salvar_lid_cache(clinic_id: str, lid: str, telefone: str, nome: str = "Desconhecido"):
     """
@@ -195,9 +184,9 @@ async def evolution_webhook(request: Request):
             texto_transcrito = audio_service.transcrever_audio_evolution(clinic_id, data)
             
             if not texto_transcrito or texto_transcrito.startswith("[Erro"):
-                enviar_mensagem_v2(
-                    clinic_id=clinic_id, 
-                    telefone_cliente=telefone_cliente, 
+                enviar_mensagem_whatsapp(
+                    instance_name=clinic_id, 
+                    remote_jid=telefone_cliente, 
                     text="Desculpe, tive um problema técnico para ouvir o áudio. Pode escrever?"
                 )
                 return {"status": "audio_error"}
@@ -246,38 +235,3 @@ async def esperar_e_processar(clinic_id, telefone_cliente, target_jid):
     except asyncio.CancelledError:
         # Se foi cancelado (porque chegou outra msg), não faz nada.
         print(f"⏳ Timer cancelado para {telefone_cliente} (nova msg chegou)")
-    
-def enviar_mensagem_v2(instance_name, telefone_cliente, text):
-    """
-    Envia mensagem usando os endpoints da Evolution API v2.
-    Endpoint: POST /message/sendText/{instance_name}
-    """
-    url = f"{EVOLUTION_API_URL}/message/sendText/{instance_name}"
-    
-    headers = {
-        "apikey": AUTHENTICATION_API_KEY,
-        "Content-Type": "application/json"
-    }
-    
-    remote_jid = str(telefone_cliente)
-    
-    if "@" not in remote_jid:
-        remote_jid = f"{remote_jid}@s.whatsapp.net"
-    
-    # NOVO PAYLOAD DA V2
-    # 'instance' agora vai no corpo da requisição
-    body = {
-        "instance": instance_name,
-        "number": remote_jid,
-        "text": text,
-        "delay": 1000,
-        "linkPreview": False
-    }
-    
-    try:
-        response = requests.post(url, json=body, headers=headers)
-        
-        if response.status_code not in [200, 201]:
-            print(f"⚠️ Erro ao enviar (V2): {response.text}")
-    except Exception as e:
-        print(f"⚠️ Erro de conexão envio (V2): {e}")
