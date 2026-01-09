@@ -15,8 +15,9 @@ REDIS_URL = os.getenv("CACHE_REDIS_URI")
 celery_app = Celery(
     "worker",
     broker=REDIS_URL,
-    backend=REDIS_URL
-)
+    backend=REDIS_URL,
+    include=["app.services.tasks"]
+) 
 
 celery_app.conf.task_routes = {
     "app.services.tasks.processar_mensagem_ia": "main-queue"
