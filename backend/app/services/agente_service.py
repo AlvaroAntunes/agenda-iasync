@@ -452,7 +452,7 @@ class AgenteClinica:
 
     def executar(self, mensagem_usuario: str, historico_conversa: List = []):
         # 1. Configurar LLM  
-        llm = ChatOpenAI(model="gpt-4o", temperature=0, api_key=os.getenv("OPENAI_API_KEY"))
+        llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0, api_key=os.getenv("OPENAI_API_KEY"))
 
         # 2. Bind das Ferramentas (Vincula as funções ao LLM)
         # --- CRIAÇÃO DAS TOOLS DE FORMA EXPLÍCITA ---

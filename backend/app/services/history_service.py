@@ -3,7 +3,7 @@
     Permite salvar e recuperar mensagens no formato esperado pelo LangChain.
 """
 
-mensagens_contexto = 25  # Número de mensagens recentes a buscar para contexto
+mensagens_contexto = 15  # Número de mensagens recentes a buscar para contexto
 
 import os
 from typing import List
