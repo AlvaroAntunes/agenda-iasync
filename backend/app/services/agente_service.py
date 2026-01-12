@@ -749,7 +749,7 @@ class AgenteClinica:
             StructuredTool.from_function(
                 func=self._logic_reagendar_agendamento,
                 name="reagendar_agendamento",
-                description="Altera o horário de uma consulta existente. Requer data antiga (DD/MM/AAAA) e hora antiga (HH:MM) para identificar, e a nova data ISO.",
+                description="Altera o horário de uma consulta existente. Requer data antiga (DD/MM/AAAA) e hora antiga (HH:MM) para identificar, e a nova data ISO. Se mudar o médico, informe o novo nome.",
                 args_schema=ReagendarInput
             )
         ]
