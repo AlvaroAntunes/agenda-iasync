@@ -509,8 +509,13 @@ class AgenteClinica:
 
         prompt_json = json.dumps(
             self.dados_clinica.get("prompt_ia", {}),
-            ensure_ascii=False
+            ensure_ascii=False,
+            indent=2
         )
+
+        # CORREÇÃO: Escapar as chaves para o LangChain
+        # Substitui '{' por '{{' e '}' por '}}'
+        prompt_json_escaped = prompt_json.replace("{", "{{").replace("}", "}}")
         
         contexto_tempo_real = f"""
         MOMENTO ATUAL: {self.dia_hoje}
@@ -524,7 +529,7 @@ class AgenteClinica:
         # 2. System Prompt Limpo (Sem repetições)
         prompt = ChatPromptTemplate.from_messages([
             # 🔒 System 1 — REGRAS FIXAS (JSON)
-            ("system", prompt_json),
+            ("system", "Siga estritamente estas configurações operacionais:\n" + prompt_json_escaped),
 
             # 📌 System 2 — CONTEXTO DINÂMICO
             ("system", contexto_tempo_real),
