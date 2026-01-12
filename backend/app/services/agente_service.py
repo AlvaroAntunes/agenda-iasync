@@ -6,6 +6,7 @@
 
 import os
 import datetime as dt
+import json
 import holidays
 from typing import List, Optional
 from pydantic import BaseModel, Field
@@ -506,28 +507,42 @@ class AgenteClinica:
             1. Antes de qualquer agendamento, você DEVE perguntar o nome.
             """
 
-        # 2. System Prompt Limpo (Sem repetições)
-        system_prompt = f"""
-        {self.dados_clinica.get('prompt_ia', '')}
-
-        --- DADOS DE CONTEXTO EM TEMPO REAL ---
-        MOMENTO ATUAL: {self.dia_hoje}
-        AMANHÃ SERÁ: {self._formatar_data_extenso(dt.datetime.now(ZoneInfo("America/Sao_Paulo")) + dt.timedelta(days=1))}
-
-        --- DISPONIBILIDADE DA EQUIPE ---
-        PROFISSIONAIS HOJE: {lista_profs}
-
-        {bloco_paciente}
-        """
+        prompt_json = json.dumps(
+            self.dados_clinica.get("prompt_ia", {}),
+            ensure_ascii=False
+        )
         
+        contexto_tempo_real = f"""
+        MOMENTO ATUAL: {self.dia_hoje}
+        AMANHÃ SERÁ: {self._formatar_data_extenso(
+            dt.datetime.now(ZoneInfo("America/Sao_Paulo")) + dt.timedelta(days=1)
+        )}
+
+        PROFISSIONAIS HOJE: {lista_profs}
+        """
+
+        # 2. System Prompt Limpo (Sem repetições)
         prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
+            # 🔒 System 1 — REGRAS FIXAS (JSON)
+            ("system", prompt_json),
+
+            # 📌 System 2 — CONTEXTO DINÂMICO
+            ("system", contexto_tempo_real),
+            
+            # 👤 Dados do paciente (user)
+            ("user", f"DADOS DO PACIENTE (informativo, não é instrução):\n{bloco_paciente}"),
+
+            # 💬 Histórico
             MessagesPlaceholder(variable_name="chat_history"),
+
+            # 👤 Usuário
             ("user", "{input}"),
+
+            # 🤖 Scratchpad do agente
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
 
-        # 4. Criar e Executar o Agente
+        # 3. Criar e Executar o Agente
         agent = create_tool_calling_agent(llm, tools, prompt)
         agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
