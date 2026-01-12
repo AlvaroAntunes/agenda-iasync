@@ -623,12 +623,7 @@ class AgenteClinica:
         # 2. Preparar Novo Horário
         try:
             dt_novo = dt.datetime.fromisoformat(nova_data_hora)
-            
-            if dt_novo.tzinfo is None:
-                br_timezone = ZoneInfo("America/Sao_Paulo")
-                dt_novo = dt_novo.replace(tzinfo=br_timezone)
-                
-            novo_horario_iso = dt_novo.isoformat()
+
         except ValueError:
             return "Erro: Formato da nova data inválido."
 
@@ -647,7 +642,7 @@ class AgenteClinica:
         try:
             supabase.table('consultas')\
                 .update({
-                    'horario_consulta': novo_horario_iso
+                    'horario_consulta': dt_novo
                 })\
                 .eq('id', consulta_alvo['id'])\
                 .execute()
