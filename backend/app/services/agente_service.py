@@ -586,11 +586,11 @@ class AgenteClinica:
             return f"Erro técnico ao cancelar: {str(e)}"
         
 
-    def _logic_reagendar_agendamento(self, data_antiga: str, hora_antiga: str, nova_data_hora: str, novo_nome_profissional: Optional[str] = None):
+    def _logic_reagendar_agendamento(self, data_atual: str, hora_atual: str, nova_data_hora: str, novo_nome_profissional: Optional[str] = None):
         """
         Move uma consulta existente. Se mudar o médico, recria o evento.
         """
-        print(f"--- TOOL: Reagendando de {data_antiga} {hora_antiga} para {nova_data_hora} ---")
+        print(f"--- TOOL: Reagendando de {data_atual} {hora_atual} para {nova_data_hora} ---")
 
         if not self.dados_paciente:
             return "Erro: Paciente não identificado."
@@ -608,12 +608,12 @@ class AgenteClinica:
                 c_dt = dt.datetime.fromisoformat(c['horario_consulta'])
                 if c_dt.tzinfo is None: c_dt = c_dt.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
                 
-                if c_dt.strftime("%d/%m/%Y") == data_antiga and c_dt.strftime("%H:%M") == hora_antiga:
+                if c_dt.strftime("%d/%m/%Y") == data_atual and c_dt.strftime("%H:%M") == hora_atual:
                     consulta_alvo = c
                     break
             
             if not consulta_alvo:
-                return f"Não encontrei a consulta do dia {data_antiga} às {hora_antiga}."
+                return f"Não encontrei a consulta do dia {data_atual} às {hora_atual}."
 
         except Exception as e:
             return f"Erro ao buscar consulta original: {e}"
