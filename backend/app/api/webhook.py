@@ -27,7 +27,7 @@ EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL")
 AUTHENTICATION_API_KEY = os.getenv("AUTHENTICATION_API_KEY")
 
 message_buffers = {}
-BUFFER_DELAY = 4  # Segundos de espera
+BUFFER_DELAY = 10  # Segundos de espera
 
 async def processar_mensagem_acumulada(clinic_id: str, telefone_cliente: str, target_response_jid: str):
     buffer_key = f"{clinic_id}:{telefone_cliente}"

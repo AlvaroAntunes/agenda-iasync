@@ -6,7 +6,6 @@
 
 import os
 import datetime as dt
-import json
 import holidays
 from typing import List, Optional
 from pydantic import BaseModel, Field
@@ -453,7 +452,7 @@ class AgenteClinica:
 
     def executar(self, mensagem_usuario: str, historico_conversa: List = []):
         # 1. Configurar LLM  
-        llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0, api_key=os.getenv("OPENAI_API_KEY"))
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=os.getenv("OPENAI_API_KEY"))
 
         # 2. Bind das Ferramentas (Vincula as funções ao LLM)
         # --- CRIAÇÃO DAS TOOLS DE FORMA EXPLÍCITA ---
@@ -507,20 +506,16 @@ class AgenteClinica:
             1. Antes de qualquer agendamento, você DEVE perguntar o nome.
             """
 
-        prompt_json = json.dumps(
-            self.dados_clinica.get("prompt_ia", {}),
-            ensure_ascii=False,
-            indent=2
-        )
+        prompt_ia = self.dados_clinica.get("prompt_ia", {}),
 
-        # CORREÇÃO: Escapar as chaves para o LangChain
-        # Substitui '{' por '{{' e '}' por '}}'
-        prompt_json_escaped = prompt_json.replace("{", "{{").replace("}", "}}")
-        
-        contexto_tempo_real = f"""
-        MOMENTO ATUAL: {self.dia_hoje}
-        AMANHÃ SERÁ: {self._formatar_data_extenso(
+        contexto_tempo_real = f""" 
+        --- DATAS DA SEMANA ---
+        HOJE: {self.dia_hoje}
+        AMANHÃ: {self._formatar_data_extenso(
             dt.datetime.now(ZoneInfo("America/Sao_Paulo")) + dt.timedelta(days=1)
+        )}
+        DEPOIS DE AMANHÃ SERÁ: {self._formatar_data_extenso(
+            dt.datetime.now(ZoneInfo("America/Sao_Paulo")) + dt.timedelta(days=2)
         )}
 
         PROFISSIONAIS HOJE: {lista_profs}
@@ -529,7 +524,7 @@ class AgenteClinica:
         # 2. System Prompt Limpo (Sem repetições)
         prompt = ChatPromptTemplate.from_messages([
             # 🔒 System 1 — REGRAS FIXAS (JSON)
-            ("system", "Siga estritamente estas configurações operacionais:\n" + prompt_json_escaped),
+            ("system", "Siga estritamente estas configurações operacionais:\n" + prompt_ia),
 
             # 📌 System 2 — CONTEXTO DINÂMICO
             ("system", contexto_tempo_real),
