@@ -11,7 +11,7 @@ class BufferService:
 
         self.client = redis.from_url(redis_url, decode_responses=True)
         # Tempo do Lock = Tempo do Buffer + Margem de segurança (2s)
-        self.LOCK_TTL = 12 
+        self.LOCK_TTL = 15 
 
     def add_message(self, clinic_id: str, phone: str, message: str):
         """
