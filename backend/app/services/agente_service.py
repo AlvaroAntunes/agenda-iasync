@@ -48,6 +48,13 @@ class VerificaConsultasExistentes(BaseModel):
     data: str = Field(description="Data para verificar no formato DD/MM/AAAA")
     nome_paciente: str = Field(description="Nome completo do paciente")
     
+class CancelarAgendamentoInput(BaseModel):
+    data_consulta: str = Field(description="A data da consulta a ser cancelada (DD/MM/AAAA)")
+    hora_consulta: str = Field(description="O horário da consulta a ser cancelada (HH:MM)")
+
+class ListarMinhasConsultasInput(BaseModel):
+    dummy: Optional[str] = Field(description="Campo ignorado, pode deixar vazio ou nulo")
+    
 class AgenteClinica:
     def __init__(self, clinic_id: str, session_id: str):
         self.clinic_id = clinic_id
@@ -447,6 +454,109 @@ class AgenteClinica:
             return f"O paciente {nome_paciente} já possui {len(consultas_response.data)} consulta(s) agendada(s) para {data} com o profissional {self._identificar_profissional(consultas_response.data[0]['profissional_id'])}."
         else:
             return f"O paciente {nome_paciente} não possui consultas agendadas para {data}."
+        
+    def _logic_listar_consultas_futuras(self, dummy: str = None):
+        """
+        Lista agendamentos futuros do paciente para ele saber o que cancelar/reagendar.
+        """
+        print(f"--- TOOL: Listando consultas futuras ---")
+        
+        # 1. Identificar paciente
+        if not self.dados_paciente:
+            return "Erro: Paciente não identificado no sistema. Pergunte o nome primeiro."
+
+        paciente_id = self.dados_paciente['id']
+        agora = dt.datetime.now(ZoneInfo("America/Sao_Paulo")).isoformat()
+
+        # 2. Buscar no Supabase
+        try:
+            consultas = supabase.table('consultas')\
+                .select('horario_consulta, status, profissionais(nome)')\
+                .eq('paciente_id', paciente_id)\
+                .eq('status', 'AGENDADA')\
+                .gte('horario_consulta', agora)\
+                .order('horario_consulta')\
+                .execute()
+
+            if not consultas.data:
+                return "Você não possui nenhuma consulta futura agendada."
+
+            texto = "Consultas encontradas:\n"
+            
+            for c in consultas.data:
+                dt_obj = dt.datetime.fromisoformat(c['horario_consulta'])
+                
+                if dt_obj.tzinfo is None:
+                    dt_obj = dt_obj.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+                
+                # Formato: 12/01/2026 às 14:30 com Dr. João
+                fmt = dt_obj.strftime("%d/%m/%Y às %H:%M")
+                medico = c['profissionais']['nome'] if c['profissionais'] else "Clínica"
+                texto += f"- {fmt} com {medico}\n"
+
+            return texto
+
+        except Exception as e:
+            return f"Erro ao buscar consultas: {str(e)}"
+
+    def _logic_cancelar_agendamento(self, data_consulta: str, hora_consulta: str):
+        """
+        Cancela uma consulta específica baseada na data e hora.
+        """
+        print(f"--- TOOL: Cancelando consulta de {data_consulta} às {hora_consulta} ---")
+
+        if not self.dados_paciente:
+            return "Erro: Paciente não identificado."
+
+        try:
+            # Converter input string para objeto data para comparação
+            # (Assume que o input vem DD/MM/AAAA e HH:MM)
+            # Precisamos varrer as consultas do paciente para achar o ID certo
+            
+            consultas_futuras = supabase.table('consultas')\
+                .select('id, horario_consulta, external_event_id, profissionais(external_calendar_id)')\
+                .eq('paciente_id', self.dados_paciente['id'])\
+                .eq('status', 'AGENDADA')\
+                .execute()
+
+            consulta_alvo = None
+            
+            for c in consultas_futuras.data:
+                c_dt = dt.datetime.fromisoformat(c['horario_consulta'])
+                
+                if c_dt.tzinfo is None:
+                    c_dt = c_dt.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+                
+                c_data_str = c_dt.strftime("%d/%m/%Y")
+                c_hora_str = c_dt.strftime("%H:%M")
+
+                if c_data_str == data_consulta and c_hora_str == hora_consulta:
+                    consulta_alvo = c
+                    break
+            
+            if not consulta_alvo:
+                return f"Não encontrei nenhuma consulta agendada para {data_consulta} às {hora_consulta}. Verifique a data."
+
+            # 1. Cancelar no Google Calendar
+            calendar_id = consulta_alvo['profissionais']['external_calendar_id']
+            event_id = consulta_alvo['external_event_id']
+
+            if calendar_id and event_id:
+                sucesso_gcal = self.calendar_service.cancelar_evento(calendar_id, event_id)
+                
+                if not sucesso_gcal:
+                    print("Aviso: Falha ao deletar do Google Calendar (pode já ter sido deletado), seguindo para cancelar no banco.")
+
+            # 2. Atualizar Banco de Dados
+            supabase.table('consultas')\
+                .update({'status': 'CANCELADO'})\
+                .eq('id', consulta_alvo['id'])\
+                .execute()
+
+            return f"Sucesso: Consulta do dia {data_consulta} às {hora_consulta} foi cancelada."
+
+        except Exception as e:
+            return f"Erro técnico ao cancelar: {str(e)}"
 
     # --- O CÉREBRO (AGENTE) ---
 
@@ -476,6 +586,18 @@ class AgenteClinica:
                 name="verificar_consultas_existentes",
                 description="Verifica se o paciente já tem consultas agendadas para uma data específica.",
                 args_schema=VerificaConsultasExistentes
+            ),
+            StructuredTool.from_function(
+                func=self._logic_listar_consultas_futuras,
+                name="listar_minhas_consultas",
+                description="Lista todas as consultas futuras agendadas para o paciente.",
+                args_schema=ListarMinhasConsultasInput
+            ),
+            StructuredTool.from_function(
+                func=self._logic_cancelar_agendamento,
+                name="cancelar_agendamento",
+                description="Cancela uma consulta específica baseada na data e hora fornecidas.",
+                args_schema=CancelarAgendamentoInput
             )
         ]
 
