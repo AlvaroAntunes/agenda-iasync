@@ -506,7 +506,7 @@ class AgenteClinica:
             1. Antes de qualquer agendamento, você DEVE perguntar o nome.
             """
 
-        prompt_ia = self.dados_clinica.get("prompt_ia", {}),
+        prompt_ia = self.dados_clinica.get("prompt_ia", '')
 
         contexto_tempo_real = f""" 
         --- DATAS DA SEMANA ---

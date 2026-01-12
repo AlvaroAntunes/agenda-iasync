@@ -165,3 +165,49 @@ class GoogleCalendarService(CalendarService):
         }
         
         return self.service.events().insert(calendarId=calendar_id, body=evento).execute()
+    
+    def cancelar_evento(self, calendar_id: str, event_id: str):
+        """
+        Deleta um evento do Google Calendar.
+        Retorna True se sucesso, False se falha.
+        """
+        try:
+            print(f"🗑️ Cancelando evento {event_id} no calendário {calendar_id}...")
+            self.service.events().delete(
+                calendarId=calendar_id,
+                eventId=event_id
+            ).execute()
+            return True
+        except Exception as e:
+            print(f"⚠️ Erro ao cancelar no Google Calendar: {e}")
+            return False
+    
+    def mover_evento(self, calendar_id: str, event_id: str, novo_inicio: dt.datetime):
+        """
+        Atualiza o horário de um evento existente (PATCH).
+        Recalcula o horário de fim mantendo 1h de duração.
+        """
+        try:
+            print(f"🔄 Movendo evento {event_id} para {novo_inicio}...")
+            
+            # Recalcula o fim (assumindo 1h de duração padrão)
+            novo_fim = novo_inicio + dt.timedelta(hours=1)
+            TIMEZONE = 'America/Sao_Paulo'
+            
+            # Usamos PATCH para alterar apenas os campos de horário, mantendo título e descrição
+            body = {
+                'start': {'dateTime': novo_inicio.isoformat(), 'timeZone': TIMEZONE},
+                'end': {'dateTime': novo_fim.isoformat(), 'timeZone': TIMEZONE},
+            }
+            
+            evento_atualizado = self.service.events().patch(
+                calendarId=calendar_id,
+                eventId=event_id,
+                body=body
+            ).execute()
+            
+            return evento_atualizado
+            
+        except Exception as e:
+            print(f"⚠️ Erro ao mover evento no Google Calendar: {e}")
+            raise e # Lança o erro para o Agente saber que falhou

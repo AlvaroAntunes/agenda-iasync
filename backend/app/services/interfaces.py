@@ -29,3 +29,13 @@ class CalendarService(ABC):
         Deve criar um evento e retornar os dados dele (link, id).
         """
         pass
+    
+    @abstractmethod
+    def cancelar_evento(self, calendar_id: str, event_id: str) -> bool:
+        """Deleta um evento do calendário."""
+        pass
+
+    @abstractmethod
+    def mover_evento(self, calendar_id: str, event_id: str, novo_inicio: dt.datetime) -> Dict[str, Any]:
+        """Atualiza a data/hora de um evento existente."""
+        pass
