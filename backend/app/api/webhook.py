@@ -7,12 +7,13 @@ import json
 import asyncio
 import os
 import requests
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, BackgroundTasks
 from dotenv import load_dotenv
 from app.services.audio_service import AudioService
 from supabase import create_client
 from app.services.tasks import processar_mensagem_ia
 from app.utils.whatsapp_utils import enviar_mensagem_whatsapp
+from app.services.buffer_service import BufferService
 
 load_dotenv()
 
@@ -26,32 +27,34 @@ router = APIRouter()
 EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL")
 AUTHENTICATION_API_KEY = os.getenv("AUTHENTICATION_API_KEY")
 
-message_buffers = {}
+buffer_service = BufferService()
 BUFFER_DELAY = 10  # Segundos de espera
 
-async def processar_mensagem_acumulada(clinic_id: str, telefone_cliente: str, target_response_jid: str):
-    buffer_key = f"{clinic_id}:{telefone_cliente}"
-    
-    if buffer_key not in message_buffers:
-        return
-
-    # 1. Recupera mensagens
-    mensagens = message_buffers[buffer_key]["msgs"]
-    del message_buffers[buffer_key]
-    
-    # 2. Junta o texto
-    texto_completo = ". ".join(mensagens)
-    
-    print(f"🚀 Enviando bloco para o Celery: {texto_completo}")
-
-    # 3. Chama o Celery em vez de processar aqui
-    # O .delay() é instantâneo, ele só joga pro Redis e libera o servidor
-    processar_mensagem_ia.delay(
-        clinic_id, 
-        telefone_cliente, 
-        texto_completo, 
-        target_response_jid
-    )
+async def esperar_e_processar(clinic_id: str, telefone_cliente: str, target_jid: str):
+    """
+    Função assíncrona que aguarda o tempo do buffer e depois dispara o processamento.
+    """
+    try:
+        print(f"⏳ [Buffer] Iniciando timer de {BUFFER_DELAY}s para {telefone_cliente}...")
+        await asyncio.sleep(BUFFER_DELAY)
+        
+        # Acordou! Vamos pegar tudo que acumulou no Redis
+        texto_completo = buffer_service.get_and_clear_messages(clinic_id, telefone_cliente)
+        
+        if texto_completo:
+            print(f"🚀 [Buffer] Disparando IA com bloco: {texto_completo}")
+            # Envia para a fila do Celery (Background Worker)
+            processar_mensagem_ia.delay(
+                clinic_id, 
+                telefone_cliente, 
+                texto_completo, 
+                target_jid
+            )
+        else:
+            print(f"⚠️ [Buffer] Timer acabou mas não havia mensagens (já processado?).")
+            
+    except Exception as e:
+        print(f"❌ Erro no processamento do buffer: {e}")
 
 def salvar_lid_cache(clinic_id: str, lid: str, telefone: str, nome: str = "Desconhecido"):
     """
@@ -112,7 +115,7 @@ def resolver_jid_cliente(clinic_id: str, remote_jid: str, sender_pn: str, lid: s
     return remote_jid if remote_jid else "unknown"
 
 @router.post("/webhook/evolution")
-async def evolution_webhook(request: Request):
+async def evolution_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     Recebe eventos da Evolution API v2.
     """
@@ -195,41 +198,31 @@ async def evolution_webhook(request: Request):
             return {"status": "no_text"}
 
         print(f"💬 Mensagem Processada: {texto_usuario}")
+        
+        # --- LÓGICA DO BUFFER (REDIS) ---
+        
+        # 1. Salva a mensagem no Redis imediatamente
+        buffer_service.add_message(clinic_id, telefone_cliente, texto_usuario)
 
-        # --- LÓGICA DO BUFFER (DEBOUNCE) ---
-        
-        buffer_key = f"{clinic_id}:{telefone_cliente}"
-        
-        # 1. Se já existe um timer rodando para esse cliente, cancela!
-        if buffer_key in message_buffers:
-            message_buffers[buffer_key]["task"].cancel()
+        # 2. Tenta pegar o Lock para ser o "Líder" do timer
+        devo_iniciar_timer = buffer_service.should_start_timer(clinic_id, telefone_cliente)
+
+        if devo_iniciar_timer:
+            # Sou o primeiro! Inicio o timer em background.
+            # O BackgroundTasks do FastAPI garante que isso rode sem travar a resposta HTTP
+            background_tasks.add_task(
+                esperar_e_processar, 
+                clinic_id, 
+                telefone_cliente, 
+                target_response_jid
+            )
+            return {"status": "timer_started"}
         else:
-            message_buffers[buffer_key] = {"msgs": []}
-            
-        # 2. Adiciona a nova mensagem na lista
-        message_buffers[buffer_key]["msgs"].append(texto_usuario)
-        
-        # 3. Cria um novo timer de 10s
-        # O asyncio.create_task roda em background sem travar o servidor
-        task = asyncio.create_task(esperar_e_processar(clinic_id, telefone_cliente, target_response_jid))
-        message_buffers[buffer_key]["task"] = task
-
-        return {"status": "buffered"}
+            # Já tem um timer rodando no Redis. Apenas acumulei a mensagem.
+            return {"status": "accumulated"}
 
     except Exception as e:
         print(f"❌ Erro no Webhook V2: {e}")
         return {"status": "error", "detail": str(e)}
 
-async def esperar_e_processar(clinic_id, telefone_cliente, target_jid):
-    """
-    Wrapper assíncrono que espera e depois chama o processador.
-    """
-    try:
-        await asyncio.sleep(BUFFER_DELAY) # Espera 10 segundos
-        
-        # Se chegou aqui sem ser cancelado, processa!
-        await processar_mensagem_acumulada(clinic_id, telefone_cliente, target_jid)
-        
-    except asyncio.CancelledError:
-        # Se foi cancelado (porque chegou outra msg), não faz nada.
-        print(f"⏳ Timer cancelado para {telefone_cliente} (nova msg chegou)")
+
