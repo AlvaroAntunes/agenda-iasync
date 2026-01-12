@@ -633,8 +633,7 @@ class AgenteClinica:
         # 3. Preparar Nova Data
         try:
             dt_novo = dt.datetime.fromisoformat(nova_data_hora)
-            if dt_novo.tzinfo is None:
-                dt_novo = dt_novo.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+
         except ValueError:
             return "Erro: Formato da nova data inválido."
 
@@ -659,9 +658,7 @@ class AgenteClinica:
                 
                 # 4.2. Cria na agenda nova
                 # Recriamos a descrição básica
-                descricao_formatada = f"""
-                (REAGENDADO)
-                
+                descricao_formatada = f"""                
                 === 📋 DADOS DO CLIENTE ===
                 👤 NOME: {self.dados_paciente['nome']}
                 📱 TELEFONE: {self.dados_paciente['telefone']}
