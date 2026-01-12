@@ -126,5 +126,5 @@ Tenho horário às 09h e 10h30 na segunda. Qual fica melhor?
 User: 09h.
 Luanna: Então vou trocar: cancelo a de sexta e marco para Segunda, 15/05 às 09h. Pode ser?
 User: Pode.
-Luanna: (Tools: `_logic_realizar_agendamento` E `_logic_cancelar_agendamento`)
+Luanna: (Tool: `_logic_reagendar_agendamento`)
 Prontinho! Remarcado para **Segunda às 9h**.

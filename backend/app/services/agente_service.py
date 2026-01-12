@@ -55,6 +55,11 @@ class CancelarAgendamentoInput(BaseModel):
 class ListarMinhasConsultasInput(BaseModel):
     dummy: Optional[str] = Field(description="Campo ignorado, pode deixar vazio ou nulo")
     
+class ReagendarInput(BaseModel):
+    data_atual: str = Field(description="A data da consulta ATUAL que será mudada (DD/MM/AAAA)")
+    hora_atual: str = Field(description="O horário da consulta ATUAL (HH:MM)")
+    nova_data_hora: str = Field(description="A NOVA data e hora desejada em formato ISO (ex: 2024-11-25T14:30:00)")
+    
 class AgenteClinica:
     def __init__(self, clinic_id: str, session_id: str):
         self.clinic_id = clinic_id
@@ -557,6 +562,86 @@ class AgenteClinica:
 
         except Exception as e:
             return f"Erro técnico ao cancelar: {str(e)}"
+        
+    def _logic_reagendar_agendamento(self, data_atual: str, hora_atual: str, nova_data_hora: str):
+        """
+        Move uma consulta existente para um novo horário (Update no Banco e no Calendar).
+        """
+        print(f"--- TOOL: Reagendando de {data_atual} {hora_atual} para {nova_data_hora} ---")
+
+        if not self.dados_paciente:
+            return "Erro: Paciente não identificado. Não posso reagendar sem saber quem é."
+
+        # 1. Achar a consulta antiga no Banco
+        try:
+            # Busca todas as consultas futuras ativas deste paciente
+            consultas = supabase.table('consultas')\
+                .select('id, horario_consulta, external_event_id, profissionais(external_calendar_id)')\
+                .eq('paciente_id', self.dados_paciente['id'])\
+                .eq('status', 'AGENDADA')\
+                .execute()
+            
+            consulta_alvo = None
+            
+            # Filtra em Python para garantir match exato de data/hora (DD/MM/AAAA e HH:MM)
+            for c in consultas.data:
+                c_dt = dt.datetime.fromisoformat(c['horario_consulta'])
+                if c_dt.tzinfo is None:
+                    c_dt = c_dt.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+                
+                if c_dt.strftime("%d/%m/%Y") == data_atual and c_dt.strftime("%H:%M") == hora_atual:
+                    consulta_alvo = c
+                    break
+            
+            if not consulta_alvo:
+                return f"Não encontrei a consulta do dia {data_atual} às {hora_atual} para reagendar. Verifique a data."
+
+        except Exception as e:
+            return f"Erro ao buscar consulta original: {e}"
+
+        # 2. Preparar Novo Horário
+        try:
+            dt_novo = dt.datetime.fromisoformat(nova_data_hora)
+            
+            if dt_novo.tzinfo is None:
+                br_timezone = ZoneInfo("America/Sao_Paulo")
+                dt_novo = dt_novo.replace(tzinfo=br_timezone)
+                
+            novo_horario_iso = dt_novo.isoformat()
+        except ValueError:
+            return "Erro: Formato da nova data inválido."
+
+        # 3. Atualizar no Google Calendar (AQUI USAMOS O MOVER_EVENTO)
+        calendar_id = consulta_alvo['profissionais']['external_calendar_id']
+        event_id = consulta_alvo['external_event_id']
+
+        if calendar_id and event_id:
+            try:
+                # Chama o método que você criou no google_calendar_service
+                self.calendar_service.mover_evento(calendar_id, event_id, dt_novo)
+            except Exception as e:
+                return f"Erro técnico ao mover o evento no Google Calendar: {str(e)}"
+
+        # 4. Atualizar no Supabase (UPDATE na mesma linha)
+        try:
+            supabase.table('consultas')\
+                .update({
+                    'horario_consulta': novo_horario_iso
+                })\
+                .eq('id', consulta_alvo['id'])\
+                .execute()
+            
+            # Log de sucesso
+            supabase.table('ia_logs').insert({
+                'clinic_id': self.clinic_id,
+                'session_id': self.session_id,
+                'event_type': 'INTENT_SCHEDULE_SUCCESS'
+            }).execute()
+
+            return f"Sucesso! A consulta foi reagendada de {data_atual} às {hora_atual} para {dt_novo.strftime('%d/%m/%Y às %H:%M')}."
+
+        except Exception as e:
+            return f"Erro ao atualizar base de dados: {e}"
 
     # --- O CÉREBRO (AGENTE) ---
 
@@ -598,6 +683,12 @@ class AgenteClinica:
                 name="cancelar_agendamento",
                 description="Cancela uma consulta específica baseada na data e hora fornecidas.",
                 args_schema=CancelarAgendamentoInput
+            ),
+            StructuredTool.from_function(
+                func=self._logic_reagendar_agendamento,
+                name="reagendar_agendamento",
+                description="Altera o horário de uma consulta existente. Requer data antiga (DD/MM/AAAA) e hora antiga (HH:MM) para identificar, e a nova data ISO.",
+                args_schema=ReagendarInput
             )
         ]
 

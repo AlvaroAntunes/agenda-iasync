@@ -39,3 +39,8 @@ class CalendarService(ABC):
     def mover_evento(self, calendar_id: str, event_id: str, novo_inicio: dt.datetime) -> Dict[str, Any]:
         """Atualiza a data/hora de um evento existente."""
         pass
+    
+    @abstractmethod
+    def mover_evento(self, calendar_id: str, event_id: str, novo_inicio: dt.datetime) -> bool:
+        """Atualiza a data/hora de um evento existente."""
+        pass
