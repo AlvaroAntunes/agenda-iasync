@@ -642,7 +642,7 @@ class AgenteClinica:
         try:
             supabase.table('consultas')\
                 .update({
-                    'horario_consulta': dt_novo
+                    'horario_consulta': dt_novo.isoformat()
                 })\
                 .eq('id', consulta_alvo['id'])\
                 .execute()
