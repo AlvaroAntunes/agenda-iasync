@@ -188,117 +188,138 @@ class AgenteClinica:
                     lista_ocupada.append(f"Dia Todo ({summary}) - Ocupado")
 
         return f"Horários OCUPADOS em {data}:\n" + "\n".join(lista_ocupada)
+    
+    def _calcular_slots_livres(self, eventos, data_base: dt.date):
+        """
+        Recebe a lista de eventos ocupados e retorna a lista de horários livres (slots de 1h).
+        Considera horário comercial 08:00 às 18:00.
+        """
+        # Configuração da Clínica 
+        hora_abertura = int(self.dados_clinica.get('hora_abertura') or 8)
+        hora_fechamento = int(self.dados_clinica.get('hora_fechamento') or 18)
+        DURACAO_CONSULTA = 1 # horas
+        
+        # Fuso Horário
+        tz_br = ZoneInfo("America/Sao_Paulo")
+        
+        # Cria todos os slots possíveis do dia (08:00, 09:00, ..., 17:00)
+        slots_possiveis = []
+        
+        for h in range(hora_abertura, hora_fechamento):
+            # Cria o objeto datetime para o slot (ex: 14/01/2026 08:00:00)
+            inicio_slot = dt.datetime.combine(data_base, dt.time(hour=h, minute=0), tzinfo=tz_br)
+            fim_slot = inicio_slot + dt.timedelta(hours=DURACAO_CONSULTA)
+            slots_possiveis.append((inicio_slot, fim_slot))
+
+        # Se for "HOJE", remove slots que já passaram (+1h de margem)
+        agora = dt.datetime.now(tz_br)
+        
+        if data_base == agora.date():
+            margem_seguranca = agora + dt.timedelta(hours=1)
+            slots_possiveis = [s for s in slots_possiveis if s[0] > margem_seguranca]
+
+        # Filtra os slots que colidem com eventos do Google
+        slots_livres = []
+        
+        for slot_inicio, slot_fim in slots_possiveis:
+            esta_livre = True
+            
+            for e in eventos:
+                # Pega start/end do evento do Google
+                try:
+                    # Eventos de dia todo ('date') bloqueiam tudo? Depende da regra. 
+                    # Aqui assumimos que bloqueiam se o dia bater.
+                    if 'date' in e['start']:
+                        esta_livre = False
+                        break
+
+                    start_evt = dt.datetime.fromisoformat(e['start'].get('dateTime'))
+                    end_evt = dt.datetime.fromisoformat(e['end'].get('dateTime'))
+                    
+                    # Lógica de Colisão de Horário:
+                    # (SlotInicio < EvtFim) E (SlotFim > EvtInicio)
+                    if slot_inicio < end_evt and slot_fim > start_evt:
+                        esta_livre = False
+                        break
+                except:
+                    continue # Ignora eventos mal formados
+            
+            if esta_livre:
+                slots_livres.append(slot_inicio.strftime('%H:%M'))
+
+        return slots_livres
         
     # --- DEFINIÇÃO DAS FERRAMENTAS (TOOLS) ---
-    
+
     def _logic_verificar_disponibilidade(self, data: str, nome_profissional: Optional[str] = None):
         """
-        Verifica a agenda.
-        Input: 
-        - data: string no formato dd/mm/aaaa.
-        - nome_profissional: (Opcional) Nome do médico/dentista. Se não informado, verifica todos.
+        Verifica a agenda e retorna os HORÁRIOS LIVRES (White-list).
         """
-        
         print(f"--- TOOL: Verificando disponibilidade para {data} ---")
         
-        # ==============================================================================
-        # 0. BLOCO DE SEGURANÇA: Validação de Data (Feriados e Fim de Semana)
-        # ==============================================================================
+        # 1. Parsing Data
         try:
             dt_inicio = dt.datetime.strptime(data, "%d/%m/%Y")
             tz_br = ZoneInfo("America/Sao_Paulo")
+            # Garante que temos a data correta
+            data_base = dt_inicio.date()
+            dt_inicio_busca = dt.datetime.combine(data_base, dt.time.min).replace(tzinfo=tz_br)
         except ValueError:
-            return "Erro: Data fornecida em formato inválido. Use ISO (YYYY-MM-DDTHH:MM:SS)."
+            return "Erro: Data inválida. Use dd/mm/aaaa."
 
-        # Configura feriados do Brasil (MG por exemplo, ajuste conforme o estado da clínica)
-        feriados = holidays.BR(state=self.dados_clinica.get('uf', 'MG'), years=[dt_inicio.year])
-        
-        # Pegando feriados municipais (se houver)
-        lista_fechada = self.dados_clinica.get('clinica_fechada', [])
-        
-        # A. Verifica se é Feriado
-        if dt_inicio.date() in feriados:
-            nome_feriado = feriados.get(dt_inicio.date())
-            return f"NEGADO: A data solicitada ({dt_inicio.strftime('%d/%m')}) é feriado de {nome_feriado}. A clínica não abre."
-        
-        if lista_fechada:
-            for item in lista_fechada:
-                if item['dia'] == dt_inicio.day and item['mes'] == dt_inicio.month:
-                    # Pega o motivo (se não tiver, usa genérico)
-                    motivo = item.get('descricao', 'Data sem expediente')
-                    return f"NEGADO: Na data solicitada ({dt_inicio.strftime('%d/%m')}) a clínica não abre. Motivo: {motivo}."
-
-        # B. Verifica se é Fim de Semana (0=Seg, 5=Sab, 6=Dom)
-        # Se sua clínica abre sábado, mude para: if dt_inicio.weekday() == 6:
+        # 2. Validação de Feriados/Fim de Semana
         if dt_inicio.weekday() >= 5: 
-            dia_semana = "Sábado" if dt_inicio.weekday() == 5 else "Domingo"
-            return f"NEGADO: A data solicitada cai em um {dia_semana} e a clínica não funciona."
+            return f"NEGADO: {data} cai em fim de semana e a clínica não abre."
+        
+        if holidays:
+            estado_uf = self.dados_clinica.get('uf', 'MG') 
+            feriados = holidays.BR(state=estado_uf, years=[dt_inicio.year])
+            if dt_inicio.date() in feriados:
+                return f"NEGADO: {data} é feriado ({feriados.get(dt_inicio.date())})."
 
-        # ==============================================================================
-        
-        # Se o usuário não especificou médico, pegamos o primeiro (ou lógica de rodízio)
-        calendar_id = 'primary'
-        dict_profs = {}
-        
-        # ==============================================================================
-        # 3. Definição dos Calendários a Verificar
-        # ==============================================================================
-        
+        # 3. Definição dos Calendários
         calendarios_alvo = [] 
-
-        if nome_profissional:
-            # Busca Específica
-            encontrado = False
-            term_busca = unidecode(nome_profissional).lower()
-            
-            for prof in self.profissionais:
-                if term_busca in unidecode(prof['nome']).lower():
-                    encontrado = True
-                    break
-            
-            if not encontrado:
-                nomes_disponiveis = ", ".join([p['nome'] for p in self.profissionais])
-                return f"Erro: O profissional '{nome_profissional}' não foi encontrado. Médicos disponíveis: {nomes_disponiveis}."
-            
-        # Busca Geral (Todos)
-        for prof in self.profissionais:
-            calendarios_alvo.append({
-                'nome': prof['nome'],
-                'id': prof['external_calendar_id']
-            })
-
-        if not calendarios_alvo:
-            return "Erro configuração: Nenhum calendário profissional encontrado no sistema."
-
-        # ==============================================================================
-        # 4. Consulta ao Google Calendar (Loop)
-        # ==============================================================================
         
-        relatorio_final = []
-
-        try:
-            # Passamos a data com fuso correto para a busca
-            data_busca = dt_inicio.replace(tzinfo=tz_br)
-
-            for cal in calendarios_alvo:
-                # Chama a função auxiliar que formata os horários
-                status_agenda = self._get_eventos_calendar(cal['id'], data_busca)
+        if nome_profissional:
+            term = unidecode(nome_profissional).lower()
+            
+            for p in self.profissionais:
+                if term in unidecode(p['nome']).lower():
+                    calendarios_alvo.append({'nome': p['nome'], 'id': p['external_calendar_id']})
+                    break
                 
-                # Se a agenda estiver livre, adicionamos uma mensagem positiva
-                if "completamente livre" in status_agenda:
-                    relatorio_final.append(f"✅ {cal['nome']}: Agenda Livre.")
+            if not calendarios_alvo: 
+                return f"Profissional não encontrado."
+        else:
+            for p in self.profissionais:
+                calendarios_alvo.append({'nome': p['nome'], 'id': p['external_calendar_id']})
+
+        # 4. Consulta e Cálculo
+        relatorio_final = []
+        
+        try:
+            for cal in calendarios_alvo:
+                # Busca ocupados no Google
+                eventos = self.calendar_service.listar_eventos(data=dt_inicio_busca, calendar_id=cal['id']) or []
+                
+                # O Python calcula o que sobra (livres), em vez de mandar o robô adivinhar
+                slots_livres = self._calcular_slots_livres(eventos, data_base)
+                
+                if not slots_livres:
+                    relatorio_final.append(f"❌ {cal['nome']}: Agenda LOTADA para este dia.")
                 else:
-                    # Se tiver ocupação, mostra os horários
-                    relatorio_final.append(f"❌ {cal['nome']}:\n{status_agenda}")
+                    # Formata bonitinho: 08:00, 09:00, 14:00...
+                    lista_str = ", ".join(slots_livres)
+                    relatorio_final.append(f"✅ {cal['nome']} (Horários Livres): {lista_str}")
 
         except Exception as e:
-            return f"Erro técnico ao consultar Google Calendar: {str(e)}"
-        
-        profissional = nome_profissional or "QUALQUER PROFISSIONAL"
-        text = f"O cliente quer agendar uma consulta na data {data} com {profissional}. NÃO OFEREÇA para o cliente agendar em um horário que já está ocupado. Se o profissional escolhido estiver ocupado, dê opções para outro profissional, caso exista.\n\n"
+            return f"Erro técnico na agenda: {str(e)}"
 
-        return f"{text}Status da Agenda para {data}:\n\n" + "\n\n".join(relatorio_final)
+        # Instrução de reforço para o Prompt
+        cabecalho = f"RELATÓRIO DE DISPONIBILIDADE PARA {data} (Horário {int(self.dados_clinica.get('hora_abertura', 8))}h-{int(self.dados_clinica.get('hora_fechamento', 18))}h):\n"
+        instrucao = "\nIMPORTANTE: Ofereça APENAS os horários listados como 'Livres' acima. Se o horário não está na lista, é porque está ocupado ou a clínica está fechada."
 
+        return cabecalho + "\n".join(relatorio_final) + instrucao
 
     def _logic_realizar_agendamento(self, nome_paciente: str, data_hora: str, nome_profissional: str):
         """
