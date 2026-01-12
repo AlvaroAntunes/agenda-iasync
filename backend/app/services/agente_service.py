@@ -59,6 +59,7 @@ class ReagendarInput(BaseModel):
     data_atual: str = Field(description="A data da consulta ATUAL que será mudada (DD/MM/AAAA)")
     hora_atual: str = Field(description="O horário da consulta ATUAL (HH:MM)")
     nova_data_hora: str = Field(description="A NOVA data e hora desejada em formato ISO (ex: 2024-11-25T14:30:00)")
+    novo_nome_profissional: Optional[str] = Field(default=None, description="O nome do novo profissional, caso o paciente queira trocar.")
     
 class AgenteClinica:
     def __init__(self, clinic_id: str, session_id: str):
@@ -90,7 +91,7 @@ class AgenteClinica:
         
         try:
             response = supabase.table('lids')\
-                .select('nome', 'id')\
+                .select('nome', 'id', 'telefone')\
                 .eq('clinic_id', self.clinic_id)\
                 .eq('telefone', telefone_busca)\
                 .limit(1)\
@@ -584,77 +585,122 @@ class AgenteClinica:
         except Exception as e:
             return f"Erro técnico ao cancelar: {str(e)}"
         
-    def _logic_reagendar_agendamento(self, data_atual: str, hora_atual: str, nova_data_hora: str):
+
+    def _logic_reagendar_agendamento(self, data_antiga: str, hora_antiga: str, nova_data_hora: str, novo_nome_profissional: Optional[str] = None):
         """
-        Move uma consulta existente para um novo horário (Update no Banco e no Calendar).
+        Move uma consulta existente. Se mudar o médico, recria o evento.
         """
-        print(f"--- TOOL: Reagendando de {data_atual} {hora_atual} para {nova_data_hora} ---")
+        print(f"--- TOOL: Reagendando de {data_antiga} {hora_antiga} para {nova_data_hora} ---")
 
         if not self.dados_paciente:
-            return "Erro: Paciente não identificado. Não posso reagendar sem saber quem é."
+            return "Erro: Paciente não identificado."
 
         # 1. Achar a consulta antiga no Banco
         try:
-            # Busca todas as consultas futuras ativas deste paciente
             consultas = supabase.table('consultas')\
-                .select('id, horario_consulta, external_event_id, profissionais(external_calendar_id)')\
+                .select('id, horario_consulta, external_event_id, profissional_id, profissionais(id, nome, external_calendar_id)')\
                 .eq('paciente_id', self.dados_paciente['id'])\
                 .eq('status', 'AGENDADA')\
                 .execute()
             
             consulta_alvo = None
-            
-            # Filtra em Python para garantir match exato de data/hora (DD/MM/AAAA e HH:MM)
             for c in consultas.data:
                 c_dt = dt.datetime.fromisoformat(c['horario_consulta'])
-                if c_dt.tzinfo is None:
-                    c_dt = c_dt.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+                if c_dt.tzinfo is None: c_dt = c_dt.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
                 
-                if c_dt.strftime("%d/%m/%Y") == data_atual and c_dt.strftime("%H:%M") == hora_atual:
+                if c_dt.strftime("%d/%m/%Y") == data_antiga and c_dt.strftime("%H:%M") == hora_antiga:
                     consulta_alvo = c
                     break
             
             if not consulta_alvo:
-                return f"Não encontrei a consulta do dia {data_atual} às {hora_atual} para reagendar. Verifique a data."
+                return f"Não encontrei a consulta do dia {data_antiga} às {hora_antiga}."
 
         except Exception as e:
             return f"Erro ao buscar consulta original: {e}"
 
-        # 2. Preparar Novo Horário
+        # 2. Definir o Profissional de Destino
+        prof_antigo = consulta_alvo['profissionais']
+        prof_novo_data = prof_antigo # Assume o mesmo por padrão
+        
+        if novo_nome_profissional:
+            # Busca o novo profissional na lista
+            found = next((p for p in self.profissionais if unidecode(novo_nome_profissional).lower() in unidecode(p['nome']).lower()), None)
+            if found:
+                prof_novo_data = found
+            else:
+                return f"Erro: O profissional '{novo_nome_profissional}' não foi encontrado."
+
+        # 3. Preparar Nova Data
         try:
             dt_novo = dt.datetime.fromisoformat(nova_data_hora)
-
+            if dt_novo.tzinfo is None:
+                dt_novo = dt_novo.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
         except ValueError:
             return "Erro: Formato da nova data inválido."
 
-        # 3. Atualizar no Google Calendar (AQUI USAMOS O MOVER_EVENTO)
-        calendar_id = consulta_alvo['profissionais']['external_calendar_id']
-        event_id = consulta_alvo['external_event_id']
+        # ==================================================================
+        # 4. Lógica de Calendário (Mover ou Recriar)
+        # ==================================================================
+        
+        novo_event_id = consulta_alvo['external_event_id'] # Mantém o mesmo ID por padrão
+        
+        try:
+            # CENÁRIO A: Mesmo Médico -> Apenas movemos (Patch)
+            if prof_antigo['id'] == prof_novo_data['id']:
+                calendar_id = prof_antigo['external_calendar_id']
+                self.calendar_service.mover_evento(calendar_id, novo_event_id, dt_novo)
+                
+            # CENÁRIO B: Médico Diferente -> Cancelamos no antigo e Criamos no novo
+            else:
+                print(f"🔄 Trocando de médico: {prof_antigo['nome']} -> {prof_novo_data['nome']}")
+                
+                # 4.1. Remove da agenda antiga
+                self.calendar_service.cancelar_evento(prof_antigo['external_calendar_id'], novo_event_id)
+                
+                # 4.2. Cria na agenda nova
+                # Recriamos a descrição básica
+                descricao_formatada = f"""
+                (REAGENDADO)
+                
+                === 📋 DADOS DO CLIENTE ===
+                👤 NOME: {self.dados_paciente['nome']}
+                📱 TELEFONE: {self.dados_paciente['telefone']}
 
-        if calendar_id and event_id:
-            try:
-                # Chama o método que você criou no google_calendar_service
-                self.calendar_service.mover_evento(calendar_id, event_id, dt_novo)
-            except Exception as e:
-                return f"Erro técnico ao mover o evento no Google Calendar: {str(e)}"
+                === ⚡ AÇÕES RÁPIDAS ===
+                🔗 WHATSAPP: https://wa.me/{self.dados_paciente['telefone']}
+                🤖 CANAL: Reagendamento via IA
+                """
+                
+                novo_evento_gcal = self.calendar_service.criar_evento(
+                    calendar_id=prof_novo_data['external_calendar_id'],
+                    resumo=f"Consulta reagendada: {self.dados_paciente['nome']} ({self.dados_paciente['telefone']})",
+                    inicio_dt=dt_novo,
+                    descricao=descricao_formatada
+                )
+                novo_event_id = novo_evento_gcal.get('id')
 
-        # 4. Atualizar no Supabase (UPDATE na mesma linha)
+        except Exception as e:
+            return f"Erro técnico no Google Calendar: {str(e)}"
+
+        # 5. Atualizar no Supabase
         try:
             supabase.table('consultas')\
                 .update({
-                    'horario_consulta': dt_novo.isoformat()
+                    'horario_consulta': dt_novo.isoformat(),
+                    'profissional_id': prof_novo_data['id'],  
+                    'external_event_id': novo_event_id        
                 })\
                 .eq('id', consulta_alvo['id'])\
                 .execute()
             
-            # Log de sucesso
             supabase.table('ia_logs').insert({
                 'clinic_id': self.clinic_id,
                 'session_id': self.session_id,
                 'event_type': 'INTENT_SCHEDULE_SUCCESS'
             }).execute()
 
-            return f"Sucesso! A consulta foi reagendada de {data_atual} às {hora_atual} para {dt_novo.strftime('%d/%m/%Y às %H:%M')}."
+            medico_nome = prof_novo_data['nome']
+            return f"Sucesso! Reagendado para {dt_novo.strftime('%d/%m/%Y às %H:%M')} com {medico_nome}."
 
         except Exception as e:
             return f"Erro ao atualizar base de dados: {e}"
