@@ -108,6 +108,18 @@ services:
       - redis
       - backend
 
+  scheduler:
+    build: ./backend
+    container_name: saas_scheduler
+    restart: always
+    # Comando para rodar o script de loop infinito
+    command: python scheduler.py
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - redis
+      - backend
+
 volumes:
   evolution_store:
   redis_data:
