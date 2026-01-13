@@ -48,6 +48,8 @@ async def esperar_e_processar(clinic_id: str, telefone_cliente: str, target_jid:
             if message_id_para_ler:
                 marcar_como_lida(clinic_id, target_jid, message_id_para_ler)
                 
+            print(f"✅ [Buffer] Mensagem marcada como lida: {message_id_para_ler}")
+                
             # Envia para a fila do Celery (Background Worker)
             processar_mensagem_ia.delay(
                 clinic_id, 
