@@ -30,7 +30,7 @@ AUTHENTICATION_API_KEY = os.getenv("AUTHENTICATION_API_KEY")
 buffer_service = BufferService()
 BUFFER_DELAY = 10  # Segundos de espera
 
-async def esperar_e_processar(clinic_id: str, telefone_cliente: str, target_jid: str,  message_id_para_ler: str):
+async def esperar_e_processar(clinic_id: str, telefone_cliente: str, target_jid: str):
     """
     Função assíncrona que aguarda o tempo do buffer e depois dispara o processamento.
     """
@@ -43,13 +43,7 @@ async def esperar_e_processar(clinic_id: str, telefone_cliente: str, target_jid:
         
         if texto_completo:
             print(f"🚀 [Buffer] Disparando IA com bloco: {texto_completo}")
-            
-            # Marcar mensagem como lida
-            if message_id_para_ler:
-                marcar_como_lida(clinic_id, target_jid, message_id_para_ler)
-                
-            print(f"✅ [Buffer] Mensagem marcada como lida: {message_id_para_ler}")
-                
+                            
             # Envia para a fila do Celery (Background Worker)
             processar_mensagem_ia.delay(
                 clinic_id, 
@@ -208,6 +202,7 @@ async def evolution_webhook(request: Request, background_tasks: BackgroundTasks)
             return {"status": "no_text"}
 
         print(f"💬 Mensagem Processada: {texto_usuario}")
+        marcar_como_lida(clinic_id, target_response_jid, message_id)
         
         # --- LÓGICA DO BUFFER (REDIS) ---
         
@@ -224,8 +219,7 @@ async def evolution_webhook(request: Request, background_tasks: BackgroundTasks)
                 esperar_e_processar, 
                 clinic_id, 
                 telefone_cliente, 
-                target_response_jid,
-                message_id
+                target_response_jid
             )
             return {"status": "timer_started"}
         else:
