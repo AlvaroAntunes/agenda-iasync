@@ -55,6 +55,8 @@ def processar_lembretes():
             # Converte horário do banco para objeto datetime
             horario_iso = c['horario_consulta']
             dt_consulta = dt.datetime.fromisoformat(horario_iso)
+            
+            print(inicio_24h, dt_consulta, fim_24h)
 
             # --- VERIFICAÇÃO DE 24H ---
             if not c['lembrete_24h']:
