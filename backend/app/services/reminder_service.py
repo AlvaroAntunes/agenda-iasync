@@ -52,7 +52,7 @@ def processar_lembretes():
             genero_medico = c['profissionais']['genero']
             pronome_medico = 'o Dr.' if genero_medico.lower() != 'feminino' else 'a Dra.'
             
-            # Converte horário do banco para objeto datetime
+            # Converte horário do banco para objeto datetime e para fuso Brasil
             horario_iso = c['horario_consulta']
             dt_utc = dt.datetime.fromisoformat(horario_iso)
             dt_consulta = dt_utc.astimezone(tz_br)

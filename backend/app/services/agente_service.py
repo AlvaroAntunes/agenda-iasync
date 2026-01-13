@@ -137,12 +137,10 @@ class AgenteClinica:
         agora = dt.datetime.now(ZoneInfo("America/Sao_Paulo"))
 
         for c in consultas:
-            # Converte string ISO para objeto datetime com fuso
-            data_cons = dt.datetime.fromisoformat(c['horario_consulta'])
-            
-            # Se o objeto não tiver fuso, adiciona
-            if data_cons.tzinfo is None:
-                data_cons = data_cons.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+            # Converte string ISO para objeto datetime e para fuso Brasil
+            horario_iso = c['horario_consulta']
+            dt_utc = dt.datetime.fromisoformat(horario_iso)
+            data_cons = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
 
             if data_cons < agora:
                 status_tempo = "(JÁ OCORREU/PASSADO)"
@@ -506,10 +504,9 @@ class AgenteClinica:
             texto = "Consultas encontradas:\n"
             
             for c in consultas.data:
-                dt_obj = dt.datetime.fromisoformat(c['horario_consulta'])
-                
-                if dt_obj.tzinfo is None:
-                    dt_obj = dt_obj.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+                horario_iso = c['horario_consulta']
+                dt_utc = dt.datetime.fromisoformat(horario_iso)
+                dt_obj = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
                 
                 # Formato: 12/01/2026 às 14:30 com Dr. João
                 fmt = dt_obj.strftime("%d/%m/%Y às %H:%M")
@@ -544,10 +541,9 @@ class AgenteClinica:
             consulta_alvo = None
             
             for c in consultas_futuras.data:
-                c_dt = dt.datetime.fromisoformat(c['horario_consulta'])
-                
-                if c_dt.tzinfo is None:
-                    c_dt = c_dt.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+                horario_iso = c['horario_consulta']
+                dt_utc = dt.datetime.fromisoformat(horario_iso)
+                c_dt = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
                 
                 c_data_str = c_dt.strftime("%d/%m/%Y")
                 c_hora_str = c_dt.strftime("%H:%M")
@@ -600,8 +596,9 @@ class AgenteClinica:
             
             consulta_alvo = None
             for c in consultas.data:
-                c_dt = dt.datetime.fromisoformat(c['horario_consulta'])
-                if c_dt.tzinfo is None: c_dt = c_dt.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+                horario_iso = c['horario_consulta']
+                dt_utc = dt.datetime.fromisoformat(horario_iso)
+                c_dt = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
                 
                 if c_dt.strftime("%d/%m/%Y") == data_atual and c_dt.strftime("%H:%M") == hora_atual:
                     consulta_alvo = c
@@ -676,9 +673,11 @@ class AgenteClinica:
 
         # 5. Atualizar no Supabase
         try:
+            dt_fuso = dt_novo.astimezone(ZoneInfo("America/Sao_Paulo"))
+            
             supabase.table('consultas')\
                 .update({
-                    'horario_consulta': dt_novo.isoformat(),
+                    'horario_consulta': dt_fuso.isoformat(),
                     'profissional_id': prof_novo_data['id'],  
                     'external_event_id': novo_event_id        
                 })\
