@@ -28,8 +28,8 @@ def processar_lembretes():
     inicio_24h = agora + dt.timedelta(hours=23)
     fim_24h = agora + dt.timedelta(hours=25)
 
-    # Janela de 2h (Entre 1h50min e 2h30min a partir de agora)
-    inicio_2h = agora + dt.timedelta(minutes=110) 
+    # Janela de 2h (Entre 1h30min e 2h30min a partir de agora)
+    inicio_2h = agora + dt.timedelta(minutes=90) 
     fim_2h = agora + dt.timedelta(minutes=150)
 
     try:
@@ -54,7 +54,8 @@ def processar_lembretes():
             
             # Converte horário do banco para objeto datetime
             horario_iso = c['horario_consulta']
-            dt_consulta = dt.datetime.fromisoformat(horario_iso)
+            dt_utc = dt.datetime.fromisoformat(horario_iso)
+            dt_consulta = dt_utc.astimezone(tz_br)
             
             print(inicio_24h, dt_consulta, fim_24h)
 
