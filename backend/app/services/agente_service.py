@@ -42,7 +42,7 @@ class VerificaDisponibilidade(BaseModel):
 class RealizaAgendamento(BaseModel):
     nome_paciente: str = Field(description="Nome completo do paciente")
     data_hora: str = Field(description="Data e hora ISO (ex: 2024-11-25T14:30:00)")
-    nome_profissional: str = Field(description="Nome do médico escolhido")
+    nome_profissional: str = Field(description="Nome do médico. Envie APENAS o nome (ex: 'Roberto'), SEM títulos como Dr. ou Dra.")
     
 class VerificaConsultasExistentes(BaseModel):
     data: str = Field(description="Data para verificar no formato DD/MM/AAAA")
@@ -59,7 +59,7 @@ class ReagendarInput(BaseModel):
     data_atual: str = Field(description="A data da consulta ATUAL que será mudada (DD/MM/AAAA)")
     hora_atual: str = Field(description="O horário da consulta ATUAL (HH:MM)")
     nova_data_hora: str = Field(description="A NOVA data e hora desejada em formato ISO (ex: 2024-11-25T14:30:00)")
-    novo_nome_profissional: Optional[str] = Field(default=None, description="O nome do novo profissional, caso o paciente queira trocar.")
+    novo_nome_profissional: Optional[str] = Field(default=None, description="O nome do novo profissional, caso o paciente queira trocar. Envie APENAS o nome (ex: 'Roberto', 'Ana'), SEM títulos como Dr. ou Dra.")
     
 class AgenteClinica:
     def __init__(self, clinic_id: str, session_id: str):
@@ -334,10 +334,16 @@ class AgenteClinica:
         print(f"--- TOOL: Tentativa de agendamento para {nome_paciente} em {data_hora} ---")
         
         # 1. Identificar Profissional e Calendar ID
-        prof_data = next((p for p in self.profissionais if unidecode(nome_profissional).lower() in unidecode(p['nome']).lower()), None)
-        
-        if not prof_data:
-            return "Erro: Profissional não encontrado. Peça para o usuário confirmar o nome do profissional."
+        if nome_profissional:
+            term_busca = unidecode(nome_profissional).lower()
+            term_busca = term_busca.replace("dr.", "").replace("dra.", "").replace("doutor", "").replace("doutora", "").strip()
+            
+            # Busca na lista (usando 'in' para permitir "Roberto" achar "Roberto Mendes")
+            prof_data = next((p for p in self.profissionais if term_busca in unidecode(p['nome']).lower()), None)
+
+            if not prof_data:
+                nomes = ", ".join([p['nome'] for p in self.profissionais])
+                return f"Erro: O profissional '{nome_profissional}' não foi encontrado. Disponíveis: {nomes}."
         
         # Tratamento de Data e Hora
         try:
@@ -595,6 +601,7 @@ class AgenteClinica:
                 .execute()
             
             consulta_alvo = None
+            
             for c in consultas.data:
                 horario_iso = c['horario_consulta']
                 dt_utc = dt.datetime.fromisoformat(horario_iso)
@@ -615,12 +622,17 @@ class AgenteClinica:
         prof_novo_data = prof_antigo # Assume o mesmo por padrão
         
         if novo_nome_profissional:
-            # Busca o novo profissional na lista
-            found = next((p for p in self.profissionais if unidecode(novo_nome_profissional).lower() in unidecode(p['nome']).lower()), None)
+            term_busca = unidecode(novo_nome_profissional).lower()
+            term_busca = term_busca.replace("dr.", "").replace("dra.", "").replace("doutor", "").replace("doutora", "").strip()
+            
+            # Busca na lista (usando 'in' para permitir "Roberto" achar "Roberto Mendes")
+            found = next((p for p in self.profissionais if term_busca in unidecode(p['nome']).lower()), None)
+            
             if found:
                 prof_novo_data = found
             else:
-                return f"Erro: O profissional '{novo_nome_profissional}' não foi encontrado."
+                nomes = ", ".join([p['nome'] for p in self.profissionais])
+                return f"Erro: O profissional '{novo_nome_profissional}' não foi encontrado. Disponíveis: {nomes}."
 
         # 3. Preparar Nova Data
         try:
@@ -673,13 +685,36 @@ class AgenteClinica:
 
         # 5. Atualizar no Supabase
         try:
-            dt_fuso = dt_novo.astimezone(ZoneInfo("America/Sao_Paulo"))
+            # Converter nova data para fuso Brasil
+            dt_novo = dt_novo.astimezone(ZoneInfo("America/Sao_Paulo"))
+            
+            # Calcular diferença entre a consulta original e a nova data
+            horario_original_iso = consulta_alvo['horario_consulta']
+            dt_original_utc = dt.datetime.fromisoformat(horario_original_iso)
+            dt_original = dt_original_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
+            
+            # Calcular diferença em dias e horas
+            diferenca_total = dt_novo - dt_original
+            diferenca_dias = (dt_novo.date() - dt_original.date()).days
+            diferenca_horas = diferenca_total.total_seconds() / 3600
+            
+            # Definir flags de lembrete baseado na diferença
+            # flag_24h = False se reagendar para 2+ dias depois (precisa enviar lembrete novamente)
+            # flag_2h = False se tiver pelo menos 4 horas de diferença (precisa enviar lembrete novamente)
+            flag_24h = diferenca_dias < 2
+            
+            if diferenca_horas < 0:
+                flag_2h = True  
+            else:
+                flag_2h = diferenca_horas < 4
             
             supabase.table('consultas')\
                 .update({
-                    'horario_consulta': dt_fuso.isoformat(),
+                    'horario_consulta': dt_novo.isoformat(),
                     'profissional_id': prof_novo_data['id'],  
-                    'external_event_id': novo_event_id        
+                    'external_event_id': novo_event_id,
+                    'lembrete_24h': flag_24h,
+                    'lembrete_2h': flag_2h    
                 })\
                 .eq('id', consulta_alvo['id'])\
                 .execute()
