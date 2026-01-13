@@ -41,8 +41,7 @@ def processar_lembretes():
             .execute()
         
         consultas = response.data or []
-        print(f"   📊 Consultas 'AGENDADA' encontradas no banco: {len(consultas)}")
-        
+                
         for c in consultas:
             c_id = c['id']
             clinic_id = c['clinic_id']
@@ -57,14 +56,17 @@ def processar_lembretes():
             dt_utc = dt.datetime.fromisoformat(horario_iso)
             dt_consulta = dt_utc.astimezone(tz_br)
             
-            print(inicio_24h, dt_consulta, fim_24h)
-
+            if dt_consulta.minute == 0:
+                hora_texto = dt_consulta.strftime('%Hh')
+            else:
+                hora_texto = dt_consulta.strftime('%Hh%M')
+                
             # --- VERIFICAÇÃO DE 24H ---
             if not c['lembrete_24h']:
                 if inicio_24h <= dt_consulta <= fim_24h:
                     print(f"   -> Enviando lembrete 24h para {paciente_nome}...")
                     
-                    msg = (f"Olá, {paciente_nome}! Lembrando da sua consulta amanhã às {dt_consulta.strftime('%Hh%M')} com {pronome_medico} {medico}.\n"
+                    msg = (f"Olá, {paciente_nome}! Lembrando da sua consulta amanhã às *{hora_texto}* com {pronome_medico} {medico}.\n"
                            f"Podemos confirmar sua presença?")
                     
                     enviar_mensagem_whatsapp(clinic_id, telefone, msg)
@@ -77,7 +79,7 @@ def processar_lembretes():
                 if inicio_2h <= dt_consulta <= fim_2h:
                     print(f"   -> Enviando lembrete 2h para {paciente_nome}...")
                     
-                    msg = (f"Oi, {paciente_nome}! Sua consulta é logo mais, às {dt_consulta.strftime('%Hh%M')}.\n"
+                    msg = (f"Oi, {paciente_nome}! Sua consulta é logo mais, às *{hora_texto}*.\n"
                            f"Estamos te aguardando! 😊")
                     
                     enviar_mensagem_whatsapp(clinic_id, telefone, msg)
