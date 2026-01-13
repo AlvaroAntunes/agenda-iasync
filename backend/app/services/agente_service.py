@@ -400,17 +400,12 @@ class AgenteClinica:
         🤖 CANAL: Agendamento via IA
         """
         try:            
-            dt_inicio = dt.datetime.fromisoformat(data_hora)
-            # if dt_inicio.tzinfo is None:
-            #     br_timezone = ZoneInfo("America/Sao_Paulo")
-            #     dt_inicio = dt_inicio.replace(tzinfo=br_timezone)
-                
-            # horario_iso_com_fuso = dt_inicio.isoformat()
+            dt_evento_calendar = dt.datetime.fromisoformat(data_hora)
 
             evento_cal = self.calendar_service.criar_evento(
                 calendar_id=prof_data['external_calendar_id'],
                 resumo=f"Consulta: {nome_paciente} ({telefone})",
-                inicio_dt=dt_inicio,
+                inicio_dt=dt_evento_calendar,
                 descricao=descricao_formatada
             )
         except Exception as e:
