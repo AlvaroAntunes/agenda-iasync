@@ -36,7 +36,7 @@ def processar_lembretes():
         # 1. Buscar Consultas Ativas (AGENDADA)
         # Trazemos dados do paciente e profissional para montar a mensagem
         response = supabase.table('consultas')\
-            .select('id, horario_consulta, clinic_id, lembrete_24h, lembrete_2h, lids(nome, telefone), profissionais(nome)')\
+            .select('id, horario_consulta, clinic_id, lembrete_24h, lembrete_2h, lids(nome, telefone), profissionais(nome, genero)')\
             .eq('status', 'AGENDADA')\
             .execute()
         
@@ -48,6 +48,8 @@ def processar_lembretes():
             paciente_nome = c['lids']['nome'].split()[0] # Primeiro nome
             telefone = c['lids']['telefone']
             medico = c['profissionais']['nome']
+            genero_medico = c['profissionais']['genero']
+            pronome_medico = 'o Dr.' if genero_medico.lower() != 'feminino' else 'a Dra.'
             
             # Converte horário do banco para objeto datetime
             horario_iso = c['horario_consulta']
@@ -58,9 +60,7 @@ def processar_lembretes():
                 if inicio_24h <= dt_consulta <= fim_24h:
                     print(f"   -> Enviando lembrete 24h para {paciente_nome}...")
                     
-                    msg = (f"Olá, {paciente_nome}! 😊\n"
-                           f"Passando para lembrar da sua consulta amanhã às {dt_consulta.strftime('%H:%M')} "
-                           f"com {medico}.\n\n"
+                    msg = (f"Olá, {paciente_nome}! Lembrando da sua consulta amanhã às {dt_consulta.strftime('%Hh%M')} com {pronome_medico} {medico}.\n"
                            f"Podemos confirmar sua presença?")
                     
                     enviar_mensagem_whatsapp(clinic_id, telefone, msg)
@@ -73,7 +73,7 @@ def processar_lembretes():
                 if inicio_2h <= dt_consulta <= fim_2h:
                     print(f"   -> Enviando lembrete 2h para {paciente_nome}...")
                     
-                    msg = (f"Oi, {paciente_nome}! Sua consulta é logo mais, às {dt_consulta.strftime('%H:%M')}.\n"
+                    msg = (f"Oi, {paciente_nome}! Sua consulta é logo mais, às {dt_consulta.strftime('%Hh%M')}.\n"
                            f"Estamos te aguardando! 😊")
                     
                     enviar_mensagem_whatsapp(clinic_id, telefone, msg)
