@@ -113,7 +113,7 @@ services:
     container_name: saas_scheduler
     restart: always
     # Comando para rodar o script de loop infinito
-    command: python scheduler.py
+    command: python -u scheduler.py
     env_file:
       - ./backend/.env
     depends_on:
