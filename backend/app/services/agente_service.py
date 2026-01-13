@@ -686,7 +686,8 @@ class AgenteClinica:
         # 5. Atualizar no Supabase
         try:
             # Converter nova data para fuso Brasil
-            dt_novo = dt_novo.astimezone(ZoneInfo("America/Sao_Paulo"))
+            tz_br = ZoneInfo("America/Sao_Paulo")
+            dt_novo = dt_novo.replace(tzinfo=tz_br)
             
             # Calcular diferença entre a consulta original e a nova data
             horario_original_iso = consulta_alvo['horario_consulta']
