@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from app.services.audio_service import AudioService
 from supabase import create_client
 from app.services.tasks import processar_mensagem_ia
-from app.utils.whatsapp_utils import enviar_mensagem_whatsapp
+from app.utils.whatsapp_utils import enviar_mensagem_whatsapp, marcar_como_lida
 from app.services.buffer_service import BufferService
 
 load_dotenv()
@@ -30,7 +30,7 @@ AUTHENTICATION_API_KEY = os.getenv("AUTHENTICATION_API_KEY")
 buffer_service = BufferService()
 BUFFER_DELAY = 10  # Segundos de espera
 
-async def esperar_e_processar(clinic_id: str, telefone_cliente: str, target_jid: str):
+async def esperar_e_processar(clinic_id: str, telefone_cliente: str, target_jid: str,  message_id_para_ler: str):
     """
     Função assíncrona que aguarda o tempo do buffer e depois dispara o processamento.
     """
@@ -43,6 +43,11 @@ async def esperar_e_processar(clinic_id: str, telefone_cliente: str, target_jid:
         
         if texto_completo:
             print(f"🚀 [Buffer] Disparando IA com bloco: {texto_completo}")
+            
+            # Marcar mensagem como lida
+            if message_id_para_ler:
+                marcar_como_lida(clinic_id, target_jid, message_id_para_ler)
+                
             # Envia para a fila do Celery (Background Worker)
             processar_mensagem_ia.delay(
                 clinic_id, 
@@ -139,6 +144,9 @@ async def evolution_webhook(request: Request, background_tasks: BackgroundTasks)
         if key.get("fromMe"):
             return {"status": "ignored_from_me"}
 
+        # Captura ID para leitura
+        message_id = key.get("id")
+        
         clinic_id = payload.get("instance")
         
         ia_ativa = supabase.table('clinicas')\
@@ -214,7 +222,8 @@ async def evolution_webhook(request: Request, background_tasks: BackgroundTasks)
                 esperar_e_processar, 
                 clinic_id, 
                 telefone_cliente, 
-                target_response_jid
+                target_response_jid,
+                message_id
             )
             return {"status": "timer_started"}
         else:
