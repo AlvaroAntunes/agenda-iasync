@@ -420,15 +420,37 @@ class AgenteClinica:
             return f"Erro ao conectar com o Calendar: {str(e)}"
 
         # 4. Salvar Consulta no Supabase
-        supabase.table('consultas').insert({
-            'clinic_id': self.clinic_id,
-            'paciente_id': paciente_id,
-            'profissional_id': prof_data['id'],
-            'horario_consulta': dt_inicio.isoformat(),
-            'status': 'AGENDADA',
-            'origem_agendamento': 'IA',
-            'external_event_id': evento_cal.get('id')
-        }).execute()
+        try:
+            # Converter nova data para fuso Brasil
+            tz_br = ZoneInfo("America/Sao_Paulo")
+            dt_evento_calendar = dt_evento_calendar.replace(tzinfo=tz_br)
+            agora = dt.datetime.now(tz_br)
+            
+            # Calcular diferença em dias e horas
+            diferenca = dt_evento_calendar - agora
+            diferenca_horas = diferenca.total_seconds() / 3600
+            
+            # Definir flags de lembrete baseado na diferença
+            # flag_24h = False se agenda para 40h+ depois (precisa enviar lembrete)
+            flag_24h = False if diferenca_horas >= 40 else True
+
+            # flag_2h = False se tiver pelo menos 4 horas de diferença (precisa enviar lembrete)
+            flag_2h = False if diferenca_horas >= 4 else True
+            
+            supabase.table('consultas').insert({
+                'clinic_id': self.clinic_id,
+                'paciente_id': paciente_id,
+                'profissional_id': prof_data['id'],
+                'horario_consulta': dt_inicio.isoformat(),
+                'status': 'AGENDADA',
+                'origem_agendamento': 'IA',
+                'external_event_id': evento_cal.get('id'),
+                'lembrete_24h': flag_24h,
+                'lembrete_2h': flag_2h
+            }).execute()
+            
+        except Exception as e:
+            return f"Erro técnico no Google Calendar: {str(e)}"
 
         # 5. Logar Sucesso (KPI)
         supabase.table('ia_logs').insert({
@@ -692,26 +714,18 @@ class AgenteClinica:
             # Converter nova data para fuso Brasil
             tz_br = ZoneInfo("America/Sao_Paulo")
             dt_novo = dt_novo.replace(tzinfo=tz_br)
-            
-            # Calcular diferença entre a consulta original e a nova data
-            horario_original_iso = consulta_alvo['horario_consulta']
-            dt_original_utc = dt.datetime.fromisoformat(horario_original_iso)
-            dt_original = dt_original_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
+            agora = dt.datetime.now(tz_br)
             
             # Calcular diferença em dias e horas
-            diferenca_total = dt_novo - dt_original
-            diferenca_dias = (dt_novo.date() - dt_original.date()).days
-            diferenca_horas = diferenca_total.total_seconds() / 3600
+            diferenca = dt_novo - agora
+            diferenca_horas = diferenca.total_seconds() / 3600
             
             # Definir flags de lembrete baseado na diferença
-            # flag_24h = False se reagendar para 2+ dias depois (precisa enviar lembrete novamente)
+            # flag_24h = False se reagendar para 40h+ depois (precisa enviar lembrete novamente)
+            flag_24h = False if diferenca_horas >= 40 else True
+
             # flag_2h = False se tiver pelo menos 4 horas de diferença (precisa enviar lembrete novamente)
-            flag_24h = diferenca_dias < 2
-            
-            if diferenca_horas < 0:
-                flag_2h = True  
-            else:
-                flag_2h = diferenca_horas < 4
+            flag_2h = False if diferenca_horas >= 4 else True
             
             supabase.table('consultas')\
                 .update({
