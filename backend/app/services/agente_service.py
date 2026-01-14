@@ -22,6 +22,7 @@ from langchain_core.tools import StructuredTool
 
 # Seus serviços
 from app.services.factory import get_calendar_service
+from app.services.buffer_service import BufferService
 from app.utils.date_utils import formatar_hora
 from app.core.database import get_supabase, TIMEZONE_BR
 
@@ -68,6 +69,7 @@ class AgenteClinica:
         self.session_id = session_id
         self.lid = lid
         self.calendar_service = get_calendar_service(clinic_id)
+        self.cache_service = BufferService()  # Serviço de cache Redis
         
         # Carregar dados da clínica (Nome, Prompt, Profissionais)
         self.dados_clinica = self._carregar_dados_clinica()
@@ -296,17 +298,29 @@ class AgenteClinica:
             for p in self.profissionais:
                 calendarios_alvo.append({'nome': p['nome'], 'id': p['external_calendar_id']})
 
-        # 4. Consulta e Cálculo
+        # 4. Consulta e Cálculo (com Cache)
         relatorio_final = []
         
         try:
             for cal in calendarios_alvo:
-                # Busca ocupados no Google
-                eventos = self.calendar_service.listar_eventos(data=dt_inicio_busca, calendar_id=cal['id']) or []
+                # Busca profissional ID pelo calendar_id
+                prof_id = next((p['id'] for p in self.profissionais if p['external_calendar_id'] == cal['id']), None)
                 
-                # O Python calcula o que sobra (livres), em vez de mandar o robô adivinhar
-                slots_livres = self._calcular_slots_livres(eventos, data_base)
+                # Tenta buscar no cache primeiro
+                slots_livres = self.cache_service.get_cached_availability(prof_id, data) if prof_id else None
                 
+                if slots_livres is None:
+                    # Cache MISS: Busca no Google Calendar
+                    eventos = self.calendar_service.listar_eventos(data=dt_inicio_busca, calendar_id=cal['id']) or []
+                    
+                    # Calcula slots livres
+                    slots_livres = self._calcular_slots_livres(eventos, data_base)
+                    
+                    # Armazena no cache (TTL: 5 minutos)
+                    if prof_id:
+                        self.cache_service.set_cached_availability(prof_id, data, slots_livres, ttl=300)
+                
+                # Formata resposta
                 if not slots_livres:
                     relatorio_final.append(f"❌ {cal['nome']}: Agenda LOTADA para este dia.")
                 else:
@@ -451,7 +465,11 @@ class AgenteClinica:
         except Exception as e:
             return f"Erro técnico no Google Calendar: {str(e)}"
 
-        # 5. Logar Sucesso (KPI)
+        # 5. Invalidar cache de disponibilidade
+        data_agendamento = dt_inicio.strftime("%d/%m/%Y")
+        self.cache_service.invalidate_availability_cache(prof_data['id'], data_agendamento)
+        
+        # 6. Logar Sucesso (KPI)
         supabase.table('ia_logs').insert({
             'clinic_id': self.clinic_id,
             'session_id': self.session_id,
@@ -601,6 +619,11 @@ class AgenteClinica:
                 .update({'status': 'CANCELADO'})\
                 .eq('id', consulta_alvo['id'])\
                 .execute()
+            
+            # 3. Invalidar cache de disponibilidade
+            prof_id = consulta_alvo['profissionais']['id'] if 'profissionais' in consulta_alvo and consulta_alvo['profissionais'] else None
+            if prof_id:
+                self.cache_service.invalidate_availability_cache(prof_id, data_consulta)
 
             return f"Sucesso: Consulta do dia {data_consulta} às {hora_consulta} foi cancelada."
 
@@ -736,6 +759,16 @@ class AgenteClinica:
                 })\
                 .eq('id', consulta_alvo['id'])\
                 .execute()
+            
+            # Invalidar cache das datas afetadas (antiga e nova)
+            data_antiga_fmt = dt.datetime.strptime(data_atual, "%d/%m/%Y").strftime("%d/%m/%Y")
+            data_nova_fmt = dt_novo.strftime("%d/%m/%Y")
+            
+            # Invalida cache do profissional antigo na data antiga
+            self.cache_service.invalidate_availability_cache(prof_antigo['id'], data_antiga_fmt)
+            
+            # Invalida cache do profissional novo na data nova (pode ser o mesmo)
+            self.cache_service.invalidate_availability_cache(prof_novo_data['id'], data_nova_fmt)
             
             supabase.table('ia_logs').insert({
                 'clinic_id': self.clinic_id,
