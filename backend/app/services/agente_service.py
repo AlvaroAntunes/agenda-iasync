@@ -74,6 +74,7 @@ class AgenteClinica:
         # Carregar dados da clínica (Nome, Prompt, Profissionais)
         self.dados_clinica = self._carregar_dados_clinica()
         self.profissionais = self._carregar_profissionais()
+        self.profissionais_por_id = {p['id']: p for p in self.profissionais} # Cache de profissionais por ID para busca O(1)
         self.dados_paciente = self._identificar_paciente()
         self.dia_hoje = self._formatar_data_extenso(dt.datetime.now(ZoneInfo("America/Sao_Paulo")))
         
@@ -110,13 +111,10 @@ class AgenteClinica:
         
     def _identificar_profissional(self, id: str):
         """
-        Busca o profissional pelo id.
+        Busca o profissional pelo id usando cache O(1).
         """
-        for prof in self.profissionais:
-            if prof['id'] == id:
-                return prof['nome']
-            
-        return None
+        prof = self.profissionais_por_id.get(id)
+        return prof['nome'] if prof else None
     
     def _formatar_data_extenso(self, data: dt.datetime) -> str:
         mapa_dias = {
@@ -136,6 +134,9 @@ class AgenteClinica:
     
     def _gerar_bloco_paciente(self, paciente_id):
         consultas = supabase.table('consultas').select('*').eq('paciente_id', paciente_id).execute().data
+        
+        if not consultas:
+            return "Nenhuma consulta registrada ainda.\n"
         
         texto_consultas = ""
         agora = dt.datetime.now(ZoneInfo("America/Sao_Paulo"))
