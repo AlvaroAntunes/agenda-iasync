@@ -11,17 +11,15 @@ import requests
 from fastapi import APIRouter, Request, BackgroundTasks
 from dotenv import load_dotenv
 from app.services.audio_service import AudioService
-from supabase import create_client
 from app.services.tasks import processar_mensagem_ia
 from app.utils.whatsapp_utils import enviar_mensagem_whatsapp
 from app.services.buffer_service import BufferService
+from app.core.database import get_supabase
 
 load_dotenv()
 
-# Config Supabase (Service quem_enviou para ter acesso total)
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+# Config Supabase
+supabase = get_supabase()
 
 router = APIRouter()
 

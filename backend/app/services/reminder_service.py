@@ -1,17 +1,13 @@
 import os
 import datetime as dt
-from zoneinfo import ZoneInfo
-from supabase import create_client, Client
 from app.utils.whatsapp_utils import enviar_mensagem_whatsapp
 from dotenv import load_dotenv
+from app.core.database import get_supabase, TIMEZONE_BR
 
 load_dotenv()
 
 # Config Supabase
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-# Use a Service Role para poder ler/editar qualquer consulta
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase = get_supabase()
 
 def processar_lembretes():
     """
@@ -20,7 +16,7 @@ def processar_lembretes():
     """
     print("⏰ [Scheduler] Verificando lembretes de consulta...")
     
-    tz_br = ZoneInfo("America/Sao_Paulo")
+    tz_br = TIMEZONE_BR
     agora = dt.datetime.now(tz_br)
 
     # Definir janelas de tempo para busca

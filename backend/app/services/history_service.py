@@ -7,16 +7,14 @@ mensagens_contexto = 15  # Número de mensagens recentes a buscar para contexto
 
 import os
 from typing import List
-from supabase import create_client
 from langchain_core.messages import HumanMessage, AIMessage
 from dotenv import load_dotenv
+from app.core.database import get_supabase
 
 load_dotenv()  # Carrega variáveis do .env
 
 # Config Supabase (Service quem_enviou para ter acesso total)
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+supabase = get_supabase()
 
 class HistoryService:
     def __init__(self, clinic_id: str, session_id: str):

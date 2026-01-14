@@ -22,15 +22,13 @@ from langchain_core.tools import StructuredTool
 
 # Seus serviços
 from app.services.factory import get_calendar_service
-from supabase import create_client, Client
 from app.utils.date_utils import formatar_hora
+from app.core.database import get_supabase, TIMEZONE_BR
 
 load_dotenv()  # Carrega variáveis do .env
 
 # Configuração do Supabase 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase = get_supabase()
 
 # --- 1. DEFINIÇÃO DOS SCHEMAS (O que o Robô vê) ---
 # Isso garante que o LLM nunca tente enviar 'self'
@@ -76,7 +74,7 @@ class AgenteClinica:
         self.profissionais = self._carregar_profissionais()
         self.profissionais_por_id = {p['id']: p for p in self.profissionais} # Cache de profissionais por ID para busca O(1)
         self.dados_paciente = self._identificar_paciente()
-        self.dia_hoje = self._formatar_data_extenso(dt.datetime.now(ZoneInfo("America/Sao_Paulo")))
+        self.dia_hoje = self._formatar_data_extenso(dt.datetime.now(TIMEZONE_BR))
         
     def _carregar_dados_clinica(self):
         response = supabase.table('clinicas').select('*').eq('id', self.clinic_id).single().execute()
@@ -139,13 +137,13 @@ class AgenteClinica:
             return "Nenhuma consulta registrada ainda.\n"
         
         texto_consultas = ""
-        agora = dt.datetime.now(ZoneInfo("America/Sao_Paulo"))
+        agora = dt.datetime.now(TIMEZONE_BR)
 
         for c in consultas:
             # Converte string ISO para objeto datetime e para fuso Brasil
             horario_iso = c['horario_consulta']
             dt_utc = dt.datetime.fromisoformat(horario_iso)
-            data_cons = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
+            data_cons = dt_utc.astimezone(TIMEZONE_BR)
 
             if data_cons < agora:
                 status_tempo = "(JÁ OCORREU/PASSADO)"
@@ -204,7 +202,7 @@ class AgenteClinica:
         DURACAO_CONSULTA = 1 # horas
         
         # Fuso Horário
-        tz_br = ZoneInfo("America/Sao_Paulo")
+        tz_br = TIMEZONE_BR
         
         # Cria todos os slots possíveis do dia (08:00, 09:00, ..., 17:00)
         slots_possiveis = []
@@ -264,7 +262,7 @@ class AgenteClinica:
         # 1. Parsing Data
         try:
             dt_inicio = dt.datetime.strptime(data, "%d/%m/%Y")
-            tz_br = ZoneInfo("America/Sao_Paulo")
+            tz_br = TIMEZONE_BR
             # Garante que temos a data correta
             data_base = dt_inicio.date()
             dt_inicio_busca = dt.datetime.combine(data_base, dt.time.min).replace(tzinfo=tz_br)
@@ -355,7 +353,7 @@ class AgenteClinica:
             dt_inicio = dt.datetime.fromisoformat(data_hora)
             
             if dt_inicio.tzinfo is None:
-                br_timezone = ZoneInfo("America/Sao_Paulo")
+                br_timezone = TIMEZONE_BR
                 dt_inicio = dt_inicio.replace(tzinfo=br_timezone)
             
             # Formato ISO com fuso para o banco (timestamptz)
@@ -423,7 +421,7 @@ class AgenteClinica:
         # 4. Salvar Consulta no Supabase
         try:
             # Converter nova data para fuso Brasil
-            tz_br = ZoneInfo("America/Sao_Paulo")
+            tz_br = TIMEZONE_BR
             dt_evento_calendar = dt_evento_calendar.replace(tzinfo=tz_br)
             agora = dt.datetime.now(tz_br)
             
@@ -519,7 +517,7 @@ class AgenteClinica:
             return "Erro: Paciente não identificado no sistema. Pergunte o nome primeiro."
 
         paciente_id = self.dados_paciente['id']
-        agora = dt.datetime.now(ZoneInfo("America/Sao_Paulo")).isoformat()
+        agora = dt.datetime.now(TIMEZONE_BR).isoformat()
 
         # 2. Buscar no Supabase
         try:
@@ -539,7 +537,7 @@ class AgenteClinica:
             for c in consultas.data:
                 horario_iso = c['horario_consulta']
                 dt_utc = dt.datetime.fromisoformat(horario_iso)
-                dt_obj = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
+                dt_obj = dt_utc.astimezone(TIMEZONE_BR)
                 
                 # Formato: 12/01/2026 às 14:30 com Dr. João
                 fmt = dt_obj.strftime("%d/%m/%Y às %H:%M")
@@ -576,7 +574,7 @@ class AgenteClinica:
             for c in consultas_futuras.data:
                 horario_iso = c['horario_consulta']
                 dt_utc = dt.datetime.fromisoformat(horario_iso)
-                c_dt = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
+                c_dt = dt_utc.astimezone(TIMEZONE_BR)
                 
                 c_data_str = c_dt.strftime("%d/%m/%Y")
                 c_hora_str = c_dt.strftime("%H:%M")
@@ -632,7 +630,7 @@ class AgenteClinica:
             for c in consultas.data:
                 horario_iso = c['horario_consulta']
                 dt_utc = dt.datetime.fromisoformat(horario_iso)
-                c_dt = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
+                c_dt = dt_utc.astimezone(TIMEZONE_BR)
                 
                 if c_dt.strftime("%d/%m/%Y") == data_atual and c_dt.strftime("%H:%M") == hora_atual:
                     consulta_alvo = c
@@ -713,7 +711,7 @@ class AgenteClinica:
         # 5. Atualizar no Supabase
         try:
             # Converter nova data para fuso Brasil
-            tz_br = ZoneInfo("America/Sao_Paulo")
+            tz_br = TIMEZONE_BR
             dt_novo = dt_novo.replace(tzinfo=tz_br)
             agora = dt.datetime.now(tz_br)
             
@@ -858,10 +856,10 @@ class AgenteClinica:
         --- DATAS DA SEMANA ---
         HOJE: {self.dia_hoje}
         AMANHÃ: {self._formatar_data_extenso(
-            dt.datetime.now(ZoneInfo("America/Sao_Paulo")) + dt.timedelta(days=1)
+            dt.datetime.now(TIMEZONE_BR) + dt.timedelta(days=1)
         )}
         DEPOIS DE AMANHÃ SERÁ: {self._formatar_data_extenso(
-            dt.datetime.now(ZoneInfo("America/Sao_Paulo")) + dt.timedelta(days=2)
+            dt.datetime.now(TIMEZONE_BR) + dt.timedelta(days=2)
         )}
 
         PROFISSIONAIS HOJE: {lista_profs}

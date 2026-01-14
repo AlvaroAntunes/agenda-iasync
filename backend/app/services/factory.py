@@ -3,17 +3,15 @@
 """
 
 import os
-from supabase import create_client, Client
 from app.services.interfaces import CalendarService
 from app.services.google_calendar_service import GoogleCalendarService
 from dotenv import load_dotenv  
+from app.core.database import get_supabase
 
 load_dotenv()  # Carrega variáveis do .env
 
 # Config Supabase
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+supabase = get_supabase()
 
 def get_calendar_service(clinic_id: str) -> CalendarService:
     """

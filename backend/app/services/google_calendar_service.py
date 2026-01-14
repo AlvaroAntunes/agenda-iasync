@@ -5,13 +5,12 @@
 
 import os
 import datetime as dt
-from supabase import create_client, Client
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
-from zoneinfo import ZoneInfo
 from app.core.security import decrypt_token 
 from app.services.interfaces import CalendarService
+from app.core.database import get_supabase, TIMEZONE_BR, TIMEZONE_STR
 
 load_dotenv()  # Carrega variáveis do .env
 
@@ -24,24 +23,14 @@ class GoogleCalendarService(CalendarService):
         Busca o refresh_token no Supabase e monta as credenciais.
         """
         self.clinic_id = clinic_id
-        self.supabase = self._get_supabase_client()
+        self.supabase = get_supabase()
         
         # Busca e monta as credenciais
         self.creds = self._get_credentials_from_db()
         
         # Constrói o serviço
         self.service = build('calendar', 'v3', credentials=self.creds)
-
-    def _get_supabase_client(self) -> Client:
-        # Conecta ao Supabase usando a Service Role Key (Acesso Admin)
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         
-        if not url or not key:
-            raise ValueError("Configurações do Supabase ausentes no .env")
-            
-        return create_client(url, key)
-
     def _get_credentials_from_db(self):
         
         # Busca o calendar_refresh_token no banco e reconstrói o objeto Credentials.
@@ -118,7 +107,7 @@ class GoogleCalendarService(CalendarService):
         
         # 2. Define o Fuso Horário do Brasil
         # (Futuramente, isso pode vir do banco de dados da clínica)
-        tz_brasil = ZoneInfo("America/Sao_Paulo")
+        tz_brasil = TIMEZONE_BR
 
         # 3. Cria o intervalo com Fuso Horário CORRETO
         # Em vez de Z (UTC), usamos o fuso local (-03:00)
@@ -147,19 +136,16 @@ class GoogleCalendarService(CalendarService):
         # inicio_dt deve ser um objeto datetime
         fim_dt = inicio_dt + dt.timedelta(hours=1)
         texto_descricao = descricao if descricao else ""
-        
-        # Fuso horário fixo por enquanto (ideal: pegar da tabela clinicas)
-        TIMEZONE = 'America/Sao_Paulo'
-        
+                
         evento = {
             'summary': resumo,
             'start': {
                 'dateTime': inicio_dt.isoformat(), 
-                'timeZone': TIMEZONE
+                'timeZone': TIMEZONE_STR
             },
             'end': {
                 'dateTime': fim_dt.isoformat(), 
-                'timeZone': TIMEZONE
+                'timeZone': TIMEZONE_STR
             },
             'description': texto_descricao
         }
@@ -192,12 +178,11 @@ class GoogleCalendarService(CalendarService):
             
             # Recalcula o fim (assumindo 1h de duração padrão)
             novo_fim = novo_inicio + dt.timedelta(hours=1)
-            TIMEZONE = 'America/Sao_Paulo'
             
             # Usamos PATCH para alterar apenas os campos de horário, mantendo título e descrição
             body = {
-                'start': {'dateTime': novo_inicio.isoformat(), 'timeZone': TIMEZONE},
-                'end': {'dateTime': novo_fim.isoformat(), 'timeZone': TIMEZONE},
+                'start': {'dateTime': novo_inicio.isoformat(), 'timeZone': TIMEZONE_STR},
+                'end': {'dateTime': novo_fim.isoformat(), 'timeZone': TIMEZONE_STR},
             }
             
             evento_atualizado = self.service.events().patch(

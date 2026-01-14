@@ -9,9 +9,9 @@ import os
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import RedirectResponse
 from google_auth_oauthlib.flow import Flow
-from supabase import create_client, Client
 from dotenv import load_dotenv
 from app.core.security import encrypt_token 
+from app.core.database import get_supabase
 
 load_dotenv()  # Carrega variáveis do .env
 
@@ -35,9 +35,7 @@ google_config = {
 }
 
 # Config Supabase
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+supabase = get_supabase()
 
 router = APIRouter()
 
