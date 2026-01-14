@@ -22,7 +22,13 @@ load_dotenv()  # Carrega variáveis do .env
 # Config Supabase
 supabase = get_supabase()
 
-app = FastAPI(title="IA Clinicas API", docs_url=None, redoc_url=None)
+# Desabilita documentação automática em produção (segurança)
+app = FastAPI(
+    title="IA Clinicas API",
+    docs_url=None,      # Desabilita /docs
+    redoc_url=None,     # Desabilita /redoc
+    openapi_url=None    # Desabilita /openapi.json (JSON com todas as rotas)
+)
 
 # Configuração de CORS
 # Para rotas públicas (webhooks): aceita qualquer origem
@@ -58,4 +64,4 @@ app.include_router(admin_rate_limit_router, tags=["Admin - Rate Limiting"])
 
 @app.get("/")
 def root():
-    return {"message": "API IA Clínicas rodando!"}
+    return {"status": "Ok"}
