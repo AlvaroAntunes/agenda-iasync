@@ -15,6 +15,9 @@ celery
 redis
 gevent
 schedule
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
 # LangChain (Sem fixar sub-dependências como 'core')
 langchain==0.2.1
 langchain-community==0.2.1

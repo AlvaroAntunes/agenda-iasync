@@ -2,20 +2,26 @@
 Endpoints administrativos para monitoramento de Rate Limiting.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.core.rate_limiter import rate_limiter
 from app.core.database import get_supabase
+from app.core.jwt_auth import require_admin
 
 router = APIRouter()
 supabase = get_supabase()
 
 
 @router.get("/admin/rate-limit/stats")
-def get_rate_limit_stats(clinic_id: str = None):
+def get_rate_limit_stats(
+    clinic_id: str = None,
+    user: dict = Depends(require_admin)
+):
     """
     Retorna estatísticas de rate limiting.
     Se clinic_id for fornecido, retorna stats específicas.
     Caso contrário, retorna stats globais.
+    
+    **Autenticação obrigatória:** Envie header `Authorization: Bearer {token}`
     """
     try:
         stats = {
@@ -39,9 +45,11 @@ def get_rate_limit_stats(clinic_id: str = None):
 
 
 @router.get("/admin/rate-limit/blocked")
-def list_blocked_clinics():
+def list_blocked_clinics(user: dict = Depends(require_admin)):
     """
     Lista todas as clínicas atualmente bloqueadas.
+    
+    **Autenticação obrigatória:** Envie header `Authorization: Bearer {token}`
     """
     try:
         # Busca todas as clínicas no banco
@@ -70,9 +78,14 @@ def list_blocked_clinics():
 
 
 @router.get("/admin/rate-limit/top-users")
-def get_top_users(limit: int = 10):
+def get_top_users(
+    limit: int = 10,
+    user: dict = Depends(require_admin)
+):
     """
     Retorna as clínicas com maior número de requisições no minuto atual.
+    
+    **Autenticação obrigatória:** Envie header `Authorization: Bearer {token}`
     """
     try:
         # Busca todas as clínicas
@@ -107,9 +120,14 @@ def get_top_users(limit: int = 10):
 
 
 @router.post("/admin/rate-limit/unblock/{clinic_id}")
-def unblock_clinic(clinic_id: str):
+def unblock_clinic(
+    clinic_id: str,
+    user: dict = Depends(require_admin)
+):
     """
     Remove o bloqueio de uma clínica manualmente.
+    
+    **Autenticação obrigatória:** Envie header `Authorization: Bearer {token}`
     """
     try:
         success = rate_limiter.unblock_clinic(clinic_id)
