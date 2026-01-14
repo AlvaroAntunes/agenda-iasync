@@ -15,13 +15,6 @@ AUTHENTICATION_API_KEY = os.getenv("AUTHENTICATION_API_KEY")
 def processar_mensagem_ia(clinic_id: str, telefone_cliente: str, texto_usuario: str, token_instancia: str):
     print(f"⚙️ [Worker] Processando para {telefone_cliente}...")
     
-    enviar_mensagem_whatsapp(
-        token_instancia=token_instancia,
-        numero_telefone=telefone_cliente, 
-        text="Testabndo as repsotas da IA..."
-    )
-    return
-
     try:
         # 1. Histórico
         history_service = HistoryService(clinic_id=clinic_id, session_id=telefone_cliente)
