@@ -125,6 +125,9 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         raw_phone = message.get("chatid") or message.get("sender_pn") or payload.get("chat").get("wa_chatid")
         telefone_cliente = str(raw_phone).replace("@s.whatsapp.net", "").replace("+", "")
         message_id = message.get("messageid")
+        lid = message.get("sender") or message.get("from")
+        nome = payload.get("chat").get("name") or "Desconhecido"
+        salvar_lid_cache(clinic_id, lid, telefone_cliente, nome)
 
         print(f"📩 Webhook Uazapi: Clínica {clinic_id} | Cliente: {telefone_cliente}")
 
