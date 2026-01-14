@@ -58,20 +58,6 @@ async def esperar_e_processar(clinic_id: str, telefone_cliente: str, token_insta
     except Exception as e:
         print(f"❌ Erro no processamento do buffer: {e}")
 
-def salvar_lid_cache(clinic_id: str, lid: str, telefone: str):
-    """
-    Salva o mapeamento LID -> Telefone no banco para consultas futuras rápidas.
-    Tabela: public.lids (lid text, telefone text, nome text, clinic_id uuid)
-    """
-    try:
-        # Upsert garante que se já existir, atualiza/ignora
-        supabase.table('lids').upsert({
-            'telefone': telefone
-        }, on_conflict='clinic_id, lid').execute()
-        print(f"💾 LID cacheado com sucesso: {lid} -> {telefone}")
-    except Exception as e:
-        print(f"⚠️ Erro ao salvar cache LID (Tabela 'lids' existe?): {e}")
-        
 @router.post("/webhook/uazapi")
 async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
     """
@@ -124,7 +110,6 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         telefone_cliente = str(raw_phone).replace("@s.whatsapp.net", "").replace("+", "")
         message_id = message.get("messageid")
         lid = message.get("sender") or message.get("from")
-        salvar_lid_cache(clinic_id, lid, telefone_cliente)
 
         print(f"📩 Webhook Uazapi: Clínica {clinic_id} | Cliente: {telefone_cliente}")
 
@@ -179,13 +164,5 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
     except Exception as e:
         print(f"❌ Erro Webhook Uazapi: {e}")
         return {"status": "error", "detail": str(e)}
-
-# @router.post("/webhook/uazapi")
-# async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
-#     # Faça o teste do payload aqui
-#     payload = await request.json()
-#     print("Payload recebido no webhook Uazapi:")
-#     print(json.dumps(payload, indent=4))  # Imprime o payload formatado no console
-#     return {"status": "received"}
     
     
