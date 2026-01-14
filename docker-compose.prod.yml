@@ -10,12 +10,10 @@ services:
       - "8002:8000"
     env_file:
       - ./backend/.env
-    environment:
-      - EVOLUTION_API_URL=http://evolution-api-clinicas:8080
     depends_on:
-      - evolution-api-clinicas
+      - redis
 
-    # --- SEU FRONTEND  ---
+  # --- SEU FRONTEND ---
   frontend:
     build: 
       context: ./frontend
@@ -27,10 +25,8 @@ services:
       - "3002:3000"
     env_file:
       - ./frontend/.env
-      # Se você tiver variáveis de build (como NEXT_PUBLIC_), pode precisar passá-las em args também,
-      # mas lendo do arquivo .env geralmente funciona se configurado no Dockerfile.
 
-  # --- NOVO SERVIÇO: REDIS ---
+  # --- REDIS (MANTENHA! O Celery precisa dele) ---
   redis:
     image: redis:7.2-alpine
     container_name: evolution_redis
@@ -39,68 +35,12 @@ services:
     volumes:
       - redis_data:/data
 
-  # --- EVOLUTION API ---
-  evolution-api-clinicas:
-    image: evoapicloud/evolution-api:v2.3.1
-    container_name: evolution_api_clinicas
-    restart: always
-    ports:
-      - "8085:8080"
-    volumes:
-      - evolution_store:/evolution/store # IMPORTANTE: Persistir as sessões do WhatsApp
-    depends_on:
-      - redis
-    dns:
-    - 8.8.8.8
-    - 8.8.4.4
-    environment:
-      - AUTHENTICATION_API_KEY=${AUTHENTICATION_API_KEY}
-
-      # PARA O LOGIN FUNCIONAR
-      - CORS_ORIGIN=*
-      - CORS_METHODS=POST,GET,PUT,DELETE
-      - CORS_CREDENTIALS=true
-      - AUTHENTICATION_TYPE=apikey
-     #  - SERVER_URL=https://api-wpp.seudominio.com # (Opcional, útil se usar domínio)
-
-      # BANCO DE DADOS (SUPABASE)
-      - DATABASE_ENABLED=true
-      - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://postgres.pofrnfocqclvqbrkuqyh:CoreSystem019%40@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require&schema=evolution&connection_limit=15&pool_timeout=20
-      - DATABASE_SAVE_DATA_INSTANCE=true
-      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
-      - DATABASE_SAVE_MESSAGE_UPDATE=true
-      - DATABASE_SAVE_DATA_CONTACTS=true
-      - DATABASE_SAVE_DATA_CHATS=true
-
-      # --- CONFIGURAÇÃO DO REDIS (CRÍTICO) ---
-      - CACHE_REDIS_ENABLED=true
-      # URI: redis://:SENHA@NOME_DO_SERVICO:PORTA/DB
-      - CACHE_REDIS_URI=redis://:redis_senha_secreta@redis:6379/0
-      - CACHE_REDIS_PREFIX_KEY=evolution
-      - CACHE_REDIS_SAVE_INSTANCES=true
-      - CACHE_LOCAL_ENABLED=false # Desativa cache local para forçar Redis
-
-  # --- EVOLUTION MANAGER  ---
-  evolution-manager:
-    build: 
-      context: ./evolution-manager-v2
-      args:
-        VITE_API_URL: http://147.93.8.232:8085
-    container_name: evolution_manager
-    restart: always
-    ports:
-      - "3001:80"
-    environment:
-      - VITE_API_URL=http://147.93.8.232:8085
-    volumes:
-      - ${PWD}/evolution-manager-v2/nginx.conf:/etc/nginx/conf.d/nginx.conf
+  # --- CELERY WORKER (Processamento IA) ---
   celery_worker:
     build: ./backend
     container_name: saas_worker
     restart: always
-    # -P gevent: Usa threads leves
-    # -c 100: Permite processar 100 mensagens SIMULTANEAMENTE
+    # Mantivemos a config de gevent para alta performance
     command: celery -A app.core.celery_app worker --pool=gevent --concurrency=20 --loglevel=info
     env_file:
       - ./backend/.env
@@ -108,11 +48,11 @@ services:
       - redis
       - backend
 
+  # --- SCHEDULER (Lembretes) ---
   scheduler:
     build: ./backend
     container_name: saas_scheduler
     restart: always
-    # Comando para rodar o script de loop infinito
     command: python -u scheduler.py
     env_file:
       - ./backend/.env
@@ -120,6 +60,6 @@ services:
       - redis
       - backend
 
+# Volumes
 volumes:
-  evolution_store:
   redis_data:

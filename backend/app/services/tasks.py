@@ -12,9 +12,16 @@ EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL")
 AUTHENTICATION_API_KEY = os.getenv("AUTHENTICATION_API_KEY")
 
 @celery_app.task(name="processar_mensagem_ia", acks_late=True)
-def processar_mensagem_ia(clinic_id: str, telefone_cliente: str, texto_usuario: str, target_jid: str):
+def processar_mensagem_ia(clinic_id: str, telefone_cliente: str, texto_usuario: str, token_instancia: str):
     print(f"⚙️ [Worker] Processando para {telefone_cliente}...")
     
+    enviar_mensagem_whatsapp(
+        token_instancia=token_instancia,
+        numero_telefone=telefone_cliente, 
+        text="Testabndo as repsotas da IA..."
+    )
+    return
+
     try:
         # 1. Histórico
         history_service = HistoryService(clinic_id=clinic_id, session_id=telefone_cliente)
@@ -29,8 +36,8 @@ def processar_mensagem_ia(clinic_id: str, telefone_cliente: str, texto_usuario: 
         # 3. Salvar e Enviar
         history_service.add_ai_message(resposta_ia)
         enviar_mensagem_whatsapp(
-            instance_name=clinic_id, 
-            remote_jid=target_jid, 
+            token_instancia=token_instancia,
+            numero_telefone=telefone_cliente, 
             text=resposta_ia
         )
         
