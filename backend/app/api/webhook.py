@@ -15,6 +15,7 @@ from app.services.tasks import processar_mensagem_ia
 from app.utils.whatsapp_utils import enviar_mensagem_whatsapp
 from app.services.buffer_service import BufferService
 from app.core.database import get_supabase
+from app.core.rate_limiter import rate_limiter
 
 load_dotenv()
 
@@ -101,6 +102,44 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         except Exception as e:
             print(f"❌ Erro ao buscar clínica no banco: {e}")
             return {"status": "db_error"}
+        
+        # 2.5. RATE LIMITING (após identificar clínica)
+        # Verifica se a clínica está bloqueada
+        is_blocked, ttl = rate_limiter.is_clinic_blocked(clinic_id)
+        if is_blocked:
+            print(f"🚫 [RateLimit] Requisição bloqueada - Clínica {clinic_id} (TTL: {ttl}s)")
+            return {
+                "status": "rate_limit_blocked",
+                "message": f"Clínica temporariamente bloqueada. Aguarde {ttl} segundos.",
+                "retry_after": ttl
+            }
+        
+        # Verifica rate limit global
+        global_allowed, global_msg = rate_limiter.check_global_rate_limit()
+        if not global_allowed:
+            print(f"🚨 [RateLimit] GLOBAL LIMIT - Requisição negada")
+            return {
+                "status": "rate_limit_global",
+                "message": global_msg
+            }
+        
+        # Verifica rate limit por clínica
+        allowed, msg = rate_limiter.check_rate_limit_per_clinic(clinic_id)
+        if not allowed:
+            print(f"⚠️ [RateLimit] Rate limit excedido - Clínica {clinic_id}")
+            return {
+                "status": "rate_limit_exceeded",
+                "message": msg
+            }
+        
+        # Verifica burst protection
+        burst_allowed, burst_msg = rate_limiter.check_burst_protection(clinic_id)
+        if not burst_allowed:
+            print(f"⚠️ [RateLimit] Burst detectado - Clínica {clinic_id}")
+            return {
+                "status": "rate_limit_burst",
+                "message": burst_msg
+            }
         
         # 3. Identificação do Cliente
         # Uazapi manda o telefone limpo ou com sufixo. Vamos limpar.
