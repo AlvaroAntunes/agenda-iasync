@@ -61,10 +61,14 @@ class ReagendarInput(BaseModel):
     nova_data_hora: str = Field(description="A NOVA data e hora desejada em formato ISO (ex: 2024-11-25T14:30:00)")
     novo_nome_profissional: Optional[str] = Field(default=None, description="O nome do novo profissional, caso o paciente queira trocar. Envie APENAS o nome (ex: 'Roberto', 'Ana'), SEM títulos como Dr. ou Dra.")
     
+class SalvarNomeClienteInput(BaseModel):
+    nome_cliente: str = Field(description="O nome completo do cliente a ser salvo no sistema.")
+    
 class AgenteClinica:
-    def __init__(self, clinic_id: str, session_id: str):
+    def __init__(self, clinic_id: str, session_id: str, lid: str):
         self.clinic_id = clinic_id
         self.session_id = session_id
+        self.lid = lid
         self.calendar_service = get_calendar_service(clinic_id)
         
         # Carregar dados da clínica (Nome, Prompt, Profissionais)
@@ -731,6 +735,25 @@ class AgenteClinica:
 
         except Exception as e:
             return f"Erro ao atualizar base de dados: {e}"
+    
+    def _logic_salvar_nome_cliente(self, nome_cliente: str):
+        """
+        Salva o nome do cliente no sistema.
+        """
+        telefone = self.session_id
+        
+        print(f"--- TOOL: Salvando nome do cliente: {nome_cliente} ---")
+        
+        try:
+            supabase.table('lids').upsert({
+                'clinic_id': self.clinic_id,
+                'lid': self.lid,
+                'telefone': telefone,
+                'nome': nome_cliente
+            }, on_conflict='clinic_id, lid').execute()
+            return f"Nome '{nome_cliente}' salvo com sucesso."
+        except Exception as e:
+            return f"Erro ao salvar nome do cliente: {str(e)}"
 
     # --- O CÉREBRO (AGENTE) ---
 
@@ -778,6 +801,12 @@ class AgenteClinica:
                 name="reagendar_agendamento",
                 description="Altera o horário de uma consulta existente. Requer data antiga (DD/MM/AAAA) e hora antiga (HH:MM) para identificar, e a nova data ISO. Se mudar o médico, informe o novo nome.",
                 args_schema=ReagendarInput
+            ),
+            StructuredTool.from_function(
+                func=self._logic_salvar_nome_cliente,
+                name="salvar_nome_cliente",
+                description="Salva o nome do cliente no sistema.",
+                args_schema=SalvarNomeClienteInput
             )
         ]
 
@@ -785,7 +814,7 @@ class AgenteClinica:
         lista_profs = ", ".join([f"{p['nome']} ({p['especialidade']})" for p in self.profissionais])
         
         # 1. Lógica do Paciente (Mantida e está ótima)
-        if self.dados_paciente:
+        if self.dados_paciente and self.dados_paciente['nome']:
             historico_consultas = self._gerar_bloco_paciente(self.dados_paciente['id'])
             
             bloco_paciente = f"""

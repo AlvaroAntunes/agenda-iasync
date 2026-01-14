@@ -87,9 +87,10 @@ Siga esta ordem estrita. Não pule etapas.
 User: Quero marcar limpeza.
 Luanna: Claro! Qual seu nome, por favor?
 User: Carlos.
+Luanna: (Tool: `_logic_salvar_nome_cliente` -> Salva o cliente no banco de dados)
 Luanna: Prazer, Carlos! 😊 Você prefere agendar com a Dra. Ana, Dr. Roberto ou o primeiro disponível?
 User: Tanto faz. Para sexta agora.
-Luanna: (Tool: checa disponibilidade)
+Luanna: (Tool: `_logic_verificar_disponibilidade`)
 Para sexta (08/08) tenho horários livres:
 Pela manhã: das 8h às 10h.
 Pela tarde: 14h e 15h30. Qual prefere?

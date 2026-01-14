@@ -30,7 +30,7 @@ UAZAPI_URL = os.getenv("UAZAPI_URL")
 buffer_service = BufferService()
 BUFFER_DELAY = 10  # Segundos de espera
 
-async def esperar_e_processar(clinic_id: str, telefone_cliente: str, token_instancia: str):
+async def esperar_e_processar(clinic_id: str, telefone_cliente: str, token_instancia: str, lid: str):
     """
     Função assíncrona que aguarda o tempo do buffer e depois dispara o processamento.
     """
@@ -49,7 +49,8 @@ async def esperar_e_processar(clinic_id: str, telefone_cliente: str, token_insta
                 clinic_id, 
                 telefone_cliente, 
                 texto_completo, 
-                token_instancia
+                token_instancia,
+                lid
             )
         else:
             print(f"⚠️ [Buffer] Timer acabou mas não havia mensagens (já processado?).")
@@ -57,7 +58,7 @@ async def esperar_e_processar(clinic_id: str, telefone_cliente: str, token_insta
     except Exception as e:
         print(f"❌ Erro no processamento do buffer: {e}")
 
-def salvar_lid_cache(clinic_id: str, lid: str, telefone: str, nome: str = "Desconhecido"):
+def salvar_lid_cache(clinic_id: str, lid: str, telefone: str):
     """
     Salva o mapeamento LID -> Telefone no banco para consultas futuras rápidas.
     Tabela: public.lids (lid text, telefone text, nome text, clinic_id uuid)
@@ -65,11 +66,8 @@ def salvar_lid_cache(clinic_id: str, lid: str, telefone: str, nome: str = "Desco
     try:
         # Upsert garante que se já existir, atualiza/ignora
         supabase.table('lids').upsert({
-            'clinic_id': clinic_id,
-            'lid': lid,
-            'telefone': telefone,
-            'nome': nome
-        }, on_conflict='clinic_id,lid').execute()
+            'telefone': telefone
+        }, on_conflict='clinic_id, lid').execute()
         print(f"💾 LID cacheado com sucesso: {lid} -> {telefone}")
     except Exception as e:
         print(f"⚠️ Erro ao salvar cache LID (Tabela 'lids' existe?): {e}")
@@ -126,8 +124,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         telefone_cliente = str(raw_phone).replace("@s.whatsapp.net", "").replace("+", "")
         message_id = message.get("messageid")
         lid = message.get("sender") or message.get("from")
-        nome = payload.get("chat").get("name") or "Desconhecido"
-        salvar_lid_cache(clinic_id, lid, telefone_cliente, nome)
+        salvar_lid_cache(clinic_id, lid, telefone_cliente)
 
         print(f"📩 Webhook Uazapi: Clínica {clinic_id} | Cliente: {telefone_cliente}")
 
@@ -172,7 +169,8 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                 esperar_e_processar, 
                 clinic_id, 
                 telefone_cliente, 
-                uazapi_token     
+                uazapi_token,
+                lid     
             )
             return {"status": "timer_started"}
         else:
