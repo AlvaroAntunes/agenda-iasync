@@ -10,7 +10,6 @@ from app.core.jwt_auth import require_admin
 router = APIRouter()
 supabase = get_supabase()
 
-
 @router.get("/admin/rate-limit/stats")
 def get_rate_limit_stats(
     clinic_id: str = None,
