@@ -27,15 +27,7 @@ class SupabaseClient:
             if not url or not key:
                 raise ValueError("SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não encontradas no .env")
             
-            cls._instance = create_client(
-                url,
-                key,
-                options={
-                    "db": {
-                        "pool_size": 25
-                    }
-                }
-            )
+            cls._instance = create_client(url, key)
         
         return cls._instance
 
