@@ -94,6 +94,8 @@ class AgenteClinica:
         # Limpa o session_id para garantir que só tem números
         telefone_busca = ''.join(filter(str.isdigit, self.session_id))
         
+        print(f"🔍 [DEBUG] Buscando paciente com telefone: {telefone_busca} (original: {self.session_id})")
+        
         try:
             response = supabase.table('lids')\
                 .select('nome', 'id', 'telefone')\
@@ -101,12 +103,17 @@ class AgenteClinica:
                 .eq('telefone', telefone_busca)\
                 .limit(1)\
                 .execute()
+            
+            print(f"🔍 [DEBUG] Resultado da busca: {response.data}")
                 
             if response.data and len(response.data) > 0:
+                print(f"✅ [DEBUG] Paciente identificado: {response.data[0].get('nome')}")
                 return response.data[0]
             
+            print(f"⚠️ [DEBUG] Nenhum paciente encontrado para este telefone")
             return None 
-        except Exception:
+        except Exception as e:
+            print(f"❌ [DEBUG] Erro ao identificar paciente: {e}")
             return None
         
     def _identificar_profissional(self, id: str):
