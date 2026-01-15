@@ -889,6 +889,8 @@ class AgenteClinica:
             INSTRUÇÕES:
             1. Antes de qualquer agendamento, você DEVE perguntar o nome.
             """
+        print("--- BLOCO PACIENTE ---")
+        print(bloco_paciente)
 
         prompt_ia = self.dados_clinica.get("prompt_ia", '')
 
