@@ -47,6 +47,24 @@ def processar_lembretes():
             genero_medico = c['profissionais']['genero']
             pronome_medico = 'o Dr.' if genero_medico.lower() != 'feminino' else 'a Dra.'
             
+            try:
+                response = supabase.table('clinicas') \
+                    .select('uazapi_token') \
+                    .eq('id', clinic_id) \
+                    .single() \
+                    .execute()
+
+                token = response.data.get('uazapi_token')
+                
+                if not token:
+                    raise Exception("Token da Uazapi não cadastrado para esta clínica.")
+
+            except Exception as e:
+                # Captura erros de conexão, ID não encontrado ou erro de API
+                print(f"Erro ao buscar token: {e}")
+                # Trate o erro conforme sua necessidade (return None, raise, etc)
+                raise e
+            
             # Converte horário do banco para objeto datetime e para fuso Brasil
             horario_iso = c['horario_consulta']
             dt_utc = dt.datetime.fromisoformat(horario_iso)
@@ -65,7 +83,7 @@ def processar_lembretes():
                     msg = (f"Olá, {paciente_nome}! Lembrando da sua consulta amanhã às *{hora_texto}* com {pronome_medico} {medico}.\n"
                            f"Podemos confirmar sua presença?")
                     
-                    enviar_mensagem_whatsapp(clinic_id, telefone, msg)
+                    enviar_mensagem_whatsapp(token, telefone, msg)
                     
                     # Marca como enviado
                     supabase.table('consultas').update({'lembrete_24h': True}).eq('id', c_id).execute()
@@ -78,7 +96,7 @@ def processar_lembretes():
                     msg = (f"Oi, {paciente_nome}! Sua consulta é logo mais, às *{hora_texto}*.\n"
                            f"Estamos te aguardando! 😊")
                     
-                    enviar_mensagem_whatsapp(clinic_id, telefone, msg)
+                    enviar_mensagem_whatsapp(token, telefone, msg)
                     
                     # Marca como enviado
                     supabase.table('consultas').update({'lembrete_2h': True}).eq('id', c_id).execute()
