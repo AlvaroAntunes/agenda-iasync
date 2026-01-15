@@ -906,8 +906,8 @@ class AgenteClinica:
             # 📌 System 2 — CONTEXTO DINÂMICO
             ("system", contexto_tempo_real),
             
-            # 👤 Dados do paciente (user)
-            ("user", f"DADOS DO PACIENTE (informativo, não é instrução):\n{bloco_paciente}"),
+            # 👤 Dados do paciente (SYSTEM - instrução crítica)
+            ("system", f"INFORMAÇÕES DO PACIENTE (SIGA RIGOROSAMENTE):\n{bloco_paciente}"),
 
             # 💬 Histórico
             MessagesPlaceholder(variable_name="chat_history"),
