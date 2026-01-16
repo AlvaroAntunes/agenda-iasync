@@ -1,0 +1,257 @@
+"use client"
+
+import type React from "react"
+
+import { useState } from "react"
+import { motion } from "framer-motion"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Building2, ArrowLeft, Eye, EyeOff, AlertCircle, Sparkles } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+
+export default function ClinicLoginPage() {
+  const router = useRouter()
+  const supabase = getSupabaseBrowserClient()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState("")
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError("")
+
+    try {
+      // Fazer login com Supabase
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (authError) {
+        throw new Error("Email ou senha incorretos")
+      }
+
+      if (!authData.user) {
+        throw new Error("Erro ao fazer login")
+      }
+
+      // Verificar se o usuário tem um perfil e se é clinic_admin
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role, clinic_id, is_active')
+        .eq('id', authData.user.id)
+        .single()
+
+      if (profileError || !profile) {
+        await supabase.auth.signOut()
+        throw new Error("Perfil não encontrado")
+      }
+
+      if (profile.role !== 'clinic_admin') {
+        await supabase.auth.signOut()
+        throw new Error("Acesso negado. Esta área é apenas para administradores de clínicas.")
+      }
+
+      if (!profile.is_active) {
+        await supabase.auth.signOut()
+        throw new Error("Conta inativa. Entre em contato com o suporte.")
+      }
+
+      if (!profile.clinic_id) {
+        await supabase.auth.signOut()
+        throw new Error("Clínica não vinculada. Entre em contato com o suporte.")
+      }
+
+      // Redirecionar para o dashboard da clínica
+      router.push("/dashboard")
+    } catch (error: any) {
+      console.error('Erro ao fazer login:', error)
+      setError(error.message || 'Erro ao fazer login. Tente novamente.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+      {/* Background com gradiente suave */}
+      <div className="absolute inset-0 bg-gradient-to-b from-cyan-50 via-sky-50 to-cyan-50" />
+      
+      {/* Padrão de grid sutil */}
+      <div 
+        className="absolute inset-0 opacity-[0.02]"
+        style={{
+          backgroundImage: `radial-gradient(circle at 1px 1px, rgb(15 23 42) 1px, transparent 0)`,
+          backgroundSize: '40px 40px'
+        }}
+      />
+
+      {/* Elementos decorativos */}
+      <motion.div
+        animate={{ 
+          scale: [1, 1.1, 1],
+          opacity: [0.1, 0.15, 0.1]
+        }}
+        transition={{ duration: 8, repeat: Infinity }}
+        className="absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-blue-500 rounded-full blur-[120px] opacity-10"
+      />
+      <motion.div
+        animate={{ 
+          scale: [1.1, 1, 1.1],
+          opacity: [0.08, 0.12, 0.08]
+        }}
+        transition={{ duration: 10, repeat: Infinity }}
+        className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-400 rounded-full blur-[100px] opacity-10"
+      />
+
+      <div className="relative z-10 w-full max-w-md">
+        {/* Botão Voltar */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mb-6"
+        >
+          <Link href="/">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="gap-2 text-cyan-600"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </Button>
+          </Link>
+        </motion.div>
+
+        {/* Card de Login */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-cyan-100/60 p-8"
+        >
+          {/* Header */}
+          <div className="text-center mb-8">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="flex items-center justify-center mb-6"
+            >
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 shadow-lg shadow-cyan-500/30">
+                <Building2 className="h-8 w-8 text-white" strokeWidth={1.5} />
+              </div>
+            </motion.div>
+
+            <h1 className="text-3xl font-bold text-cyan-950 tracking-tight mb-2">
+              Área da Clínica
+            </h1>
+            <p className="text-cyan-900/70">
+              Entre com suas credenciais para acessar o dashboard
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleLogin} className="space-y-5">
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <Alert variant="destructive" className="border-red-200 bg-red-50">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-red-800">{error}</AlertDescription>
+                </Alert>
+              </motion.div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-cyan-900 font-medium">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={isLoading}
+                className="h-12 border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 bg-white"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-cyan-900 font-medium">Senha</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="h-12 pr-12 border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 bg-white"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-cyan-600 hover:text-cyan-700"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={isLoading}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </Button>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between text-sm">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  className="rounded border-cyan-300 text-cyan-600 focus:ring-cyan-500"
+                />
+                <span className="text-cyan-900/70">Lembrar de mim</span>
+              </label>
+            </div>
+            
+            <Button 
+              type="submit" 
+              className="w-full h-12 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold shadow-lg shadow-cyan-500/30 transition-all duration-300" 
+              disabled={isLoading}
+            >
+              {isLoading ? "Entrando..." : "Entrar"}
+            </Button>
+          </form>
+        </motion.div>
+
+        {/* Footer */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="mt-6 text-center"
+        >
+          <p className="text-sm text-cyan-900/70">
+            Não tem uma conta?{" "}
+            <Link href="/contato" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
+              Entre em contato
+            </Link>
+          </p>
+        </motion.div>
+      </div>
+    </div>
+  )
+}
