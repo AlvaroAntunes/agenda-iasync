@@ -200,7 +200,7 @@ class AgenteClinica:
 
         return f"Horários OCUPADOS em {data}:\n" + "\n".join(lista_ocupada)
     
-    def _calcular_slots_livres(self, eventos, data_base: dt.date):
+    def _calcular_slots_livres(self, eventos, data_base: dt.date, eventos_ignorar: List[str] = []):
         """
         Recebe a lista de eventos ocupados e retorna a lista de horários livres (slots de 5min).
         Considera horário comercial 08:00 às 18:00.
@@ -258,6 +258,10 @@ class AgenteClinica:
             
             for e in eventos:
                 try:
+                    # Se o evento for do próprio paciente, IGNORA O BLOQUEIO
+                    if e.get('id') in eventos_ignorar:
+                        continue
+                    
                     # Bloqueia dias inteiros
                     if 'date' in e['start']:
                         esta_livre = False
@@ -366,6 +370,20 @@ class AgenteClinica:
         else:
             for p in self.profissionais:
                 calendarios_alvo.append({'nome': p['nome'], 'id': p['external_calendar_id']})
+                
+        try:
+            # Busca IDs dos eventos do Google associados a este paciente
+            minhas_consultas = supabase.table('consultas')\
+                .select('external_event_id')\
+                .eq('paciente_id', self.dados_paciente['id'])\
+                .eq('status', 'AGENDADA')\
+                .execute()
+            
+            if minhas_consultas.data:
+                ids_para_ignorar = [c['external_event_id'] for c in minhas_consultas.data if c['external_event_id']]
+                print(f"🕵️ Ignorando {len(ids_para_ignorar)} eventos do próprio paciente na verificação.")
+        except Exception as e:
+            print(f"⚠️ Erro ao buscar eventos para ignorar: {e}")
 
         # 4. Consulta e Cálculo (com Cache)
         relatorio_final = []
@@ -383,7 +401,7 @@ class AgenteClinica:
                     eventos = self.calendar_service.listar_eventos(data=dt_inicio_busca, calendar_id=cal['id']) or []
                     
                     # Calcula slots livres
-                    slots_livres = self._calcular_slots_livres(eventos, data_base)
+                    slots_livres = self._calcular_slots_livres(eventos, data_base, eventos_ignorar=ids_para_ignorar)
                     
                     # Armazena no cache (TTL: 5 minutos)
                     if prof_id:
