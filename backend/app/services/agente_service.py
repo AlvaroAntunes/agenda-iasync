@@ -276,13 +276,53 @@ class AgenteClinica:
                     continue 
 
             if esta_livre:
-                # Formata para ficar bonito na resposta (ex: 08h15)
-                slots_livres.append(slot_inicio.strftime('%Hh%M'))
+                slots_livres.append(slot_inicio)
             
             # Avança o cursor em 15 minutos
             cursor_tempo += intervalo_step
 
         return slots_livres
+    
+    def _agrupar_horarios(self, slots_dt: List[dt.datetime]) -> str:
+        """
+        Recebe lista de datetimes [08:00, 08:15, 08:30, 09:15]
+        Retorna string agrupada: "das 08h às 08h30, 09h15"
+        """
+        if not slots_dt: return ""
+        
+        step_min = 15 # O mesmo do intervalo
+        faixas = []
+        
+        if not slots_dt: return ""
+
+        inicio_faixa = slots_dt[0]
+        fim_faixa = slots_dt[0]
+        
+        for i in range(1, len(slots_dt)):
+            atual = slots_dt[i]
+            # Se o atual for exatamente 'fim_faixa + step', continua a faixa
+            if atual == fim_faixa + dt.timedelta(minutes=step_min):
+                fim_faixa = atual
+            else:
+                # Quebrou a sequência, salva a anterior
+                faixas.append((inicio_faixa, fim_faixa))
+                inicio_faixa = atual
+                fim_faixa = atual
+        
+        # Adiciona a última
+        faixas.append((inicio_faixa, fim_faixa))
+        
+        textos = []
+        for inicio, fim in faixas:
+            txt_ini = inicio.strftime('%Hh%M').replace('h00', 'h')
+            
+            if inicio == fim:
+                textos.append(txt_ini)
+            else:
+                txt_fim = fim.strftime('%Hh%M').replace('h00', 'h')
+                textos.append(f"das {txt_ini} às {txt_fim}")
+                
+        return ", ".join(textos)
         
     # --- DEFINIÇÃO DAS FERRAMENTAS (TOOLS) ---
 
@@ -355,9 +395,22 @@ class AgenteClinica:
                 if not slots_livres:
                     relatorio_final.append(f"❌ {cal['nome']}: Agenda LOTADA para este dia.")
                 else:
-                    # Formata bonitinho: 08h, 8h15, 14h...
-                    lista_str = ", ".join(slots_livres)
-                    relatorio_final.append(f"✅ {cal['nome']} (Horários Livres): {lista_str}")
+                    # 2. Separa Manhã (< 12h) e Tarde (>= 12h)
+                    slots_manha = [s for s in slots_livres if s.hour < 12]
+                    slots_tarde = [s for s in slots_livres if s.hour >= 12]
+
+                    # 3. Formata os grupos separadamente
+                    msg_medico = f"✅ **{cal['nome']}** (Horários Livres):"
+                    
+                    if slots_manha:
+                        txt_manha = self._agrupar_horarios(slots_manha)
+                        msg_medico += f"\n   🌞 Manhã: {txt_manha}"
+                    
+                    if slots_tarde:
+                        txt_tarde = self._agrupar_horarios(slots_tarde)
+                        msg_medico += f"\n   🌤️ Tarde: {txt_tarde}"
+                    
+                    relatorio_final.append(msg_medico)
 
         except Exception as e:
             return f"Erro técnico na agenda: {str(e)}"
