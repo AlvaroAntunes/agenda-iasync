@@ -202,44 +202,64 @@ class AgenteClinica:
     
     def _calcular_slots_livres(self, eventos, data_base: dt.date):
         """
-        Recebe a lista de eventos ocupados e retorna a lista de horários livres (slots de 1h).
+        Recebe a lista de eventos ocupados e retorna a lista de horários livres (slots de 15min).
         Considera horário comercial 08:00 às 18:00.
         """
         # Configuração da Clínica 
         hora_abertura = int(self.dados_clinica.get('hora_abertura') or 8)
         hora_fechamento = int(self.dados_clinica.get('hora_fechamento') or 18)
-        DURACAO_CONSULTA = 1 # horas
+
+        # DEFINIÇÕES DE TEMPO
+        duracao_consulta = dt.timedelta(hours=1)      # Duração do bloco ocupado
+        intervalo_step = dt.timedelta(minutes=15)     # Pulo visual (08:00, 08:15, 08:30...)
         
         # Fuso Horário
         tz_br = TIMEZONE_BR
         
-        # Cria todos os slots possíveis do dia (08:00, 09:00, ..., 17:00)
-        slots_possiveis = []
+        # Define marcos de início e fim do dia
+        inicio_expediente = dt.datetime.combine(data_base, dt.time(hour=hora_abertura, minute=0), tzinfo=tz_br)
+        fim_expediente = dt.datetime.combine(data_base, dt.time(hour=hora_fechamento, minute=0), tzinfo=tz_br)
         
-        for h in range(hora_abertura, hora_fechamento):
-            # Cria o objeto datetime para o slot (ex: 14/01/2026 08:00:00)
-            inicio_slot = dt.datetime.combine(data_base, dt.time(hour=h, minute=0), tzinfo=tz_br)
-            fim_slot = inicio_slot + dt.timedelta(hours=DURACAO_CONSULTA)
-            slots_possiveis.append((inicio_slot, fim_slot))
+        # Cursor que vai percorrer o dia
+        cursor_tempo = inicio_expediente
 
-        # Se for "HOJE", remove slots que já passaram (+1h de margem)
+        # --- TRATAMENTO PARA "HOJE" ---
         agora = dt.datetime.now(tz_br)
         
         if data_base == agora.date():
+            # Margem de 1h de antecedência mínima
             margem_seguranca = agora + dt.timedelta(hours=1)
-            slots_possiveis = [s for s in slots_possiveis if s[0] > margem_seguranca]
+            
+            # Se a margem já passou do início do expediente, avançamos o cursor
+            if margem_seguranca > cursor_tempo:
+                cursor_tempo = margem_seguranca
+                
+                # Arredondamento Matemático para o próximo slot de 15 min
+                # Ex: Se são 14:12, viraria 15:12. Arredondamos para 15:15.
+                minutos = cursor_tempo.minute
+                passo_min = 15
+                resto = minutos % passo_min
+                
+                if resto > 0:
+                    falta_para_proximo = passo_min - resto
+                    cursor_tempo += dt.timedelta(minutes=falta_para_proximo)
+                
+                # Zera segundos para ficar limpo
+                cursor_tempo = cursor_tempo.replace(second=0, microsecond=0)
 
-        # Filtra os slots que colidem com eventos do Google
+        # --- LOOP DE VERIFICAÇÃO ---
         slots_livres = []
         
-        for slot_inicio, slot_fim in slots_possiveis:
+        # Enquanto o horário do slot + duração da consulta couber no expediente
+        while cursor_tempo + duracao_consulta <= fim_expediente:
+            slot_inicio = cursor_tempo
+            slot_fim = cursor_tempo + duracao_consulta
+            
             esta_livre = True
             
             for e in eventos:
-                # Pega start/end do evento do Google
                 try:
-                    # Eventos de dia todo ('date') bloqueiam tudo? Depende da regra. 
-                    # Aqui assumimos que bloqueiam se o dia bater.
+                    # Bloqueia dias inteiros
                     if 'date' in e['start']:
                         esta_livre = False
                         break
@@ -247,16 +267,20 @@ class AgenteClinica:
                     start_evt = dt.datetime.fromisoformat(e['start'].get('dateTime'))
                     end_evt = dt.datetime.fromisoformat(e['end'].get('dateTime'))
                     
-                    # Lógica de Colisão de Horário:
-                    # (SlotInicio < EvtFim) E (SlotFim > EvtInicio)
+                    # Lógica de Colisão de Horário
                     if slot_inicio < end_evt and slot_fim > start_evt:
                         esta_livre = False
                         break
+                    
                 except:
-                    continue # Ignora eventos mal formados
-            
+                    continue 
+
             if esta_livre:
-                slots_livres.append(slot_inicio.strftime('%H:%M'))
+                # Formata para ficar bonito na resposta (ex: 08h15)
+                slots_livres.append(slot_inicio.strftime('%Hh%M'))
+            
+            # Avança o cursor em 15 minutos
+            cursor_tempo += intervalo_step
 
         return slots_livres
         
@@ -331,7 +355,7 @@ class AgenteClinica:
                 if not slots_livres:
                     relatorio_final.append(f"❌ {cal['nome']}: Agenda LOTADA para este dia.")
                 else:
-                    # Formata bonitinho: 08:00, 09:00, 14:00...
+                    # Formata bonitinho: 08h, 8h15, 14h...
                     lista_str = ", ".join(slots_livres)
                     relatorio_final.append(f"✅ {cal['nome']} (Horários Livres): {lista_str}")
 
