@@ -13,6 +13,7 @@ load_dotenv()
 # Constantes globais
 TIMEZONE_BR = ZoneInfo("America/Sao_Paulo")
 TIMEZONE_STR = "America/Sao_Paulo"
+SLOT_CONSULTA = 5  # minutos
 
 class SupabaseClient:
     """Singleton para cliente Supabase."""

@@ -24,7 +24,7 @@ from langchain_core.tools import StructuredTool
 from app.services.factory import get_calendar_service
 from app.services.buffer_service import BufferService
 from app.utils.date_utils import formatar_hora
-from app.core.database import get_supabase, TIMEZONE_BR
+from app.core.database import get_supabase, TIMEZONE_BR, SLOT_CONSULTA
 
 load_dotenv()  # Carrega variáveis do .env
 
@@ -202,7 +202,7 @@ class AgenteClinica:
     
     def _calcular_slots_livres(self, eventos, data_base: dt.date):
         """
-        Recebe a lista de eventos ocupados e retorna a lista de horários livres (slots de 15min).
+        Recebe a lista de eventos ocupados e retorna a lista de horários livres (slots de 5min).
         Considera horário comercial 08:00 às 18:00.
         """
         # Configuração da Clínica 
@@ -211,7 +211,7 @@ class AgenteClinica:
 
         # DEFINIÇÕES DE TEMPO
         duracao_consulta = dt.timedelta(hours=1)      # Duração do bloco ocupado
-        intervalo_step = dt.timedelta(minutes=15)     # Pulo visual (08:00, 08:15, 08:30...)
+        intervalo_step = dt.timedelta(minutes=SLOT_CONSULTA)     # Pulo visual (08:00, 08:05, 08:10...)
         
         # Fuso Horário
         tz_br = TIMEZONE_BR
@@ -234,14 +234,13 @@ class AgenteClinica:
             if margem_seguranca > cursor_tempo:
                 cursor_tempo = margem_seguranca
                 
-                # Arredondamento Matemático para o próximo slot de 15 min
+                # Arredondamento Matemático para o próximo slot de 5 min
                 # Ex: Se são 14:12, viraria 15:12. Arredondamos para 15:15.
                 minutos = cursor_tempo.minute
-                passo_min = 15
-                resto = minutos % passo_min
+                resto = minutos % SLOT_CONSULTA
                 
                 if resto > 0:
-                    falta_para_proximo = passo_min - resto
+                    falta_para_proximo = SLOT_CONSULTA - resto
                     cursor_tempo += dt.timedelta(minutes=falta_para_proximo)
                 
                 # Zera segundos para ficar limpo
@@ -278,7 +277,7 @@ class AgenteClinica:
             if esta_livre:
                 slots_livres.append(slot_inicio)
             
-            # Avança o cursor em 15 minutos
+            # Avança o cursor em 5 minutos
             cursor_tempo += intervalo_step
 
         return slots_livres
@@ -290,7 +289,6 @@ class AgenteClinica:
         """
         if not slots_dt: return ""
         
-        step_min = 15 # O mesmo do intervalo
         faixas = []
         
         if not slots_dt: return ""
@@ -301,7 +299,7 @@ class AgenteClinica:
         for i in range(1, len(slots_dt)):
             atual = slots_dt[i]
             # Se o atual for exatamente 'fim_faixa + step', continua a faixa
-            if atual == fim_faixa + dt.timedelta(minutes=step_min):
+            if atual == fim_faixa + dt.timedelta(minutes=SLOT_CONSULTA):
                 fim_faixa = atual
             else:
                 # Quebrou a sequência, salva a anterior
