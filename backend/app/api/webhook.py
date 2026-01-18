@@ -147,20 +147,17 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         telefone_cliente = str(raw_phone).replace("@s.whatsapp.net", "").replace("+", "")
         message_id = message.get("messageid")
         lid = message.get("sender") or message.get("from")
-        
 
         print(f"📩 Webhook Uazapi: Clínica {clinic_id} | Cliente: {telefone_cliente}")
 
         # 5. Extração do Conteúdo (Texto ou Áudio)
         msg_type = message.get("messageType") or message.get("type")
-        types_text = ["Conversation", "text", "ExtendedTextMessage"]
-        types_audio = ["AudioMessage", "media"]
         texto_usuario = ""
 
-        if msg_type in types_text:
+        if msg_type == "Conversation" or msg_type == "text" or msg_type == "ExtendedTextMessage":
             texto_usuario = message.get("content") or message.get("text")
             
-        elif msg_type in types_audio:
+        elif msg_type == "AudioMessage" or msg_type == "media":
             print("🎧 Áudio detectado (Uazapi)...")
             # A Uazapi manda a URL direta do arquivo
             audio_url = message.get("content").get("URL")
