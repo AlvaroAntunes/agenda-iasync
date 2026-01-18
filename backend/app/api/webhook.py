@@ -151,11 +151,14 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         print(f"📩 Webhook Uazapi: Clínica {clinic_id} | Cliente: {telefone_cliente}")
 
         # 5. Extração do Conteúdo (Texto ou Áudio)
-        msg_type = message.get("messageType") or message.get("type")
+        msg_type = message.get("messageType") or message.get("type") or payload.get("messageType")
         texto_usuario = ""
 
         if msg_type == "Conversation" or msg_type == "text" or msg_type == "ExtendedTextMessage":
             texto_usuario = message.get("content") or message.get("text")
+            
+            if isinstance(texto_usuario, dict):
+                texto_usuario = texto_usuario.get("text", "Não entendi a mensagem.")
             
         elif msg_type == "AudioMessage" or msg_type == "media":
             print("🎧 Áudio detectado (Uazapi)...")
