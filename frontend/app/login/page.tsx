@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,9 +18,51 @@ export default function ClinicLoginPage() {
   const supabase = getSupabaseBrowserClient()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
+
+  // Verificar se há sessão ativa ao carregar
+  useEffect(() => {
+    const checkSession = async () => {
+      // Verificar se era uma sessão temporária (não marcou "lembrar de mim")
+      // sessionStorage é limpo quando o navegador fecha, então se não existir
+      // e havia uma sessão, significa que o navegador foi fechado
+      const wasTempSession = sessionStorage.getItem("clinic_temp_session")
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session && !wasTempSession) {
+        // Havia uma sessão mas não tem o flag de sessão temporária
+        // Isso significa que o navegador foi fechado e reaberto
+        // Verificar se o usuário tinha marcado "lembrar de mim"
+        const shouldRemember = localStorage.getItem("clinic_remember") === "true"
+        
+        if (!shouldRemember) {
+          // Não marcou "lembrar de mim", fazer logout
+          await supabase.auth.signOut()
+          localStorage.removeItem("clinic-auth")
+        } else {
+          // Tinha marcado "lembrar de mim", manter sessão e redirecionar
+          router.push("/dashboard")
+        }
+      } else if (session && wasTempSession) {
+        // Sessão temporária ainda ativa (navegador não foi fechado)
+        router.push("/dashboard")
+      } else {
+        // Não há sessão, apenas carregar email salvo se houver
+        const savedEmail = localStorage.getItem("clinic_email")
+        const shouldRemember = localStorage.getItem("clinic_remember") === "true"
+
+        if (savedEmail && shouldRemember) {
+          setEmail(savedEmail)
+          setRememberMe(true)
+        }
+      }
+    }
+
+    checkSession()
+  }, [supabase, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,6 +109,22 @@ export default function ClinicLoginPage() {
       if (!profile.clinic_id) {
         await supabase.auth.signOut()
         throw new Error("Clínica não vinculada. Entre em contato com o suporte.")
+      }
+
+      // Gerenciar persistência da sessão
+      if (!rememberMe) {
+        // Se não marcou "lembrar de mim", remover a sessão do localStorage
+        // A sessão ainda estará ativa no navegador atual, mas será perdida ao fechar
+        localStorage.removeItem("clinic_email")
+        localStorage.removeItem("clinic_remember")
+        
+        // Salvar um flag para fazer logout ao fechar o navegador
+        sessionStorage.setItem("clinic_temp_session", "true")
+      } else {
+        // Salvar email para próximo acesso
+        localStorage.setItem("clinic_email", email)
+        localStorage.setItem("clinic_remember", "true")
+        sessionStorage.removeItem("clinic_temp_session")
       }
 
       // Redirecionar para o dashboard da clínica
@@ -221,7 +279,10 @@ export default function ClinicLoginPage() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input 
                   type="checkbox" 
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
                   className="rounded border-cyan-300 text-cyan-600 focus:ring-cyan-500"
+                  disabled={isLoading}
                 />
                 <span className="text-cyan-900/70">Lembrar de mim</span>
               </label>
