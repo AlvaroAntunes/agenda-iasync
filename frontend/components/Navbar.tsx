@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Sparkles } from "lucide-react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -26,7 +27,7 @@ const Navbar = () => {
       <div className="max-w-5xl mx-auto">
         <div className="glass rounded-full px-6 py-3 shadow-soft flex items-center justify-between">
           {/* Logo */}
-          <a href="#" className="flex items-center gap-2 group">
+          <a href="/#" className="flex items-center gap-2 group">
             <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
               <Sparkles className="w-4 h-4 text-white" strokeWidth={1.5} />
             </div>
@@ -120,17 +121,20 @@ const Navbar = () => {
                     </a>
                   );
                 })}
-                <button className="mt-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-6 py-3 rounded-full text-sm
-                                  font-medium cursor-pointer hover:from-cyan-600 hover:to-blue-600">
+    
+                <Link
+                  href="/login"
+                  className="mt-2 inline-flex items-center justify-center bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-6 py-3 rounded-full text-sm font-medium cursor-pointer hover:from-cyan-600 hover:to-blue-600"
+                >
                   Entrar
-                </button>
-                <a
-                  href="#planos"
-                  className="mt-2 px-6 py-3 rounded-full text-sm font-semibold text-cyan-700 text-center
-                             border border-cyan-200/70 bg-white/90 hover:bg-white cursor-pointer transition-colors"
+                </Link>
+
+                <Link
+                  href="/login"
+                  className="mt-2 inline-flex items-center justify-center px-6 py-3 rounded-full text-sm font-semibold text-cyan-700 text-center border border-cyan-200/70 bg-white/90 hover:bg-white cursor-pointer transition-colors"
                 >
                   Teste Grátis
-                </a>
+                </Link>
                          
               </div>
             </motion.div>
