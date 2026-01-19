@@ -1,12 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { AsaasClient } from '@/lib/asaas-client'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { clinicId, plano, ciclo_cobranca } = body
+    const { clinicId, plano, ciclo_cobranca, metodoPagamento } = body
 
-    if (!clinicId || !plano || !ciclo_cobranca) {
+    if (!clinicId || !plano || !ciclo_cobranca || !metodoPagamento) {
       return NextResponse.json(
         { error: 'Dados incompletos' },
         { status: 400 }
@@ -52,29 +53,47 @@ export async function POST(request: Request) {
 
     const valor = ciclo_cobranca === 'mensal' ? planData.preco_mensal : planData.preco_anual
 
-    // Atualizar clínica com novo plano
-    const { error: updateError } = await supabaseAdmin
+    // Buscar dados da clínica para criar cliente no Asaas
+    const { data: clinicData, error: clinicError } = await supabaseAdmin
       .from('clinicas')
-      .update({
-        plano: plano,
-        ciclo_cobranca: ciclo_cobranca,
-        status_assinatura: 'ativa',
-        inicio_periodo_atual: periodStart.toISOString(),
-        fim_periodo_atual: periodEnd.toISOString(),
-        trial_ends_at: null, // Limpar trial
-      })
+      .select('nome, email, cnpj, telefone, endereco, cidade, uf')
       .eq('id', clinicId)
+      .single()
 
-    if (updateError) {
-      console.error('Erro ao atualizar clínica:', updateError)
+    if (clinicError || !clinicData) {
       return NextResponse.json(
-        { error: 'Erro ao atualizar plano' },
-        { status: 500 }
+        { error: 'Clínica não encontrada' },
+        { status: 404 }
       )
     }
 
-    // Registrar pagamento (status 'pendente' até confirmação do gateway)
-    const { error: paymentError } = await supabaseAdmin
+    // Criar cliente no Asaas
+    const asaas = new AsaasClient()
+    const asaasCustomer = await asaas.createOrUpdateCustomer({
+      name: clinicData.nome,
+      email: clinicData.email,
+      cpfCnpj: clinicData.cnpj,
+      phone: clinicData.telefone,
+      externalReference: clinicId,
+    })
+
+    // Calcular vencimento (7 dias a partir de hoje)
+    const dueDate = new Date()
+    dueDate.setDate(dueDate.getDate() + 7)
+    const dueDateStr = dueDate.toISOString().split('T')[0] // YYYY-MM-DD
+
+    // Criar cobrança no Asaas
+    const asaasPayment = await asaas.createPayment({
+      customer: asaasCustomer.id!,
+      billingType: metodoPagamento, // 'PIX' ou 'BOLETO'
+      value: valor,
+      dueDate: dueDateStr,
+      description: `Plano ${plano.toUpperCase()} - ${ciclo_cobranca === 'mensal' ? 'Mensal' : 'Anual'}`,
+      externalReference: clinicId,
+    })
+
+    // Registrar pagamento no banco
+    const { data: paymentRecord, error: paymentError } = await supabaseAdmin
       .from('pagamentos')
       .insert({
         clinica_id: clinicId,
@@ -82,25 +101,40 @@ export async function POST(request: Request) {
         ciclo_cobranca: ciclo_cobranca,
         valor: valor,
         status: 'pendente',
-        metodo_pagamento: 'manual', // Depois integrar com gateway
+        metodo_pagamento: metodoPagamento,
+        id_gateway_pagamento: asaasPayment.id,
       })
+      .select()
+      .single()
 
     if (paymentError) {
       console.error('Erro ao registrar pagamento:', paymentError)
-      // Não falhar a requisição por causa disso
+    }
+
+    // Atualizar clínica (status ainda pendente até confirmar pagamento)
+    const { error: updateError } = await supabaseAdmin
+      .from('clinicas')
+      .update({
+        ciclo_cobranca: ciclo_cobranca,
+        // Não ativar ainda, esperar webhook
+      })
+      .eq('id', clinicId)
+
+    if (updateError) {
+      console.error('Erro ao atualizar clínica:', updateError)
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Plano atualizado com sucesso',
+      message: 'Cobrança criada com sucesso',
       data: {
-        plano,
-        ciclo_cobranca,
-        valor,
-        periodo: {
-          inicio: periodStart,
-          fim: periodEnd,
-        }
+        paymentId: asaasPayment.id,
+        status: asaasPayment.status,
+        dueDate: asaasPayment.dueDate,
+        valor: asaasPayment.value,
+        invoiceUrl: asaasPayment.invoiceUrl,
+        bankSlipUrl: asaasPayment.bankSlipUrl,
+        pixQrCode: asaasPayment.pixTransaction?.qrCode,
       }
     })
 
