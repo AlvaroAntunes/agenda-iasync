@@ -58,7 +58,7 @@ const Pricing = () => {
         "Relatórios essenciais",
       ],
       highlighted: false,
-      cta: "Falar com Especialista",
+      cta: "Começar agora",
       enterprise: true,
     },
   ];
@@ -83,7 +83,7 @@ const Pricing = () => {
           </h2>
           <p className="text-lg text-cyan-900/70">
             Escolha o plano ideal para o tamanho da sua clínica. 
-            Todos incluem setup gratuito e 7 dias de teste.
+            Todos incluem setup gratuito e 7 dias de teste grátis.
           </p>
         </motion.div>
 

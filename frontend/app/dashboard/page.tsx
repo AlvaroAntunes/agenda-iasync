@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Switch } from "@/components/ui/switch"
+import { TrialBanner } from "@/components/TrialBanner"
 import { 
   Calendar, 
   Clock, 
@@ -237,6 +238,11 @@ export default function ClinicDashboard() {
       </header>
 
       <main className="container mx-auto px-6 py-8">
+        {/* Trial Banner */}
+        {clinicData && (
+          <TrialBanner clinicId={clinicData.id} blockAccess={false} />
+        )}
+
         {/* Success Alert */}
         {success && (
           <Alert className="mb-6 border-green-200 bg-green-50">

@@ -69,7 +69,7 @@ const Navbar = () => {
               Entrar
             </motion.a>
             <motion.a
-              href="#planos"
+              href="/cadastro"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               className="px-6 py-2.5 rounded-full text-sm font-semibold text-cyan-700
@@ -130,7 +130,7 @@ const Navbar = () => {
                 </Link>
 
                 <Link
-                  href="/login"
+                  href="/cadastro"
                   className="mt-2 inline-flex items-center justify-center px-6 py-3 rounded-full text-sm font-semibold text-cyan-700 text-center border border-cyan-200/70 bg-white/90 hover:bg-white cursor-pointer transition-colors"
                 >
                   Teste Grátis

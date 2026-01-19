@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Play, ArrowRight, Shield, Clock, Users, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link"
 
 const Hero = () => {
   return (
@@ -86,25 +87,30 @@ const Hero = () => {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
           >
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="btn-primary flex items-center gap-3 group w-full sm:w-auto min-w-[200px] justify-center cursor-pointer bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-600" 
-                         
-            >
-              Conhecer a Solução
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" strokeWidth={2} />
-            </motion.button>
+            <Link href="/#solucao">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="btn-primary flex items-center gap-3 group w-full sm:w-auto min-w-[200px] justify-center cursor-pointer bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-600" 
+                          
+              >
+                Conhecer a Solução
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" strokeWidth={2} />
+              </motion.button>
+            </Link>
             
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="btn-secondary flex items-center gap-3 w-full sm:w-auto min-w-[200px] justify-center cursor-pointer text-cyan-600"
-            >
-              Teste grátis
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" strokeWidth={2} />
-            </motion.button>
-          </motion.div>
+            <Link href="/cadastro">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="btn-secondary flex items-center gap-3 w-full sm:w-auto min-w-[200px] justify-center cursor-pointer text-cyan-600"
+              >
+                Teste grátis
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" strokeWidth={2} />
+              </motion.button>
+            </Link>
+
+            </motion.div>
 
           {/* Trust Indicators */}
           <motion.div

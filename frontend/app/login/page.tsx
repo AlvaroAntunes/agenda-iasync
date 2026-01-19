@@ -421,8 +421,8 @@ export default function ClinicLoginPage() {
           >
             <p className="text-sm text-cyan-900/70">
               Não tem uma conta?{" "}
-              <Link href="/contato" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
-                Entre em contato
+              <Link href="/cadastro" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
+                Cadastre-se
               </Link>
             </p>
           </motion.div>
