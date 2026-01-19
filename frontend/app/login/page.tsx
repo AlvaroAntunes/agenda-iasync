@@ -22,6 +22,10 @@ export default function ClinicLoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [resetEmail, setResetEmail] = useState("")
+  const [resetSuccess, setResetSuccess] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
 
   // Verificar se há sessão ativa ao carregar
   useEffect(() => {
@@ -137,6 +141,35 @@ export default function ClinicLoginPage() {
     }
   }
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsResetting(true)
+    setError("")
+    setResetSuccess(false)
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+
+      if (error) {
+        throw error
+      }
+
+      setResetSuccess(true)
+      setTimeout(() => {
+        setShowForgotPassword(false)
+        setResetSuccess(false)
+        setResetEmail("")
+      }, 5000)
+    } catch (error: any) {
+      console.error('Erro ao enviar email de recuperação:', error)
+      setError('Erro ao enviar email de recuperação. Verifique se o email está correto.')
+    } finally {
+      setIsResetting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
       {/* Background com gradiente suave */}
@@ -171,23 +204,25 @@ export default function ClinicLoginPage() {
 
       <div className="relative z-10 w-full max-w-md">
         {/* Botão Voltar */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-6"
-        >
-          <Link href="/">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="gap-2 text-cyan-600"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Voltar
-            </Button>
-          </Link>
-        </motion.div>
+        {!showForgotPassword && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mb-6"
+          >
+            <Link href="/">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="gap-2 text-cyan-600"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar
+              </Button>
+            </Link>
+          </motion.div>
+        )}
 
         {/* Card de Login */}
         <motion.div
@@ -210,15 +245,18 @@ export default function ClinicLoginPage() {
             </motion.div>
 
             <h1 className="text-3xl font-bold text-cyan-950 tracking-tight mb-2">
-              Área da Clínica
+              {showForgotPassword ? "Recuperar Senha" : "Área da Clínica"}
             </h1>
             <p className="text-cyan-900/70">
-              Entre com suas credenciais para acessar o dashboard
+              {showForgotPassword 
+                ? "Digite seu email para receber o link de recuperação" 
+                : "Entre com suas credenciais para acessar o dashboard"}
             </p>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleLogin} className="space-y-5">
+          {/* Form de Login */}
+          {!showForgotPassword ? (
+            <form onSubmit={handleLogin} className="space-y-5">
             {error && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
@@ -286,6 +324,14 @@ export default function ClinicLoginPage() {
                 />
                 <span className="text-cyan-900/70">Lembrar de mim</span>
               </label>
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-cyan-700 hover:text-cyan-800 font-medium hover:underline cursor-pointer"
+                disabled={isLoading}
+              >
+                Esqueci minha senha
+              </button>
             </div>
             
             <Button 
@@ -296,22 +342,91 @@ export default function ClinicLoginPage() {
               {isLoading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
+          ) : (
+            /* Form de Recuperação de Senha */
+            <form onSubmit={handleForgotPassword} className="space-y-5">
+              {resetSuccess ? (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <Alert className="border-green-200 bg-green-50">
+                    <AlertCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-800">
+                      Email enviado! Verifique sua caixa de entrada para redefinir sua senha.
+                    </AlertDescription>
+                  </Alert>
+                </motion.div>
+              ) : error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <Alert variant="destructive" className="border-red-200 bg-red-50">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-red-800">{error}</AlertDescription>
+                  </Alert>
+                </motion.div>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="reset-email" className="text-cyan-900 font-medium">Email</Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  required
+                  disabled={isResetting || resetSuccess}
+                  className="h-12 border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 bg-white"
+                />
+              </div>
+              
+              <div className="space-y-3">
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold shadow-lg shadow-cyan-500/30 transition-all duration-300" 
+                  disabled={isResetting || resetSuccess}
+                >
+                  {isResetting ? "Enviando..." : "Enviar link de recuperação"}
+                </Button>
+                
+                <Button 
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setShowForgotPassword(false)
+                    setResetEmail("")
+                    setError("")
+                    setResetSuccess(false)
+                  }}
+                  className="w-full h-12 text-cyan-700 hover:text-cyan-800 hover:bg-cyan-50"
+                  disabled={isResetting}
+                >
+                  Voltar para o login
+                </Button>
+              </div>
+            </form>
+          )}
         </motion.div>
 
         {/* Footer */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="mt-6 text-center"
-        >
-          <p className="text-sm text-cyan-900/70">
-            Não tem uma conta?{" "}
-            <Link href="/contato" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
-              Entre em contato
-            </Link>
-          </p>
-        </motion.div>
+        {!showForgotPassword && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="mt-6 text-center"
+          >
+            <p className="text-sm text-cyan-900/70">
+              Não tem uma conta?{" "}
+              <Link href="/contato" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
+                Entre em contato
+              </Link>
+            </p>
+          </motion.div>
+        )}
       </div>
     </div>
   )
