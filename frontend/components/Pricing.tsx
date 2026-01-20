@@ -7,58 +7,62 @@ import { useState } from "react";
 const Pricing = () => {
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
 
+  const handlePlanClick = (planName: string) => {
+    const message = `Olá! Quero automatizar o agendamento da minha clínica com o Agenda IASync. Tenho interesse no plano ${planName} e gostaria de entender os próximos passos para começar.`;
+    const whatsappUrl = `https://wa.me/5527996887194?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   const plans = [
     {
-      name: "Clinic Essential",
-      description: "Ideal para consultórios individuais",
+      name: "Consultório",
+      description: "Para profissionais liberais que trabalham sozinhos.",
       monthlyPrice: "297",
       annualPrice: "267",
       period: "/mês",
       features: [
         "Acesso completo a plataforma",
-        "Até 500 agendamentos/mês",
-        "Até 2 profissionais",
-        "Integrações básicas",
+        "Até 300 agendamentos/mês",
+        "Agente de IA para agendamentos",
+        "1 Profissional (Agenda Única)",
+        "Integração Google Calendar",
         "Suporte via chat",
-        "Relatórios essenciais",
+        "Lembretes de 24h e 2h antes da consulta",
       ],
       highlighted: false,
       cta: "Começar Agora",
     },
     {
-      name: "Clinic Pro",
-      description: "A escolha dos especialistas",
+      name: "Clínica Pro",
+      description: "Perfeito para clínicas com sócios ou multiespecialidades.",
       monthlyPrice: "497",
       annualPrice: "447",
       period: "/mês",
       badge: "Mais Popular",
       features: [
-        "Acesso completo a plataforma",
-        "Até 500 agendamentos/mês",
-        "Até 5 profissionais",
-        "Integrações básicas",
-        "Suporte via chat",
-        "Relatórios essenciais",
+        "Tudo do Consultório, mais:",
+        "Agendamentos Ilimitados",
+        "Até 5 Profissionais (Agendas Separadas)",
+        "Suporte Prioritário (WhatsApp)"
       ],
       highlighted: true,
-      cta: "Escolher Clinic Pro",
+      cta: "Escolher Clínica Pro",
     },
     {
-      name: "Enterprise",
-      description: "Para múltiplas unidades",
-      monthlyPrice: "697",
-      annualPrice: "627",
+      name: "Corporate",
+      description: "Para redes, franquias e hospitais.",
+      monthlyPrice: "997", 
+      annualPrice: "897",
       period: "/mês",
       features: [
-        "Acesso completo a plataforma",
-        "Até 500 agendamentos/mês",
-        "Até 10 profissionais",
-        "Integrações básicas",
-        "Suporte via chat",
-        "Relatórios essenciais",
+        "Tudo do Clínica Pro, mais:",
+        "Até 15 Profissionais",
+        "Integração com CRM/ERP Utilizado",
+        "Gestor de Conta Dedicado",
+        "Treinamento da Equipe"
       ],
       highlighted: false,
-      cta: "Começar agora",
+      cta: "Começar Agora",
       enterprise: true,
     },
   ];
@@ -233,6 +237,8 @@ const Pricing = () => {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
+                  onClick={() => handlePlanClick(
+                    plan.name)}
                   className={`w-full py-4 px-6 rounded-xl font-semibold transition-all duration-300 cursor-pointer
                               ${plan.highlighted
                                 ? "bg-white text-cyan-900 hover:bg-cyan-50"

@@ -21,6 +21,7 @@ import {
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { useSubscriptionCheck } from "@/lib/use-subscription-check"
 
 type Appointment = {
   id: string
@@ -55,6 +56,8 @@ type ClinicData = {
 export default function ClinicDashboard() {
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
+  useSubscriptionCheck() // Verificar status da assinatura automaticamente
+  
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(true)
   const [success, setSuccess] = useState("")
@@ -95,6 +98,12 @@ export default function ClinicDashboard() {
         .single()
 
       if (clinicError) throw clinicError
+
+      // Verificar se a assinatura está inativa
+      if (clinic.status_assinatura === 'inativa') {
+        router.push('/renovar-assinatura')
+        return
+      }
 
       setClinicData(clinic)
       

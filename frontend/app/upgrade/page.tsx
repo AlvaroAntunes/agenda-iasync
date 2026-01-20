@@ -48,6 +48,11 @@ export default function UpgradePage() {
   const [processingPlan, setProcessingPlan] = useState<string | null>(null)
   const [error, setError] = useState("")
 
+  // Rota desabilitada - apenas para testes
+  useEffect(() => {
+    router.push('/dashboard')
+  }, [router])
+
   useEffect(() => {
     loadData()
   }, [])

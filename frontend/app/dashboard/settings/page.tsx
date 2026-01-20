@@ -23,6 +23,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { useSubscriptionCheck } from "@/lib/use-subscription-check"
 
 type ClinicData = {
   id: string
@@ -50,6 +51,8 @@ type Profissional = {
 export default function SettingsPage() {
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
+  useSubscriptionCheck() // Verificar status da assinatura automaticamente
+  
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState("")

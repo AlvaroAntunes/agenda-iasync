@@ -87,6 +87,7 @@ export async function POST(request: Request) {
         ia_ativa: true,
         prompt_ia: '',
         trial_ends_at: trialEndsAt.toISOString(),
+        status_assinatura: 'ativa',
       })
       .select()
       .single()
