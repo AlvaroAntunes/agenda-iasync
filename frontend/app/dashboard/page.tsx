@@ -126,7 +126,7 @@ export default function ClinicDashboard() {
           horario_consulta,
           status,
           origem_agendamento,
-          paciente:lids!paciente_id (
+          paciente:leads!paciente_id (
             nome,
             telefone
           ),

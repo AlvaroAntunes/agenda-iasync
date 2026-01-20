@@ -32,7 +32,7 @@ def processar_lembretes():
         # 1. Buscar Consultas Ativas (AGENDADA)
         # Trazemos dados do paciente e profissional para montar a mensagem
         response = supabase.table('consultas')\
-            .select('id, horario_consulta, clinic_id, lembrete_24h, lembrete_2h, lids(nome, telefone), profissionais(nome, genero)')\
+            .select('id, horario_consulta, clinic_id, lembrete_24h, lembrete_2h, leads(nome, telefone), profissionais(nome, genero)')\
             .eq('status', 'AGENDADA')\
             .execute()
         
@@ -41,8 +41,8 @@ def processar_lembretes():
         for c in consultas:
             c_id = c['id']
             clinic_id = c['clinic_id']
-            paciente_nome = c['lids']['nome'].split()[0] # Primeiro nome
-            telefone = c['lids']['telefone']
+            paciente_nome = c['leads']['nome'].split()[0] # Primeiro nome
+            telefone = c['leads']['telefone']
             medico = c['profissionais']['nome']
             genero_medico = c['profissionais']['genero']
             pronome_medico = 'o Dr.' if genero_medico.lower() != 'feminino' else 'a Dra.'

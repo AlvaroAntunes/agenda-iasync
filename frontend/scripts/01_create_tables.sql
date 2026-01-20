@@ -59,10 +59,10 @@ CREATE TABLE public.clinicas (
 -- Habilitar Row Level Security (RLS) na tabela de clínicas
 ALTER TABLE public.clinicas ENABLE ROW LEVEL SECURITY;
 
--- 3. TABELA "lids"
+-- 3. TABELA "leads"
 -- Armazena os pacientes, cada um "pertencendo" a uma clínica.
 
-CREATE TABLE public.lids (
+CREATE TABLE public.leads (
     id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     
     -- Chave estrangeira para "amarrar" este paciente a uma clínica
@@ -75,14 +75,14 @@ CREATE TABLE public.lids (
 );
 
 -- Habilitar Row Level Security (RLS)
-ALTER TABLE public.lids ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
 
 -- ÍNDICES DE VELOCIDADE (Obrigatório para Multi-Tenant):
 -- 1. Para o dashboard encontrar "todos os pacientes desta clínica"
-CREATE INDEX idx_lids_clinic_id ON public.lids(clinic_id);
+CREATE INDEX idx_leads_clinic_id ON public.leads(clinic_id);
 
 -- 2. Para o IA encontrar "este paciente pelo telefone DENTRO desta clínica"
-CREATE UNIQUE INDEX idx_lids_clinic_telefone ON public.lids(clinic_id, telefone);
+CREATE UNIQUE INDEX idx_leads_clinic_telefone ON public.leads(clinic_id, telefone);
 
 -- 4. TABELA "consultas"
 -- O coração do sistema. Armazena os eventos de agendamento.
@@ -92,8 +92,8 @@ CREATE TABLE public.consultas (
     
     -- Chaves estrangeiras
     clinic_id uuid NOT NULL REFERENCES public.clinicas(id) ON DELETE CASCADE,
-    paciente_id uuid NOT NULL REFERENCES public.lids(id) ON DELETE CASCADE,
-    profissional_id uuid REFERENCES public.lids(id) ON DELETE SET NULL,
+    paciente_id uuid NOT NULL REFERENCES public.leads(id) ON DELETE CASCADE,
+    profissional_id uuid REFERENCES public.leads(id) ON DELETE SET NULL,
     
     -- Dados da consulta
     horario_consulta timestamptz NOT NULL,

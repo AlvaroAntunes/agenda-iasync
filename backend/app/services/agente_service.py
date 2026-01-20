@@ -97,7 +97,7 @@ class AgenteClinica:
         print(f"🔍 [DEBUG] Buscando paciente com telefone: {telefone_busca} (original: {self.session_id})")
         
         try:
-            response = supabase.table('lids')\
+            response = supabase.table('leads')\
                 .select('nome', 'id', 'telefone')\
                 .eq('clinic_id', self.clinic_id)\
                 .eq('telefone', telefone_busca)\
@@ -495,13 +495,13 @@ class AgenteClinica:
 
         # 2. Verificar/Criar Paciente no Supabase (Upsert)
         # Primeiro buscamos se existe pelo telefone
-        paciente_response = supabase.table('lids').select('id').eq('clinic_id', self.clinic_id).eq('telefone', telefone).execute()
+        paciente_response = supabase.table('leads').select('id').eq('clinic_id', self.clinic_id).eq('telefone', telefone).execute()
         
         if paciente_response.data:
             paciente_id = paciente_response.data[0]['id']
         else:
             # Cria novo
-            novo_paciente = supabase.table('lids').insert({
+            novo_paciente = supabase.table('leads').insert({
                 'clinic_id': self.clinic_id,
                 'lid': telefone, 
                 'telefone': telefone,
@@ -591,7 +591,7 @@ class AgenteClinica:
         
         # 1. Identificar Paciente no Supabase
         try:
-            paciente_response = supabase.table('lids')\
+            paciente_response = supabase.table('leads')\
                 .select('id')\
                 .eq('clinic_id', self.clinic_id)\
                 .eq('telefone', telefone)\
@@ -891,7 +891,7 @@ class AgenteClinica:
         print(f"--- TOOL: Salvando nome do cliente: {nome_cliente} ---")
         
         try:
-            supabase.table('lids').upsert({
+            supabase.table('leads').upsert({
                 'clinic_id': self.clinic_id,
                 'lid': self.lid,
                 'telefone': telefone,
