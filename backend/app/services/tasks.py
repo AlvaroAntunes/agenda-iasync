@@ -8,9 +8,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL")
-AUTHENTICATION_API_KEY = os.getenv("AUTHENTICATION_API_KEY")
-
 @celery_app.task(name="processar_mensagem_ia", acks_late=True)
 def processar_mensagem_ia(clinic_id: str, telefone_cliente: str, texto_usuario: str, token_instancia: str, lid: str):
     print(f"⚙️ [Worker] Processando para {telefone_cliente}...")
