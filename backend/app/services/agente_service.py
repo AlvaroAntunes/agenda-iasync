@@ -429,6 +429,9 @@ class AgenteClinica:
                         txt_tarde = self._agrupar_horarios(slots_tarde)
                         msg_medico += f"\n   🌤️ Tarde: {txt_tarde}"
                     
+                    # Nota explicativa sobre os slots de 5 minutos
+                    msg_medico += f"\n   ⏱️ Obs: Dentro dos intervalos acima, há disponibilidade a cada {SLOT_CONSULTA} minutos."
+                    
                     relatorio_final.append(msg_medico)
 
         except Exception as e:
@@ -436,7 +439,7 @@ class AgenteClinica:
 
         # Instrução de reforço para o Prompt
         cabecalho = f"RELATÓRIO DE DISPONIBILIDADE PARA {data} (Horário {int(self.dados_clinica.get('hora_abertura', 8))}h-{int(self.dados_clinica.get('hora_fechamento', 18))}h):\n"
-        instrucao = "\nIMPORTANTE: Ofereça APENAS os horários listados como 'Livres' acima. Se o horário não está na lista, é porque está ocupado ou a clínica está fechada."
+        instrucao = f"\n\n⚠️ IMPORTANTE PARA O AGENTE:\n1. Os horários acima são INTERVALOS de disponibilidade.\n2. Dentro de cada intervalo (ex: 'das 14h às 16h'), você pode agendar em QUALQUER horário de {SLOT_CONSULTA} em {SLOT_CONSULTA} minutos (ex: 14h, 14h05, 14h10, 14h15... até 16h).\n3. Se o paciente pedir '16h30' e você vê 'das 14h às 17h', esse horário ESTÁ disponível.\n4. NÃO ofereça horários fora dos intervalos listados acima."
 
         return cabecalho + "\n".join(relatorio_final) + instrucao
 
