@@ -98,7 +98,7 @@ def callback_google(request: Request):
         }).eq('id', clinic_id).execute()
 
         # Redirecionar de volta para o Frontend (Dashboard)
-        return RedirectResponse("http://localhost:3000/")
+        return RedirectResponse("https://agendaiasync.com.br/dashboard")
 
     except Exception as e:
         return {"erro": str(e)}     
