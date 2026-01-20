@@ -1,24 +1,41 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Sparkles, Linkedin, Instagram, Mail, Phone } from "lucide-react";
+import { Sparkles, Linkedin, Instagram, Mail, Phone, Target } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa"
 
 const Footer = () => {
+  const handleScrollTo = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href.startsWith('#')) {
+      e.preventDefault();
+      
+      // Se estiver em outra página, redireciona para home
+      if (window.location.pathname !== '/') {
+        // Salva o ID da seção para scroll depois
+        sessionStorage.setItem('scrollToSection', href);
+        window.location.href = '/';
+      } else {
+        // Se já estiver na home, faz scroll direto
+        const element = document.querySelector(href);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    }
+  };
+
   const footerLinks = {
     Produto: [
       { name: "Recursos", href: "#recursos" },
       { name: "Planos", href: "#planos" },
     ],
     Empresa: [
-      { name: "Sobre nós", href: "#sobre-nos" },
-      { name: "Blog", href: "#blog" },
+      { name: "Sobre nós", href: "/sobre-nos" },
       { name: "Contato", href: "/contato" }
     ],
     Legal: [
-      { name: "Política de Privacidade", href: "#politica-de-privacidade" },
-      { name: "Termos de Uso", href: "#termos-de-uso" },
-      { name: "LGPD", href: "#lgpd" }
+      { name: "Política de Privacidade", href: "/politica-de-privacidade" },
+      { name: "Termos de Uso", href: "/termos-de-uso" }
     ]
   };
 
@@ -56,7 +73,7 @@ const Footer = () => {
                 {/* Social Links */}
                 <div className="flex items-center gap-3">
                   {[
-                    { icon: FaWhatsapp, href: "https://wa.me/5527996887194"},
+                    { icon: FaWhatsapp, href: "https://wa.me/5527996887194", Target: "_blank" },
                     { icon: Instagram, href: "https://www.instagram.com/ia_sync/" },
                     { icon: Mail, href: "mailto:contato@agendaia.com" },
                   ].map((social, index) => (
@@ -88,7 +105,8 @@ const Footer = () => {
                     <li key={link.name}>
                       <a
                         href={link.href}
-                        className="text-slate-600 text-sm hover:text-cyan-700 transition-colors"
+                        onClick={(e) => handleScrollTo(e, link.href)}
+                        className="text-slate-600 text-sm hover:text-cyan-700 transition-colors cursor-pointer"
                       >
                         {link.name}
                       </a>

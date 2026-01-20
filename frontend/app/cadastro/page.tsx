@@ -337,8 +337,8 @@ export default function CadastroClinicaPage() {
             <h1 className="text-3xl font-bold text-cyan-950 tracking-tight mb-2">
               Cadastrar Nova Clínica
             </h1>
-            <p className="text-cyan-900/70">
-              Preencha os dados para criar sua conta
+            <p className="text-cyan-900/70 text-sm">
+              Comece seu período de 7 dias grátis agora mesmo.
             </p>
           </div>
 
@@ -656,7 +656,7 @@ export default function CadastroClinicaPage() {
                 />
                 <span className="text-sm text-cyan-900/80 group-hover:text-cyan-900">
                   Li e aceito os{" "}
-                  <Link href="/termos-de-uso" target="_blank" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
+                  <Link href="/termos-de-uso" target="_self" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
                     Termos de Uso
                   </Link>
                 </span>
@@ -673,7 +673,7 @@ export default function CadastroClinicaPage() {
                 />
                 <span className="text-sm text-cyan-900/80 group-hover:text-cyan-900">
                   Li e aceito a{" "}
-                  <Link href="/politica-de-privacidade" target="_blank" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
+                  <Link href="/politica-de-privacidade" target="_self" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
                     Política de Privacidade
                   </Link>
                 </span>

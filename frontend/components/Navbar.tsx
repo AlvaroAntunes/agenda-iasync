@@ -10,6 +10,28 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
+  const handleScrollTo = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href.startsWith('/#')) {
+      e.preventDefault();
+      const sectionId = href.substring(1); // Remove o '/'
+      
+      // Se estiver em outra página, redireciona para home
+      if (window.location.pathname !== '/') {
+        sessionStorage.setItem('scrollToSection', sectionId);
+        window.location.href = '/';
+      } else {
+        // Se já estiver na home, faz scroll direto
+        const element = document.querySelector(sectionId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+      
+      // Fecha o menu mobile se estiver aberto
+      setIsOpen(false);
+    }
+  };
+
   const navLinks = [
     { name: "Solução", href: "/#solucao" },
     { name: "Recursos", href: "/#recursos" },
@@ -44,7 +66,8 @@ const Navbar = () => {
                 <a
                   key={link.name}
                   href={link.href}
-                  className={`text-sm transition-colors font-medium ${
+                  onClick={(e) => handleScrollTo(e, link.href)}
+                  className={`text-sm transition-colors font-medium cursor-pointer ${
                     isActive 
                       ? 'text-cyan-600 font-semibold' 
                       : 'text-slate-600 hover:text-cyan-600'
@@ -110,8 +133,8 @@ const Navbar = () => {
                     <a
                       key={link.name}
                       href={link.href}
-                      onClick={() => setIsOpen(false)}
-                      className={`px-4 py-3 rounded-xl transition-colors font-medium ${
+                      onClick={(e) => handleScrollTo(e, link.href)}
+                      className={`px-4 py-3 rounded-xl transition-colors font-medium cursor-pointer ${
                         isActive
                           ? 'text-cyan-700 bg-cyan-50 font-semibold'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
