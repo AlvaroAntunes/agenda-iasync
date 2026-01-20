@@ -370,7 +370,10 @@ class AgenteClinica:
         else:
             for p in self.profissionais:
                 calendarios_alvo.append({'nome': p['nome'], 'id': p['external_calendar_id']})
-                
+        
+        # Inicializa lista de IDs para ignorar
+        ids_para_ignorar = []
+        
         try:
             # Busca IDs dos eventos do Google associados a este paciente
             minhas_consultas = supabase.table('consultas')\
