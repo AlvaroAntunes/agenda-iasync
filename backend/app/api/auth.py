@@ -15,8 +15,6 @@ from app.core.database import get_supabase
 
 load_dotenv()  # Carrega variáveis do .env
 
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1' # PERMITE HTTP EM LOCALHOST (REMOVER EM PRODUÇÃO!)
-# CLIENT_SECRETS_FILE = "client_secret.json"
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI") 
 
