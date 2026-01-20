@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Sparkles } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -49,12 +50,18 @@ const Navbar = () => {
       <div className="max-w-5xl mx-auto">
         <div className="glass rounded-full px-6 py-3 shadow-soft flex items-center justify-between">
           {/* Logo */}
-          <a href="/#" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Sparkles className="w-4 h-4 text-white" strokeWidth={1.5} />
+          <a href="/" className="flex items-center gap-2 group">
+            <div className="w-14 h-14 flex items-center justify-center overflow-hidden">
+              <Image 
+                src="/logo.png" 
+                alt="Agenda IASync Logo" 
+                width={64} 
+                height={64}
+                className="object-cover"
+              />
             </div>
             <span className="font-semibold text-slate-900 tracking-tight">
-              AgendaIA
+              Agenda IASync
             </span>
           </a>
 

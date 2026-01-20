@@ -63,7 +63,7 @@ const Footer = () => {
                   <div className="w-10 h-10 bg-cyan-100 rounded-xl flex items-center justify-center border border-cyan-200/80">
                     <Sparkles className="w-5 h-5 text-cyan-700" strokeWidth={1.5} />
                   </div>
-                  <span className="font-bold text-xl tracking-tight text-slate-900">AgendaIA</span>
+                  <span className="font-bold text-xl tracking-tight text-slate-900">Agenda IASync</span>
                 </a>
                 
                 <p className="text-slate-500 text-sm leading-relaxed mb-6 max-w-xs">
@@ -75,7 +75,7 @@ const Footer = () => {
                   {[
                     { icon: FaWhatsapp, href: "https://wa.me/5527996887194", Target: "_blank" },
                     { icon: Instagram, href: "https://www.instagram.com/ia_sync/" },
-                    { icon: Mail, href: "mailto:contato@agendaia.com" },
+                    { icon: Mail, href: "mailto:contatoiasync@gmail.com" },
                   ].map((social, index) => (
                     <a
                       key={index}
@@ -123,7 +123,7 @@ const Footer = () => {
           <div className="container-narrow px-6 py-6">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <p className="text-slate-500 text-sm">
-                © {new Date().getFullYear()} AgendaIA. Todos os direitos reservados.
+                © {new Date().getFullYear()} Agenda IASync. Todos os direitos reservados.
               </p>
               
               <motion.p

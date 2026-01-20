@@ -47,8 +47,8 @@ const ContactSection = () => {
     {
       icon: Mail,
       title: "Email",
-      value: "contato@agendaia.com",
-      link: "mailto:contato@agendaia.com",
+      value: "contatoiasync@gmail.com",
+      link: "mailto:contatoiasync@gmail.com",
       description: "Suporte premium"
     },
     {
@@ -307,7 +307,7 @@ const ContactSection = () => {
               </div>
               <p className="text-slate-600 leading-relaxed mb-4">
                 Nossa equipe está disponível para uma demonstração personalizada 
-                e consultoria gratuita sobre como a AgendaIA pode transformar 
+                e consultoria gratuita sobre como a Agenda IASync pode transformar 
                 o atendimento da sua clínica.
               </p>
               <ul className="space-y-2 text-sm text-slate-600">

@@ -53,7 +53,7 @@ export default function PoliticaDePrivacidade() {
                   <li><strong>Dados Pessoais:</strong> Informações relacionadas a pessoa natural identificada ou identificável;</li>
                   <li><strong>Dados Sensíveis:</strong> Dados sobre saúde, origem racial ou étnica, convicção religiosa, opinião política, entre outros;</li>
                   <li><strong>Titular:</strong> Pessoa natural a quem se referem os dados pessoais;</li>
-                  <li><strong>Controlador:</strong> AgendaIA, responsável pelas decisões sobre o tratamento de dados;</li>
+                  <li><strong>Controlador:</strong> Agenda IASync, responsável pelas decisões sobre o tratamento de dados;</li>
                   <li><strong>Operador:</strong> Quem realiza o tratamento de dados em nome do controlador;</li>
                   <li><strong>Tratamento:</strong> Toda operação com dados pessoais (coleta, armazenamento, uso, compartilhamento, etc.).</li>
                 </ul>
@@ -206,7 +206,7 @@ export default function PoliticaDePrivacidade() {
                 <h3 className="text-xl font-semibold text-slate-800 mb-3 mt-6">6.1. Como Exercer seus Direitos</h3>
                 <p className="text-slate-600 leading-relaxed">
                   Para exercer qualquer um desses direitos, entre em contato através do e-mail 
-                  <strong> privacidade@agendaia.com</strong> ou pelo canal de atendimento na plataforma. 
+                  <strong> contatoiasync@gmail.com</strong> ou pelo canal de atendimento na plataforma. 
                   Responderemos sua solicitação em até 15 dias.
                 </p>
 
@@ -265,7 +265,7 @@ export default function PoliticaDePrivacidade() {
               <section>
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">9. Dados de Menores de Idade</h2>
                 <p className="text-slate-600 leading-relaxed">
-                  A plataforma AgendaIA não se destina diretamente a menores de 18 anos. Quando um menor 
+                  A plataforma Agenda IASync não se destina diretamente a menores de 18 anos. Quando um menor 
                   for paciente de uma clínica usuária, o tratamento de seus dados deve ser realizado com 
                   o consentimento de ao menos um dos pais ou responsável legal, conforme determina a LGPD.
                 </p>
@@ -303,7 +303,7 @@ export default function PoliticaDePrivacidade() {
                 <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 mt-4">
                   <p className="text-slate-600 leading-relaxed">
                     <strong className="text-slate-900">Contato do DPO:</strong><br/>
-                    E-mail: <strong>privacidade@agendaia.com</strong><br/>
+                    E-mail: <strong>contatoiasync@gmail.com</strong><br/>
                     WhatsApp: <strong>(27) 99688-7194</strong>
                   </p>
                 </div>
@@ -332,7 +332,7 @@ export default function PoliticaDePrivacidade() {
                   Para dúvidas, solicitações ou reclamações sobre privacidade e proteção de dados:
                 </p>
                 <ul className="text-slate-600 leading-relaxed space-y-2 mt-4">
-                  <li><strong>E-mail:</strong> privacidade@agendaia.com</li>
+                  <li><strong>E-mail:</strong> contatoiasync@gmail.com</li>
                   <li><strong>WhatsApp:</strong> (27) 99688-7194</li>
                   <li><strong>Endereço:</strong> Vitória/ES - Brasil</li>
                 </ul>
@@ -340,7 +340,7 @@ export default function PoliticaDePrivacidade() {
 
               <section className="bg-slate-50 rounded-xl p-6 border border-slate-200 mt-8">
                 <p className="text-slate-600 leading-relaxed text-sm">
-                  <strong className="text-slate-900">Atenção:</strong> A AgendaIA está comprometida com a transparência e a proteção de seus dados. 
+                  <strong className="text-slate-900">Atenção:</strong> A Agenda IASync está comprometida com a transparência e a proteção de seus dados. 
                   Estamos à disposição para esclarecer quaisquer dúvidas sobre como tratamos suas informações pessoais.
                 </p>
               </section>
@@ -354,7 +354,7 @@ export default function PoliticaDePrivacidade() {
         <div className="container-narrow px-6 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-slate-500 text-sm">
-              © {new Date().getFullYear()} AgendaIA. Todos os direitos reservados.
+              © {new Date().getFullYear()} Agenda IASync. Todos os direitos reservados.
             </p>
             <div className="flex gap-6 text-sm">
               <Link href="/termos-de-uso" className="text-slate-600 hover:text-cyan-700 transition-colors">

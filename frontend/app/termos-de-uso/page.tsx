@@ -46,12 +46,12 @@ export default function TermosDeUso() {
               <section>
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">1. Aceitação dos Termos</h2>
                 <p className="text-slate-600 leading-relaxed">
-                  Ao acessar e utilizar a plataforma AgendaIA, você concorda em cumprir e estar vinculado aos 
+                  Ao acessar e utilizar a plataforma Agenda IASync, você concorda em cumprir e estar vinculado aos 
                   presentes Termos de Uso. Se você não concorda com qualquer parte destes termos, não deve 
                   utilizar nossos serviços.
                 </p>
                 <p className="text-slate-600 leading-relaxed mt-4">
-                  A AgendaIA é uma plataforma de gestão e agendamento para clínicas médicas e odontológicas, 
+                  A Agenda IASync é uma plataforma de gestão e agendamento para clínicas médicas e odontológicas, 
                   que utiliza inteligência artificial para automatizar processos de atendimento ao paciente.
                 </p>
               </section>
@@ -59,10 +59,10 @@ export default function TermosDeUso() {
               <section>
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">2. Definições</h2>
                 <ul className="text-slate-600 leading-relaxed space-y-2 list-disc pl-6">
-                  <li><strong>Plataforma:</strong> Sistema AgendaIA e todos os seus recursos e funcionalidades.</li>
+                  <li><strong>Plataforma:</strong> Sistema Agenda IASync e todos os seus recursos e funcionalidades.</li>
                   <li><strong>Usuário:</strong> Clínicas, profissionais de saúde e suas equipes que utilizam a plataforma.</li>
                   <li><strong>Paciente:</strong> Pessoa física que agenda consultas através da plataforma.</li>
-                  <li><strong>Serviços:</strong> Todas as funcionalidades oferecidas pela AgendaIA.</li>
+                  <li><strong>Serviços:</strong> Todas as funcionalidades oferecidas pela Agenda IASync.</li>
                 </ul>
               </section>
 
@@ -112,7 +112,7 @@ export default function TermosDeUso() {
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">5. Planos e Pagamentos</h2>
                 <h3 className="text-xl font-semibold text-slate-800 mb-3 mt-4">5.1. Planos Disponíveis</h3>
                 <p className="text-slate-600 leading-relaxed">
-                  A AgendaIA oferece diferentes planos de assinatura com recursos e limites variados. 
+                  A Agenda IASync oferece diferentes planos de assinatura com recursos e limites variados. 
                   Os detalhes de cada plano estão disponíveis em nossa página de preços.
                 </p>
 
@@ -141,14 +141,14 @@ export default function TermosDeUso() {
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">6. Dados e Privacidade</h2>
                 <h3 className="text-xl font-semibold text-slate-800 mb-3 mt-4">6.1. Proteção de Dados</h3>
                 <p className="text-slate-600 leading-relaxed">
-                  A AgendaIA está comprometida com a proteção de dados pessoais, em conformidade com a 
+                  A Agenda IASync está comprometida com a proteção de dados pessoais, em conformidade com a 
                   Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018). Para mais informações, 
                   consulte nossa <Link href="/politica-de-privacidade" className="text-cyan-700 hover:underline">Política de Privacidade</Link>.
                 </p>
 
                 <h3 className="text-xl font-semibold text-slate-800 mb-3 mt-6">6.2. Propriedade dos Dados</h3>
                 <p className="text-slate-600 leading-relaxed">
-                  Os dados inseridos por você na plataforma permanecem de sua propriedade. A AgendaIA atua 
+                  Os dados inseridos por você na plataforma permanecem de sua propriedade. A Agenda IASync atua 
                   como operadora de dados, processando-os apenas para fornecer os serviços contratados.
                 </p>
 
@@ -164,7 +164,7 @@ export default function TermosDeUso() {
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">7. Responsabilidades Médicas</h2>
                 <h3 className="text-xl font-semibold text-slate-800 mb-3 mt-4">7.1. Natureza do Serviço</h3>
                 <p className="text-slate-600 leading-relaxed">
-                  A AgendaIA é uma ferramenta de gestão e agendamento. NÃO somos responsáveis por:
+                  A Agenda IASync é uma ferramenta de gestão e agendamento. NÃO somos responsáveis por:
                 </p>
                 <ul className="text-slate-600 leading-relaxed space-y-2 list-disc pl-6 mt-2">
                   <li>Diagnósticos, tratamentos ou decisões médicas;</li>
@@ -202,7 +202,7 @@ export default function TermosDeUso() {
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">9. Propriedade Intelectual</h2>
                 <p className="text-slate-600 leading-relaxed">
                   Todo o conteúdo da plataforma, incluindo código-fonte, design, logotipos, textos e 
-                  funcionalidades, é de propriedade exclusiva da AgendaIA ou de seus licenciadores, 
+                  funcionalidades, é de propriedade exclusiva da Agenda IASync ou de seus licenciadores, 
                   protegido por leis de direitos autorais e propriedade intelectual.
                 </p>
               </section>
@@ -217,7 +217,7 @@ export default function TermosDeUso() {
 
                 <h3 className="text-xl font-semibold text-slate-800 mb-3 mt-6">10.2. Limitação de Responsabilidade</h3>
                 <p className="text-slate-600 leading-relaxed">
-                  A AgendaIA não será responsável por:
+                  A Agenda IASync não será responsável por:
                 </p>
                 <ul className="text-slate-600 leading-relaxed space-y-2 list-disc pl-6 mt-2">
                   <li>Danos indiretos, incidentais ou consequentes;</li>
@@ -239,7 +239,7 @@ export default function TermosDeUso() {
                   O acesso permanecerá ativo até o fim do período pago.
                 </p>
 
-                <h3 className="text-xl font-semibold text-slate-800 mb-3 mt-6">11.2. Cancelamento pela AgendaIA</h3>
+                <h3 className="text-xl font-semibold text-slate-800 mb-3 mt-6">11.2. Cancelamento pela Agenda IASync</h3>
                 <p className="text-slate-600 leading-relaxed">
                   Podemos suspender ou cancelar sua conta imediatamente em caso de:
                 </p>
@@ -283,7 +283,7 @@ export default function TermosDeUso() {
                   Para dúvidas sobre estes Termos de Uso, entre em contato:
                 </p>
                 <ul className="text-slate-600 leading-relaxed space-y-2 mt-4">
-                  <li><strong>E-mail:</strong> contato@agendaia.com</li>
+                  <li><strong>E-mail:</strong> contatoiasync@gmail.com</li>
                   <li><strong>WhatsApp:</strong> (27) 99688-7194</li>
                   <li><strong>Endereço:</strong> Vitória/ES - Brasil</li>
                 </ul>
@@ -291,7 +291,7 @@ export default function TermosDeUso() {
 
               <section className="bg-cyan-50 rounded-xl p-6 border border-cyan-100 mt-8">
                 <p className="text-slate-600 leading-relaxed text-sm">
-                  <strong className="text-slate-900">Atenção:</strong> Ao utilizar a plataforma AgendaIA, 
+                  <strong className="text-slate-900">Atenção:</strong> Ao utilizar a plataforma Agenda IASync, 
                   você declara ter lido, compreendido e concordado com todos os termos acima descritos.
                 </p>
               </section>
