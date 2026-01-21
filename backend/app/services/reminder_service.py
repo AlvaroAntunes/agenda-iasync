@@ -9,6 +9,14 @@ load_dotenv()
 # Config Supabase
 supabase = get_supabase()
 
+def salvar_mensagem(clinic_id: str, session_id: str, quem_enviou: str, conteudo: str):
+    supabase.table('chat_messages').insert({
+        'clinic_id': clinic_id,
+        'session_id': session_id,
+        'quem_enviou': quem_enviou,
+        'conteudo': conteudo
+    }).execute()
+
 def processar_lembretes():
     """
     Verifica consultas próximas (24h e 2h) e envia lembretes.
@@ -84,6 +92,7 @@ def processar_lembretes():
                            f"Podemos confirmar sua presença?")
                     
                     enviar_mensagem_whatsapp(token, telefone, msg)
+                    salvar_mensagem(clinic_id, telefone, 'ai', msg)
                     
                     # Marca como enviado
                     supabase.table('consultas').update({'lembrete_24h': True}).eq('id', c_id).execute()
@@ -97,6 +106,7 @@ def processar_lembretes():
                            f"Estamos te aguardando! 😊")
                     
                     enviar_mensagem_whatsapp(token, telefone, msg)
+                    salvar_mensagem(clinic_id, telefone, 'ai', msg)
                     
                     # Marca como enviado
                     supabase.table('consultas').update({'lembrete_2h': True}).eq('id', c_id).execute()
