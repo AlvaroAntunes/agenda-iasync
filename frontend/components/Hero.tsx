@@ -76,8 +76,8 @@ const Hero = () => {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed"
           >
-            Automatize o agendamento de pacientes com a elegância 
-            de uma secretária executiva e a precisão da Inteligência Artificial.
+            Automatize o agendamento de pacientes em clínicas médicas e odontológicas 
+            com a elegância de uma secretária executiva e a precisão da Inteligência Artificial.
           </motion.p>
 
           {/* CTA Buttons */}
