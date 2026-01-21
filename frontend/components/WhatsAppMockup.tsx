@@ -68,7 +68,7 @@ const WhatsAppMockup = () => {
             <p className="text-lg text-slate-600 leading-relaxed mb-8">
               A nossa IA foi treinada para representar a sua clínica com a mesma 
               sofisticação que os seus pacientes esperam. Linguagem refinada, 
-              respostas instantâneas e agendamento impecável.
+              respostas rápidas e agendamento impecável.
             </p>
 
             <div className="space-y-4">

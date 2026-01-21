@@ -348,25 +348,6 @@ export default function PoliticaDePrivacidade() {
           </div>
         </motion.div>
       </main>
-
-      {/* Footer */}
-      <footer className="border-t border-slate-200 mt-16">
-        <div className="container-narrow px-6 py-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-slate-500 text-sm">
-              © {new Date().getFullYear()} Agenda IASync. Todos os direitos reservados.
-            </p>
-            <div className="flex gap-6 text-sm">
-              <Link href="/termos-de-uso" className="text-slate-600 hover:text-cyan-700 transition-colors">
-                Termos de Uso
-              </Link>
-              <Link href="/contato" className="text-slate-600 hover:text-cyan-700 transition-colors">
-                Contato
-              </Link>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

@@ -38,6 +38,7 @@ const Navbar = () => {
     { name: "Recursos", href: "/#recursos" },
     { name: "Planos", href: "/#planos" },
     { name: "Contato", href: "/contato" },
+    { name: "Sobre Nós", href: "/sobre-nos" },
   ];
 
   return (
@@ -50,7 +51,18 @@ const Navbar = () => {
       <div className="max-w-5xl mx-auto">
         <div className="glass rounded-full px-6 py-3 shadow-soft flex items-center justify-between">
           {/* Logo */}
-          <a href="/" className="flex items-center gap-2 group">
+          <a 
+            href="/" 
+            onClick={(e) => {
+              e.preventDefault();
+              if (window.location.pathname === '/') {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              } else {
+                window.location.href = '/';
+              }
+            }}
+            className="flex items-center gap-2 group cursor-pointer"
+          >
             <div className="w-14 h-14 flex items-center justify-center overflow-hidden">
               <Image 
                 src="/logo.png" 
@@ -60,7 +72,7 @@ const Navbar = () => {
                 className="object-cover"
               />
             </div>
-            <span className="font-semibold text-slate-900 tracking-tight">
+            <span className="font-semibold text-slate-900 tracking-tight group-hover:text-cyan-600 transition-colors">
               Agenda IASync
             </span>
           </a>

@@ -58,8 +58,8 @@ const Features = () => {
     },
     {
       icon: Zap,
-      title: "Resposta Instantânea",
-      description: "Atendimento 24/7 com tempo médio de resposta inferior a 15 segundos (para não ficar robotizado).",
+      title: "Resposta Rápida",
+      description: "Atendimento 24/7 com tempo médio de resposta inferior a 20 segundos.",
       size: "small",
       gradient: "from-yellow-50 to-slate-50",
     },

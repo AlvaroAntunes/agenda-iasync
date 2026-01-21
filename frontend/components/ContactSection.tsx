@@ -11,6 +11,7 @@ const ContactSection = () => {
     email: "",
     phone: "",
     message: "",
+    preferredContact: "email" as "email" | "whatsapp",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
@@ -18,29 +19,62 @@ const ContactSection = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitStatus("idle");
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSubmitStatus("success");
+        setFormData({ name: "", email: "", phone: "", message: "", preferredContact: "email" });
+        setTimeout(() => setSubmitStatus("idle"), 5000);
+      } else {
+        setSubmitStatus("error");
+        setTimeout(() => setSubmitStatus("idle"), 5000);
+      }
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error);
+      setSubmitStatus("error");
+      setTimeout(() => setSubmitStatus("idle"), 5000);
+    } finally {
       setIsSubmitting(false);
-      setSubmitStatus("success");
-      setFormData({ name: "", email: "", phone: "", message: "" });
-      
-      setTimeout(() => setSubmitStatus("idle"), 3000);
-    }, 1500);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
+    const { name, value } = e.target;
+    
+    if (name === 'phone') {
+      const formatted = formatTelefone(value);
+      setFormData(prev => ({ ...prev, phone: formatted }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const formatTelefone = (value: string) => {
+    const numbers = value.replace(/\D/g, "");
+    
+    if (numbers.length === 0) return "";
+    if (numbers.length <= 2) return `(${numbers}`;
+    if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
   };
 
   const contactInfo = [
     {
       icon: FaWhatsapp,
       title: "WhatsApp",
-      value: "+55 (27) 99688-7194",
+      value: "(27) 99688-7194",
       link: "https://wa.me/5527996887194",
       description: "Resposta em minutos"
     },
@@ -187,6 +221,38 @@ const ContactSection = () => {
                 </div>
 
                 <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-3">
+                    Preferência de Contato
+                  </label>
+                  <div className="flex gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, preferredContact: "email" }))}
+                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${
+                        formData.preferredContact === "email"
+                          ? "border-cyan-500 bg-cyan-50 text-cyan-700"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                      }`}
+                    >
+                      <Mail className="w-4 h-4" strokeWidth={1.5} />
+                      <span className="font-medium">Email</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, preferredContact: "whatsapp" }))}
+                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${
+                        formData.preferredContact === "whatsapp"
+                          ? "border-cyan-500 bg-cyan-50 text-cyan-700"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                      }`}
+                    >
+                      <FaWhatsapp className="w-4 h-4" />
+                      <span className="font-medium">WhatsApp</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
                   <label htmlFor="message" className="block text-sm font-medium text-slate-700 mb-2">
                     Mensagem
                   </label>
@@ -211,6 +277,16 @@ const ContactSection = () => {
                     className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-700 text-sm"
                   >
                     ✓ Mensagem enviada com sucesso! Entraremos em contato em breve.
+                  </motion.div>
+                )}
+
+                {submitStatus === "error" && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm"
+                  >
+                    ✗ Erro ao enviar mensagem. Por favor, tente novamente ou entre em contato pelo WhatsApp.
                   </motion.div>
                 )}
 

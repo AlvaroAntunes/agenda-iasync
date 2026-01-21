@@ -26,6 +26,7 @@ const Footer = () => {
 
   const footerLinks = {
     Produto: [
+      { name: "Solução", href: "#solucao" },
       { name: "Recursos", href: "#recursos" },
       { name: "Planos", href: "#planos" },
     ],
@@ -73,13 +74,15 @@ const Footer = () => {
                 {/* Social Links */}
                 <div className="flex items-center gap-3">
                   {[
-                    { icon: FaWhatsapp, href: "https://wa.me/5527996887194", Target: "_blank" },
+                    { icon: FaWhatsapp, href: "https://wa.me/5527996887194" },
                     { icon: Instagram, href: "https://www.instagram.com/ia_sync/" },
                     { icon: Mail, href: "mailto:contatoiasync@gmail.com" },
                   ].map((social, index) => (
                     <a
                       key={index}
                       href={social.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="w-10 h-10 bg-white border border-cyan-100 hover:bg-cyan-50 rounded-lg 
                                  flex items-center justify-center transition-colors"
                     >
