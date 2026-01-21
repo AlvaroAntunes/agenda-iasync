@@ -63,7 +63,7 @@ const Navbar = () => {
             }}
             className="flex items-center gap-2 group cursor-pointer"
           >
-            <div className="w-14 h-14 flex items-center justify-center overflow-hidden">
+            <div className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center overflow-hidden">
               <Image 
                 src="/logo.png" 
                 alt="Agenda IASync Logo" 

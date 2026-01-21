@@ -25,7 +25,7 @@ const SobreNosPage = () => {
     {
       icon: TrendingUp,
       title: "Inovação",
-      description: "Sempre à frente, trazendo soluções modernas para sua clínica."
+      description: "Sempre à frente, trazendo soluções inovadoras de IA para diversos setores."
     }
   ];
 
@@ -73,13 +73,13 @@ const SobreNosPage = () => {
             </div>
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 tracking-tight leading-tight mb-6">
-              Transformando o Atendimento
-              <span className="text-gradient"> em Clínicas de Saúde</span>
+              Desenvolvendo Soluções em IA
+              <span className="text-gradient"> com Foco no Setor de Saúde</span>
             </h1>
 
             <p className="text-lg md:text-xl text-slate-600 leading-relaxed mb-8 md:mb-12">
-              Somos apaixonados por elevar o padrão do atendimento em clínicas que 
-              não aceitam nada menos que excelência.
+              Somos a IASync, uma empresa de software especializada em Inteligência Artificial 
+              que desenvolve soluções inovadoras, com destaque para o setor de saúde.
             </p>
           </motion.div>
         </div>
@@ -106,23 +106,25 @@ const SobreNosPage = () => {
               </div>
 
               <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight mb-6">
-                Nascemos da Necessidade Real do Mercado
+                Uma Empresa de Software e IA
               </h2>
 
               <div className="space-y-4 text-slate-600 leading-relaxed">
                 <p>
-                  A Agenda IASync surgiu da observação de um problema recorrente: clínicas de 
-                  excelência perdiam oportunidades e sobrecarregavam suas equipes com tarefas 
-                  repetitivas de agendamento.
+                  A IASync é uma empresa de tecnologia especializada no desenvolvimento de soluções 
+                  baseadas em Inteligência Artificial para diversos segmentos, com destaque especial 
+                  para o setor de saúde, onde desenvolvemos ferramentas que otimizam processos e elevam 
+                  a qualidade do atendimento.
                 </p>
                 <p>
-                  Desenvolvemos uma solução que combina a sofisticação de uma secretária executiva 
-                  com a disponibilidade e precisão da Inteligência Artificial, garantindo que cada 
-                  paciente receba um atendimento premium desde o primeiro contato.
+                  O <strong>Agenda IASync</strong> é nosso produto principal para o setor de saúde: uma plataforma 
+                  inteligente de agendamento que combina automação via IA com atendimento humanizado, liberando 
+                  equipes médicas para focarem no que realmente importa - cuidar de pessoas.
                 </p>
                 <p>
-                  Nossa missão é democratizar o acesso à tecnologia de ponta, permitindo que clínicas 
-                  de todos os tamanhos ofereçam um atendimento de excelência aos seus pacientes.
+                  Com expertise em machine learning, processamento de linguagem natural e integrações 
+                  avançadas, desenvolvemos soluções personalizadas que atendem às necessidades específicas 
+                  de cada cliente e mercado.
                 </p>
               </div>
             </motion.div>
@@ -136,7 +138,7 @@ const SobreNosPage = () => {
             >
               <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-2xl p-8 border border-cyan-100">
                 <h3 className="text-xl font-bold text-slate-900 mb-6">
-                  Por que escolher a Agenda IASync?
+                  Nossa Expertise
                 </h3>
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
@@ -146,8 +148,8 @@ const SobreNosPage = () => {
                       </svg>
                     </div>
                     <div>
-                      <p className="text-slate-700 font-medium">Atendimento 24/7</p>
-                      <p className="text-sm text-slate-600">Disponível a qualquer hora, sem pausas</p>
+                      <p className="text-slate-700 font-medium">Inteligência Artificial</p>
+                      <p className="text-sm text-slate-600">Machine Learning e NLP avançados</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -157,8 +159,8 @@ const SobreNosPage = () => {
                       </svg>
                     </div>
                     <div>
-                      <p className="text-slate-700 font-medium">Implementação Rápida</p>
-                      <p className="text-sm text-slate-600">Configure e comece a usar em minutos</p>
+                      <p className="text-slate-700 font-medium">Desenvolvimento de Software</p>
+                      <p className="text-sm text-slate-600">Plataformas escaláveis e seguras</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -168,8 +170,8 @@ const SobreNosPage = () => {
                       </svg>
                     </div>
                     <div>
-                      <p className="text-slate-700 font-medium">Suporte Especializado</p>
-                      <p className="text-sm text-slate-600">Equipe dedicada ao sucesso da sua clínica</p>
+                      <p className="text-slate-700 font-medium">Setor de Saúde (Especialização)</p>
+                      <p className="text-sm text-slate-600">Soluções para clínicas médicas e odontológicas</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -179,8 +181,8 @@ const SobreNosPage = () => {
                       </svg>
                     </div>
                     <div>
-                      <p className="text-slate-700 font-medium">Tecnologia de Ponta</p>
-                      <p className="text-sm text-slate-600">IA treinada para atendimento médico e odontológico</p>
+                      <p className="text-slate-700 font-medium">Inovação Contínua</p>
+                      <p className="text-sm text-slate-600">Pesquisa e desenvolvimento constante</p>
                     </div>
                   </div>
                 </div>
@@ -190,9 +192,122 @@ const SobreNosPage = () => {
         </div>
       </section>
 
-      {/* Missão e Visão */}
+      {/* Fundadores */}
       <section className="relative py-24 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-slate-50 to-white" />
+        
+        <div className="relative z-10 container-narrow px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-center max-w-3xl mx-auto mb-16"
+          >
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight mb-4">
+              Nossos Fundadores
+            </h2>
+            <p className="text-lg text-slate-600">
+              Uma equipe multidisciplinar unida pela paixão por tecnologia e inovação.
+            </p>
+          </motion.div>
+
+          <div className="max-w-6xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-12"
+            >
+              <p className="text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
+                A IASync foi fundada por um time de <strong>4 empreendedores</strong> com visão de 
+                transformar o mercado através da Inteligência Artificial. Nossa força está na 
+                diversidade de conhecimentos e experiências que cada fundador traz para a empresa.
+              </p>
+            </motion.div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+              {[
+                {
+                  name: "Álvaro Antunes",
+                  role: "Engenharia de Computação",
+                  image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alvaro&backgroundColor=b6e3f4"
+                },
+                {
+                  name: "Pedro Fabres",
+                  role: "Engenharia de Computação",
+                  image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Joao&backgroundColor=c0aede"
+                },
+                {
+                  name: "Emanuel Delpupo",
+                  role: "Gestão Financeira e Segurança",
+                  image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Maria&backgroundColor=ffd5dc"
+                },
+                {
+                  name: "Augusto Rocha",
+                  role: "Desenvolvedor Sênior",
+                  image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Pedro&backgroundColor=d1d4f9"
+                }
+              ].map((founder, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: index * 0.1 }}
+                  className="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 hover:border-cyan-200 transition-all hover:shadow-xl"
+                >
+                  <div className="w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden bg-gradient-to-br from-cyan-50 to-blue-50 border-4 border-white shadow-md">
+                    <img 
+                      src={founder.image} 
+                      alt={founder.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 text-center mb-2">
+                    {founder.name}
+                  </h3>
+                  <p className="text-sm text-slate-600 text-center leading-relaxed">
+                    {founder.role}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="bg-white rounded-2xl p-8 md:p-10 shadow-lg border border-slate-100"
+            >
+              <div className="space-y-6 text-slate-600 leading-relaxed">
+                <p>
+                  Nossa equipe reúne <strong>especialistas em Engenharia de Computação</strong> com profundo 
+                  conhecimento em desenvolvimento de software, arquitetura de sistemas e implementação de 
+                  soluções baseadas em IA, garantindo robustez técnica em cada projeto. Contamos também 
+                  com expertise em <strong>gestão financeira, estratégia de negócios e segurança de dados</strong>, 
+                  fundamental para entender as necessidades do mercado e garantir proteção total das informações. 
+                  Completando o time, temos um <strong>desenvolvedor sênior</strong> com vasta experiência 
+                  de mercado, que traz maturidade técnica e visão prática para transformar ideias em 
+                  produtos reais e escaláveis.
+                </p>
+
+                <p className="pt-4">
+                  Com raízes na <strong>Universidade Federal do Espírito Santo (Ufes)</strong>, nossa equipe 
+                  fundadora une conhecimento técnico aprofundado com visão empreendedora prática, 
+                  resultando em soluções tecnológicas que realmente agregam valor ao mercado.
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Missão e Visão */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-white" />
         
         <div className="relative z-10 container-narrow px-6">
           <motion.div
@@ -206,7 +321,7 @@ const SobreNosPage = () => {
               Nossa Missão e Visão
             </h2>
             <p className="text-lg text-slate-600">
-              Guiados por propósito e direcionados para o futuro
+              Guiados por propósito e direcionados para o futuro.
             </p>
           </motion.div>
 
@@ -223,9 +338,9 @@ const SobreNosPage = () => {
               </div>
               <h3 className="text-2xl font-bold text-slate-900 mb-4">Missão</h3>
               <p className="text-slate-600 leading-relaxed">
-                Capacitar clínicas de saúde a oferecer um atendimento excepcional através de 
-                tecnologia inteligente, humanizada e acessível, liberando profissionais para 
-                focarem no que fazem de melhor: cuidar de pessoas.
+                Desenvolver soluções de software e Inteligência Artificial que transformam 
+                processos e negócios, com foco especial no setor de saúde, tornando a gestão 
+                mais eficiente e humanizada, permitindo que profissionais se dediquem ao essencial.
               </p>
             </motion.div>
 
@@ -241,9 +356,9 @@ const SobreNosPage = () => {
               </div>
               <h3 className="text-2xl font-bold text-slate-900 mb-4">Visão</h3>
               <p className="text-slate-600 leading-relaxed">
-                Ser a plataforma referência em automação inteligente de agendamentos no setor 
-                de saúde, reconhecida pela excelência, inovação e pelo impacto positivo na 
-                experiência de pacientes e profissionais.
+                Ser uma empresa de tecnologia referência em soluções de Inteligência Artificial, 
+                reconhecida pela inovação, excelência técnica e pelo impacto positivo em diversos 
+                setores, com destaque para o segmento de saúde.
               </p>
             </motion.div>
           </div>
@@ -266,7 +381,7 @@ const SobreNosPage = () => {
               Nossos Valores
             </h2>
             <p className="text-lg text-slate-600">
-              Princípios que guiam cada decisão e ação
+              Princípios que guiam cada decisão e ação.
             </p>
           </motion.div>
 
