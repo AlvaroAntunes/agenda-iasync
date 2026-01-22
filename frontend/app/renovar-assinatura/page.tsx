@@ -6,6 +6,7 @@ import { motion } from "framer-motion"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { Button } from "@/components/ui/button"
 import { Check, Clock, MessageCircle, LogOut, Sparkles } from "lucide-react"
+import { logger } from '@/lib/logger'
 
 export default function RenovarAssinaturaPage() {
   const router = useRouter()

@@ -22,6 +22,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { useSubscriptionCheck } from "@/lib/use-subscription-check"
+import { logger } from '@/lib/logger'
 
 type Appointment = {
   id: string

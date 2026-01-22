@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, Clock, Crown } from 'lucide-react'
 import { checkTrialStatus, type TrialStatus } from '@/lib/check-trial'
+import { logger } from '@/lib/logger'
 
 interface TrialBannerProps {
   clinicId: string

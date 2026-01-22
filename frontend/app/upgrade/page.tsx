@@ -20,6 +20,7 @@ import {
   Loader2
 } from "lucide-react"
 import Link from "next/link"
+import { logger } from '@/lib/logger'
 
 type Plan = {
   id: string

@@ -6,6 +6,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Building2, Users, Calendar, Bot, Plus, LogOut } from "lucide-react"
+import { logger } from '@/lib/logger'
 
 type Profile = {
   id: string

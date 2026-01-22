@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Mail, Phone, MapPin, Send, Sparkles } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
 import { useState } from "react";
+import { logger } from '@/lib/logger'
 
 const ContactSection = () => {
   const [formData, setFormData] = useState({

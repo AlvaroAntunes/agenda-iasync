@@ -48,6 +48,7 @@ import {
   EyeOff
 } from "lucide-react"
 import Link from "next/link"
+import { logger } from '@/lib/logger'
 
 type Clinic = {
   id: string

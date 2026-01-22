@@ -262,7 +262,7 @@ export default function CadastroClinicaPage() {
               clinic_id: data.clinicId,
               is_active: true,
               full_name: nomeClinica,
-              phone: telefone.replace(/\D/g, ""),
+              phone: telefoneNumeros.replace(/\D/g, ""),
             })
             .eq('id', signUpData.user.id)
 

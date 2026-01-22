@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { useSubscriptionCheck } from "@/lib/use-subscription-check"
+import { logger } from '@/lib/logger'
 
 type ClinicData = {
   id: string
