@@ -136,6 +136,11 @@ export default function ClinicLoginPage() {
     } catch (error: any) {
       console.error('Erro ao fazer login:', error)
       setError(error.message || 'Erro ao fazer login. Tente novamente.')
+      
+      // Limpar mensagem de erro após 3 segundos
+      setTimeout(() => {
+        setError("")
+      }, 3000)
     } finally {
       setIsLoading(false)
     }
@@ -165,6 +170,11 @@ export default function ClinicLoginPage() {
     } catch (error: any) {
       console.error('Erro ao enviar email de recuperação:', error)
       setError('Erro ao enviar email de recuperação. Verifique se o email está correto.')
+      
+      // Limpar mensagem de erro após 3 segundos
+      setTimeout(() => {
+        setError("")
+      }, 3000)
     } finally {
       setIsResetting(false)
     }

@@ -229,22 +229,53 @@ export default function CadastroClinicaPage() {
         throw new Error(data.error || 'Erro ao cadastrar')
       }
 
-      // Fazer login após cadastro bem-sucedido
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password: senha,
-      })
+      // Se retornou requiresSignup, fazer o signup no cliente para enviar o email correto
+      if (data.requiresSignup) {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password: senha,
+          options: {
+            emailRedirectTo: `${window.location.origin}/confirm-email`,
+            data: {
+              full_name: nomeClinica,
+              clinic_id: data.clinicId,
+            }
+          }
+        })
 
-      if (signInError) {
-        throw new Error('Conta criada, mas erro ao fazer login. Tente fazer login manualmente.')
+        if (signUpError) {
+          console.error('Erro ao fazer signup:', signUpError)
+          throw new Error('Erro ao enviar email de confirmação')
+        }
+
+        // Atualizar o perfil com os dados da clínica
+        if (signUpData.user) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({
+              role: 'clinic_admin',
+              clinic_id: data.clinicId,
+              is_active: true,
+              full_name: nomeClinica,
+              phone: telefone.replace(/\D/g, ""),
+            })
+            .eq('id', signUpData.user.id)
+
+          if (profileError) {
+            console.error('Erro ao atualizar perfil:', profileError)
+          }
+        }
       }
 
       setSuccess(true)
       
-      // Redirecionar para dashboard após 1 segundo
+      // Scroll para o topo para mostrar a mensagem de sucesso
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      
+      // Redirecionar para página de confirmação após 8 segundos
       setTimeout(() => {
-        router.push("/dashboard")
-      }, 1000)
+        router.push("/login")
+      }, 8000)
 
     } catch (error: any) {
       console.error('Erro ao cadastrar:', error)
@@ -352,8 +383,12 @@ export default function CadastroClinicaPage() {
                 <Alert className="border-green-200 bg-green-50">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
                   <AlertDescription className="text-green-800">
-                    🎉 Cadastro realizado com sucesso! Sua conta está ativa e você já pode começar a usar todas as funcionalidades. 
-                    Redirecionando para o dashboard...
+                    <div className="space-y-2">
+                      <p className="font-semibold">🎉 Cadastro realizado com sucesso!</p>
+                      <p>Enviamos um email de confirmação para <strong>{email}</strong></p>
+                      <p className="text-sm">Por favor, verifique sua caixa de entrada e clique no link de confirmação para ativar sua conta.</p>
+                      <p className="text-xs mt-2">💡 <strong>Dica:</strong> Verifique também a caixa de spam ou lixo eletrônico</p>
+                    </div>
                   </AlertDescription>
                 </Alert>
               </motion.div>

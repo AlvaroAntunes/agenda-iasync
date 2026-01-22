@@ -100,65 +100,13 @@ export async function POST(request: Request) {
       )
     }
 
-    // 3. Criar usuário no Supabase Auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password: senha,
-      email_confirm: true, // Confirmar email automaticamente
-      user_metadata: {
-        full_name: nomeClinica,
-      }
-    })
-
-    if (authError) {
-      console.error('Erro ao criar usuário:', authError)
-      // Rollback: deletar clínica
-      await supabaseAdmin.from('clinicas').delete().eq('id', clinicData.id)
-      return NextResponse.json(
-        { error: 'Erro ao criar usuário' },
-        { status: 500 }
-      )
-    }
-
-    if (!authData.user) {
-      // Rollback: deletar clínica
-      await supabaseAdmin.from('clinicas').delete().eq('id', clinicData.id)
-      return NextResponse.json(
-        { error: 'Erro ao criar usuário' },
-        { status: 500 }
-      )
-    }
-
-    // 4. Atualizar perfil do usuário (assumindo que existe trigger on_auth_user_created)
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .update({
-        role: 'clinic_admin',
-        clinic_id: clinicData.id,
-        is_active: true,
-        full_name: nomeClinica,
-        phone: telefone,
-      })
-      .eq('id', authData.user.id)
-
-    if (profileError) {
-      console.error('Erro ao atualizar perfil:', profileError)
-      // Rollback: deletar usuário e clínica
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
-      await supabaseAdmin.from('clinicas').delete().eq('id', clinicData.id)
-      return NextResponse.json(
-        { error: 'Erro ao configurar perfil' },
-        { status: 500 }
-      )
-    }
-
+    // 3. Retornar sucesso para o frontend fazer o signup
+    // O frontend fará o signup usando signUp() que envia o email de confirmação correto
     return NextResponse.json({
       success: true,
-      message: 'Cadastro realizado com sucesso',
-      user: {
-        id: authData.user.id,
-        email: authData.user.email,
-      }
+      message: 'Clínica cadastrada. Prosseguindo com registro de usuário...',
+      clinicId: clinicData.id,
+      requiresSignup: true
     })
 
   } catch (error: any) {
