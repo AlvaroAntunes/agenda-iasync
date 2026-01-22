@@ -205,8 +205,11 @@ export default function CadastroClinicaPage() {
     const cnpjNumeros = cnpjClinica.replace(/\D/g, "")
 
     try {
-      // Chamar API route para cadastrar (server-side com service role)
-      const response = await fetch('/api/cadastro', {
+      const apiUrl = process.env.NEXT_PUBLIC_URL_SITE 
+        ? `${process.env.NEXT_PUBLIC_URL_SITE}/api/cadastro`
+        : '/api/cadastro'
+              
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
