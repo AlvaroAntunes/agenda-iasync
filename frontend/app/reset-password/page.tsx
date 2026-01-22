@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Building2, Eye, EyeOff, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Building2, Eye, EyeOff, AlertCircle, CheckCircle2, Check, X } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
@@ -23,16 +23,54 @@ export default function ResetPasswordPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
+  const [isValidatingToken, setIsValidatingToken] = useState(true)
+
+  // Validações de senha em tempo real
+  const passwordValidation = {
+    minLength: newPassword.length >= 8,
+    hasLowerCase: /[a-z]/.test(newPassword),
+    hasUpperCase: /[A-Z]/.test(newPassword),
+    hasSpecialChar: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword),
+  }
+
+  const isPasswordValid = Object.values(passwordValidation).every(Boolean)
 
   useEffect(() => {
-    // Verificar se há um hash de recuperação na URL
-    const hashParams = new URLSearchParams(window.location.hash.substring(1))
-    const accessToken = hashParams.get('access_token')
-    const type = hashParams.get('type')
+    const validateToken = async () => {
+      try {
+        // Aguardar um pouco para garantir que a URL foi carregada
+        await new Promise(resolve => setTimeout(resolve, 100))
 
-    if (!accessToken || type !== 'recovery') {
-      setError("Link de recuperação inválido ou expirado")
+        // Verificar tanto hash (#) quanto query params (?)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+        const queryParams = new URLSearchParams(window.location.search)
+        
+        let accessToken = hashParams.get('access_token') || queryParams.get('access_token')
+        let type = hashParams.get('type') || queryParams.get('type')
+
+        // Se não encontrou, verificar a sessão do Supabase
+        if (!accessToken || type !== 'recovery') {
+          const { data: { session } } = await supabase.auth.getSession()
+          console.log('🔍 Debug - Session:', session)
+          
+          if (session) {
+            // Tem sessão ativa, pode redefinir senha
+            console.log('✅ Sessão válida encontrada')
+            setIsValidatingToken(false)
+            return
+          }
+          
+          setError("Link de recuperação inválido ou expirado. Por favor, solicite um novo link.")
+        }
+      } catch (err) {
+        console.error('❌ Erro ao validar token:', err)
+        setError("Erro ao validar o link de recuperação")
+      } finally {
+        setIsValidatingToken(false)
+      }
     }
+
+    validateToken()
   }, [])
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -41,14 +79,16 @@ export default function ResetPasswordPage() {
     setError("")
 
     // Validações
-    if (newPassword.length < 6) {
-      setError("A senha deve ter pelo menos 6 caracteres")
+    if (!isPasswordValid) {
+      setError("A senha não atende aos requisitos mínimos")
+      setTimeout(() => setError(""), 3000)
       setIsLoading(false)
       return
     }
 
     if (newPassword !== confirmPassword) {
       setError("As senhas não coincidem")
+      setTimeout(() => setError(""), 3000)
       setIsLoading(false)
       return
     }
@@ -70,7 +110,22 @@ export default function ResetPasswordPage() {
       }, 3000)
     } catch (error: any) {
       console.error('Erro ao redefinir senha:', error)
-      setError(error.message || 'Erro ao redefinir senha. Tente novamente.')
+      
+      // Traduzir mensagens de erro comuns
+      let errorMessage = error.message || 'Erro ao redefinir senha. Tente novamente.'
+      
+      if (errorMessage.includes('New password should be different from the old password')) {
+        errorMessage = 'A nova senha deve ser diferente da senha antiga.'
+      } else if (errorMessage.includes('Password should be at least')) {
+        errorMessage = 'A senha deve ter pelo menos 6 caracteres.'
+      } else if (errorMessage.includes('Unable to validate email address')) {
+        errorMessage = 'Não foi possível validar o endereço de email.'
+      } else if (errorMessage.includes('Token has expired or is invalid')) {
+        errorMessage = 'Link de recuperação expirado ou inválido. Solicite um novo.'
+      }
+      
+      setError(errorMessage)
+      setTimeout(() => setError(""), 5000)
     } finally {
       setIsLoading(false)
     }
@@ -138,20 +193,20 @@ export default function ResetPasswordPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleResetPassword} className="space-y-5">
-            {success ? (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <Alert className="border-green-200 bg-green-50">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-800">
-                    Senha redefinida com sucesso! Redirecionando para o login...
-                  </AlertDescription>
-                </Alert>
-              </motion.div>
-            ) : error && (
+          {isValidatingToken ? (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <Alert className="border-blue-200 bg-blue-50">
+                <AlertCircle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  Validando link de recuperação...
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+          ) : error && error.includes('Link de recuperação inválido ou expirado') ? (
+            <div className="space-y-5">
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -161,9 +216,44 @@ export default function ResetPasswordPage() {
                   <AlertDescription className="text-red-800">{error}</AlertDescription>
                 </Alert>
               </motion.div>
-            )}
-            
-            <div className="space-y-2">
+              
+              <div className="text-center">
+                <Link href="/login">
+                  <Button 
+                    className="w-full h-12 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold shadow-lg shadow-cyan-500/30 transition-all duration-300"
+                  >
+                    Voltar para o login
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleResetPassword} className="space-y-5">
+              {success ? (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <Alert className="border-green-200 bg-green-50">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-800">
+                      Senha redefinida com sucesso! Redirecionando para o login...
+                    </AlertDescription>
+                  </Alert>
+                </motion.div>
+              ) : error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <Alert variant="destructive" className="border-red-200 bg-red-50">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-red-800">{error}</AlertDescription>
+                  </Alert>
+                </motion.div>
+              )}
+              
+              <div className="space-y-2">
               <Label htmlFor="newPassword" className="text-cyan-900 font-medium">Nova Senha</Label>
               <div className="relative">
                 <Input
@@ -175,7 +265,7 @@ export default function ResetPasswordPage() {
                   required
                   disabled={isLoading || success}
                   className="h-12 pr-12 border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 bg-white"
-                  minLength={6}
+                  minLength={8}
                 />
                 <Button
                   type="button"
@@ -192,6 +282,53 @@ export default function ResetPasswordPage() {
                   )}
                 </Button>
               </div>
+              {newPassword && (
+                <div className="space-y-2 mt-3 p-3 bg-cyan-50/50 rounded-lg border border-cyan-100">
+                  <p className="text-xs font-medium text-cyan-900 mb-2">Requisitos da senha:</p>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-xs">
+                      {passwordValidation.minLength ? (
+                        <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
+                      ) : (
+                        <X className="h-4 w-4 text-red-500 flex-shrink-0" />
+                      )}
+                      <span className={passwordValidation.minLength ? "text-green-700" : "text-red-600"}>
+                        Mínimo 8 caracteres
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      {passwordValidation.hasLowerCase ? (
+                        <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
+                      ) : (
+                        <X className="h-4 w-4 text-red-500 flex-shrink-0" />
+                      )}
+                      <span className={passwordValidation.hasLowerCase ? "text-green-700" : "text-red-600"}>
+                        Pelo menos uma letra minúscula
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      {passwordValidation.hasUpperCase ? (
+                        <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
+                      ) : (
+                        <X className="h-4 w-4 text-red-500 flex-shrink-0" />
+                      )}
+                      <span className={passwordValidation.hasUpperCase ? "text-green-700" : "text-red-600"}>
+                        Pelo menos uma letra MAIÚSCULA
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      {passwordValidation.hasSpecialChar ? (
+                        <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
+                      ) : (
+                        <X className="h-4 w-4 text-red-500 flex-shrink-0" />
+                      )}
+                      <span className={passwordValidation.hasSpecialChar ? "text-green-700" : "text-red-600"}>
+                        Pelo menos um caractere especial (!@#$%...)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -206,7 +343,7 @@ export default function ResetPasswordPage() {
                   required
                   disabled={isLoading || success}
                   className="h-12 pr-12 border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 bg-white"
-                  minLength={6}
+                  minLength={8}
                 />
                 <Button
                   type="button"
@@ -223,24 +360,40 @@ export default function ResetPasswordPage() {
                   )}
                 </Button>
               </div>
+              {confirmPassword && (
+                <div className="flex items-center gap-2 text-xs mt-1">
+                  {newPassword === confirmPassword ? (
+                    <>
+                      <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
+                      <span className="text-green-700">As senhas coincidem</span>
+                    </>
+                  ) : (
+                    <>
+                      <X className="h-4 w-4 text-red-500 flex-shrink-0" />
+                      <span className="text-red-600">As senhas devem ser iguais</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             
             <Button 
               type="submit" 
-              className="w-full h-12 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold shadow-lg shadow-cyan-500/30 transition-all duration-300" 
-              disabled={isLoading || success}
+              className="w-full h-12 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold shadow-lg shadow-cyan-500/30 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed" 
+              disabled={isLoading || success || isValidatingToken || !isPasswordValid || newPassword !== confirmPassword}
             >
               {isLoading ? "Redefinindo..." : success ? "Senha redefinida!" : "Redefinir senha"}
             </Button>
 
-            {!success && (
-              <div className="text-center">
-                <Link href="/login" className="text-sm text-cyan-700 hover:text-cyan-800 font-medium hover:underline">
-                  Voltar para o login
-                </Link>
-              </div>
-            )}
-          </form>
+              {!success && (
+                <div className="text-center">
+                  <Link href="/login" className="text-sm text-cyan-700 hover:text-cyan-800 font-medium hover:underline">
+                    Voltar para o login
+                  </Link>
+                </div>
+              )}
+            </form>
+          )}
         </motion.div>
       </div>
     </div>

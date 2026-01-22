@@ -247,11 +247,17 @@ export default function ClinicLoginPage() {
             <h1 className="text-3xl font-bold text-cyan-950 tracking-tight mb-2">
               {showForgotPassword ? "Recuperar Senha" : "Área da Clínica"}
             </h1>
-            <p className="text-cyan-900/70">
+            <p className="text-cyan-900/70 mb-8 lg:mb-4">
               {showForgotPassword 
                 ? "Digite seu email para receber o link de recuperação" 
                 : "Entre com suas credenciais para acessar o dashboard"}
             </p>
+
+            {showForgotPassword && (
+              <p className="text-xs text-cyan-700 mt-2 bg-cyan-50 px-3 py-2 rounded-lg border border-cyan-100">
+                💡 <strong>Dica:</strong> Verifique também a caixa de spam ou lixo eletrônico
+              </p>
+            )}
           </div>
 
           {/* Form de Login */}

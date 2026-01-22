@@ -656,7 +656,7 @@ export default function CadastroClinicaPage() {
                 />
                 <span className="text-sm text-cyan-900/80 group-hover:text-cyan-900">
                   Li e aceito os{" "}
-                  <Link href="/termos-de-uso" target="_self" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
+                  <Link href="/termos-de-uso" target="_blank" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
                     Termos de Uso
                   </Link>
                 </span>
@@ -673,7 +673,7 @@ export default function CadastroClinicaPage() {
                 />
                 <span className="text-sm text-cyan-900/80 group-hover:text-cyan-900">
                   Li e aceito a{" "}
-                  <Link href="/politica-de-privacidade" target="_self" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
+                  <Link href="/politica-de-privacidade" target="_blank" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
                     Política de Privacidade
                   </Link>
                 </span>
