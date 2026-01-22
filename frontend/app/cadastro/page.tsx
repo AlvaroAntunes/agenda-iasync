@@ -536,7 +536,7 @@ export default function CadastroClinicaPage() {
               {/* Endereço */}
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="endereco" className="text-cyan-900 font-medium">
-                  Endereço *
+                  Endereço da clínica *
                 </Label>
                 <Input
                   id="endereco"
