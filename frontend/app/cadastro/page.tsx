@@ -12,6 +12,8 @@ import { Building2, ArrowLeft, Eye, EyeOff, AlertCircle, CheckCircle2, X, Check 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { logger } from '@/lib/logger'
+
 
 // Lista de UFs brasileiras
 const UFS = [
@@ -247,7 +249,7 @@ export default function CadastroClinicaPage() {
         })
 
         if (signUpError) {
-          console.error('Erro ao fazer signup:', signUpError)
+          logger.error('Erro ao fazer signup:', signUpError)
           throw new Error('Erro ao enviar email de confirmação')
         }
 
@@ -265,7 +267,7 @@ export default function CadastroClinicaPage() {
             .eq('id', signUpData.user.id)
 
           if (profileError) {
-            console.error('Erro ao atualizar perfil:', profileError)
+            logger.error('Erro ao atualizar perfil:', profileError)
           }
         }
       }
@@ -281,7 +283,7 @@ export default function CadastroClinicaPage() {
       }, 8000)
 
     } catch (error: any) {
-      console.error('Erro ao cadastrar:', error)
+      logger.error('Erro ao cadastrar:', error)
       setError(error.message || 'Erro ao cadastrar. Tente novamente.')
       
       // Scroll para o topo da página para mostrar a mensagem de erro

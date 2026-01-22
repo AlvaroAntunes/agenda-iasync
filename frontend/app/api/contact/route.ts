@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      console.error('Erro ao enviar email:', error);
+      logger.error('Erro ao enviar email:', error);
       return NextResponse.json(
         { error: 'Erro ao enviar mensagem. Tente novamente.' },
         { status: 500 }
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error('Erro no endpoint de contato:', error);
+    logger.error('Erro no endpoint de contato:', error);
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }

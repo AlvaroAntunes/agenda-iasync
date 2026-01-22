@@ -41,7 +41,7 @@ const ContactSection = () => {
         setTimeout(() => setSubmitStatus("idle"), 5000);
       }
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
+      logger.error('Erro ao enviar mensagem:', error);
       setSubmitStatus("error");
       setTimeout(() => setSubmitStatus("idle"), 5000);
     } finally {

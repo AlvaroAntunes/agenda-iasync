@@ -53,7 +53,7 @@ export default function RenovarAssinaturaPage() {
 
       setClinicData(clinic)
     } catch (error) {
-      console.error('Erro ao carregar dados:', error)
+      logger.error('Erro ao carregar dados:', error)
       router.push('/dashboard')
     } finally {
       setLoading(false)

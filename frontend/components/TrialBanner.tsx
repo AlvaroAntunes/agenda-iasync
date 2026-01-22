@@ -31,7 +31,7 @@ export function TrialBanner({ clinicId, blockAccess = false }: TrialBannerProps)
         router.push('/upgrade')
       }
     } catch (error) {
-      console.error('Erro ao carregar status do trial:', error)
+      logger.error('Erro ao carregar status do trial:', error)
     } finally {
       setLoading(false)
     }

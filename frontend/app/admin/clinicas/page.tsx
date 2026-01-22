@@ -137,7 +137,7 @@ export default function ClinicsManagementPage() {
 
       loadClinics()
     } catch (error) {
-      console.error('Erro ao verificar autenticação:', error)
+      logger.error('Erro ao verificar autenticação:', error)
       router.push('/login/admin')
     }
   }
@@ -153,7 +153,7 @@ export default function ClinicsManagementPage() {
 
       setClinics(data || [])
     } catch (error) {
-      console.error('Erro ao carregar clínicas:', error)
+      logger.error('Erro ao carregar clínicas:', error)
       setError('Erro ao carregar clínicas')
     } finally {
       setLoading(false)
@@ -214,7 +214,7 @@ export default function ClinicsManagementPage() {
       resetForm()
       loadClinics()
     } catch (error: any) {
-      console.error('Erro ao criar clínica:', error)
+      logger.error('Erro ao criar clínica:', error)
       setError(error.message || 'Erro ao criar clínica')
     }
   }
@@ -252,7 +252,7 @@ export default function ClinicsManagementPage() {
       resetForm()
       loadClinics()
     } catch (error: any) {
-      console.error('Erro ao atualizar clínica:', error)
+      logger.error('Erro ao atualizar clínica:', error)
       setError(error.message || 'Erro ao atualizar clínica')
     }
   }
@@ -276,7 +276,7 @@ export default function ClinicsManagementPage() {
       setSuccess("Clínica excluída com sucesso!")
       loadClinics()
     } catch (error: any) {
-      console.error('Erro ao excluir clínica:', error)
+      logger.error('Erro ao excluir clínica:', error)
       setError(error.message || 'Erro ao excluir clínica')
     }
   }

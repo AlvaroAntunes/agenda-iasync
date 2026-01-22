@@ -12,6 +12,7 @@ import { Shield, ArrowLeft, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { logger } from "@/lib/logger"
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -27,7 +28,7 @@ export default function AdminLoginPage() {
     setError("")
 
     try {
-      console.log('🔐 Tentando login com:', email)
+      logger.log('🔐 Tentando login com:', email)
       
       // Login com Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -36,13 +37,13 @@ export default function AdminLoginPage() {
       })
 
       if (authError) {
-        console.error('❌ Erro de autenticação:', authError)
+        logger.error('❌ Erro de autenticação:', authError)
         setError(`Email ou senha inválidos: ${authError.message}`)
         setIsLoading(false)
         return
       }
 
-      console.log('✅ Autenticado com sucesso. User ID:', authData.user.id)
+      logger.log('✅ Autenticado com sucesso. User ID:', authData.user.id)
 
       // Verificar se é super_admin
       const { data: profile, error: profileError } = await supabase
@@ -51,11 +52,11 @@ export default function AdminLoginPage() {
         .eq('id', authData.user.id)
         .single()
 
-      console.log('📋 Profile encontrado:', profile)
-      console.log('❌ Erro no profile:', profileError)
+      logger.log('📋 Profile encontrado:', profile)
+      logger.log('❌ Erro no profile:', profileError)
 
       if (profileError || !profile) {
-        console.error('❌ Erro ao carregar perfil:', profileError)
+        logger.error('❌ Erro ao carregar perfil:', profileError)
         setError(`Erro ao carregar perfil do usuário: ${profileError?.message || 'Profile não encontrado'}`)
         await supabase.auth.signOut()
         setIsLoading(false)
@@ -63,18 +64,18 @@ export default function AdminLoginPage() {
       }
 
       if (profile.role !== 'super_admin') {
-        console.warn('⚠️ Usuário não é super_admin. Role:', profile.role)
+        logger.warn('⚠️ Usuário não é super_admin. Role:', profile.role)
         setError("Acesso negado. Apenas super administradores podem acessar esta área.")
         await supabase.auth.signOut()
         setIsLoading(false)
         return
       }
 
-      console.log('🎉 Super admin verificado! Redirecionando...')
+      logger.log('🎉 Super admin verificado! Redirecionando...')
       // Sucesso - redirecionar para admin
       router.push("/admin/dashboard")
     } catch (err) {
-      console.error("💥 Erro no login:", err)
+      logger.error("💥 Erro no login:", err)
       setError(`Erro ao fazer login: ${err instanceof Error ? err.message : 'Tente novamente.'}`)
       setIsLoading(false)
     }

@@ -10,6 +10,7 @@ import { Building2, AlertCircle, CheckCircle2, Mail } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { logger } from '@/lib/logger'
 
 export default function ConfirmEmailPage() {
   const router = useRouter()
@@ -54,7 +55,7 @@ export default function ConfirmEmailPage() {
           }, 3000)
         }
       } catch (err) {
-        console.error('❌ Erro ao confirmar email:', err)
+        logger.error('❌ Erro ao confirmar email:', err)
         setError("Erro ao confirmar o email")
       } finally {
         setIsValidating(false)

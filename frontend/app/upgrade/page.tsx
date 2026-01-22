@@ -97,7 +97,7 @@ export default function UpgradePage() {
 
       setPlans(plansData || [])
     } catch (error) {
-      console.error('Erro ao carregar dados:', error)
+      logger.error('Erro ao carregar dados:', error)
       setError('Erro ao carregar planos')
     } finally {
       setLoading(false)
@@ -130,7 +130,7 @@ export default function UpgradePage() {
       // Redirecionar para página de pagamento ou dashboard
       router.push('/dashboard?upgraded=true')
     } catch (error: any) {
-      console.error('Erro ao fazer upgrade:', error)
+      logger.error('Erro ao fazer upgrade:', error)
       setError(error.message || 'Erro ao processar upgrade')
     } finally {
       setProcessingPlan(null)

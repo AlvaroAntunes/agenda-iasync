@@ -109,7 +109,7 @@ export default function SettingsPage() {
       // Carregar profissionais da clínica
       await loadProfissionais(profile.clinic_id)
     } catch (error) {
-      console.error('Erro ao carregar dados:', error)
+      logger.error('Erro ao carregar dados:', error)
       router.push('/login/clinic')
     } finally {
       setLoading(false)
@@ -128,7 +128,7 @@ export default function SettingsPage() {
 
       setProfissionais(profissionaisData || [])
     } catch (error) {
-      console.error('Erro ao carregar profissionais:', error)
+      logger.error('Erro ao carregar profissionais:', error)
     }
   }
 
@@ -152,7 +152,7 @@ export default function SettingsPage() {
         .single()
 
       if (insertError) {
-        console.error('Erro detalhado do Supabase:', insertError)
+        logger.error('Erro detalhado do Supabase:', insertError)
         throw new Error(insertError.message || 'Erro ao inserir profissional no banco de dados')
       }
 
@@ -169,8 +169,8 @@ export default function SettingsPage() {
         setProfissionalSuccess("")
       }, 3000)
     } catch (error: any) {
-      console.error('Erro ao adicionar profissional:', error)
-      console.error('Detalhes do erro:', JSON.stringify(error, null, 2))
+      logger.error('Erro ao adicionar profissional:', error)
+      logger.error('Detalhes do erro:', JSON.stringify(error, null, 2))
       const errorMessage = error?.message || error?.error_description || error?.hint || 'Erro desconhecido ao adicionar profissional'
       setProfissionalError(errorMessage)
     } finally {
@@ -198,7 +198,7 @@ export default function SettingsPage() {
         .single()
 
       if (updateError) {
-        console.error('Erro detalhado do Supabase:', updateError)
+        logger.error('Erro detalhado do Supabase:', updateError)
         throw new Error(updateError.message || 'Erro ao atualizar profissional no banco de dados')
       }
 
@@ -218,8 +218,8 @@ export default function SettingsPage() {
         setProfissionalSuccess("")
       }, 3000)
     } catch (error: any) {
-      console.error('Erro ao atualizar profissional:', error)
-      console.error('Detalhes do erro:', JSON.stringify(error, null, 2))
+      logger.error('Erro ao atualizar profissional:', error)
+      logger.error('Detalhes do erro:', JSON.stringify(error, null, 2))
       const errorMessage = error?.message || error?.error_description || error?.hint || 'Erro desconhecido ao atualizar profissional'
       setProfissionalError(errorMessage)
     } finally {
@@ -255,7 +255,7 @@ export default function SettingsPage() {
         setProfissionalSuccess("")
       }, 3000)
     } catch (error: any) {
-      console.error('Erro ao remover profissional:', error)
+      logger.error('Erro ao remover profissional:', error)
       setProfissionalError(error.message || 'Erro ao remover profissional')
     }
   }
@@ -292,7 +292,7 @@ export default function SettingsPage() {
         setSuccess("")
       }, 3000)
     } catch (error: any) {
-      console.error('Erro ao salvar:', error)
+      logger.error('Erro ao salvar:', error)
       setError(error.message || 'Erro ao salvar alterações')
     } finally {
       setSaving(false)

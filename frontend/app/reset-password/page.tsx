@@ -12,6 +12,8 @@ import { Building2, Eye, EyeOff, AlertCircle, CheckCircle2, Check, X } from "luc
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { logger } from "@/lib/logger"
+
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -51,11 +53,11 @@ export default function ResetPasswordPage() {
         // Se não encontrou, verificar a sessão do Supabase
         if (!accessToken || type !== 'recovery') {
           const { data: { session } } = await supabase.auth.getSession()
-          console.log('🔍 Debug - Session:', session)
+          logger.log('🔍 Debug - Session:', session)
           
           if (session) {
             // Tem sessão ativa, pode redefinir senha
-            console.log('✅ Sessão válida encontrada')
+            logger.log('✅ Sessão válida encontrada')
             setIsValidatingToken(false)
             return
           }
@@ -63,7 +65,7 @@ export default function ResetPasswordPage() {
           setError("Link de recuperação inválido ou expirado. Por favor, solicite um novo link.")
         }
       } catch (err) {
-        console.error('❌ Erro ao validar token:', err)
+        logger.error('❌ Erro ao validar token:', err)
         setError("Erro ao validar o link de recuperação")
       } finally {
         setIsValidatingToken(false)
@@ -109,7 +111,7 @@ export default function ResetPasswordPage() {
         router.push("/login")
       }, 3000)
     } catch (error: any) {
-      console.error('Erro ao redefinir senha:', error)
+      logger.error('Erro ao redefinir senha:', error)
       
       // Traduzir mensagens de erro comuns
       let errorMessage = error.message || 'Erro ao redefinir senha. Tente novamente.'

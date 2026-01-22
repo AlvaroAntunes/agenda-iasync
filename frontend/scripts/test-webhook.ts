@@ -1,8 +1,10 @@
 // Script para testar webhook localmente
 // Execute: node scripts/test-webhook.js ou cole no console do navegador
 
+import { logger } from "@/lib/logger"
+
 const testWebhook = async () => {
-  console.log('🧪 Testando webhook de pagamento...')
+  logger.log('🧪 Testando webhook de pagamento...')
   
   // Simulando pagamento recebido
   const webhookPayload = {
@@ -18,7 +20,7 @@ const testWebhook = async () => {
     }
   }
 
-  console.log('📤 Enviando webhook:', webhookPayload)
+  logger.log('📤 Enviando webhook:', webhookPayload)
 
   try {
     const response = await fetch('http://localhost:3000/api/webhooks/asaas', {
@@ -30,15 +32,15 @@ const testWebhook = async () => {
     })
 
     const data = await response.json()
-    console.log('✅ Resposta do webhook:', data)
+    logger.log('✅ Resposta do webhook:', data)
     
     if (response.ok) {
-      console.log('🎉 Webhook processado com sucesso!')
+      logger.log('🎉 Webhook processado com sucesso!')
     } else {
-      console.error('❌ Erro ao processar webhook:', data)
+      logger.error('❌ Erro ao processar webhook:', data)
     }
   } catch (error) {
-    console.error('💥 Erro na requisição:', error)
+    logger.error('💥 Erro na requisição:', error)
   }
 }
 
@@ -49,7 +51,7 @@ if (typeof window === 'undefined') {
 
 // Para executar no console do navegador
 if (typeof window !== 'undefined') {
-  console.log('Execute: testWebhook()')
+  logger.log('Execute: testWebhook()')
 }
 
 // Exportar para uso em outros arquivos

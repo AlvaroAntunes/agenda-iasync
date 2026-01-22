@@ -18,6 +18,7 @@ import {
   FileText
 } from "lucide-react"
 import Link from "next/link"
+import { logger } from '@/lib/logger'
 
 function CheckoutContent() {
   const router = useRouter()
@@ -60,7 +61,7 @@ function CheckoutContent() {
 
       setPaymentData({ ...data, ...asaasData })
     } catch (error: any) {
-      console.error('Erro ao carregar pagamento:', error)
+      logger.error('Erro ao carregar pagamento:', error)
       setError(error.message || 'Erro ao carregar dados do pagamento')
     } finally {
       setLoading(false)
@@ -83,7 +84,7 @@ function CheckoutContent() {
 
       setPaymentData((prev: any) => ({ ...prev, ...data }))
     } catch (error) {
-      console.error('Erro ao verificar status:', error)
+      logger.error('Erro ao verificar status:', error)
     } finally {
       setCheckingPayment(false)
     }
@@ -95,7 +96,7 @@ function CheckoutContent() {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (error) {
-      console.error('Erro ao copiar:', error)
+      logger.error('Erro ao copiar:', error)
     }
   }
 

@@ -110,7 +110,7 @@ export default function ClinicDashboard() {
       // Carregar consultas da clínica
       await loadAppointments(profile.clinic_id)
     } catch (error) {
-      console.error('Erro ao carregar dados:', error)
+      logger.error('Erro ao carregar dados:', error)
       router.push('/login/clinic')
     } finally {
       setLoading(false)
@@ -162,7 +162,7 @@ export default function ClinicDashboard() {
       })
       setUpcomingAppointments(upcomingAppts)
     } catch (error) {
-      console.error('Erro ao carregar consultas:', error)
+      logger.error('Erro ao carregar consultas:', error)
     }
   }
 
@@ -186,7 +186,7 @@ export default function ClinicDashboard() {
         setSuccess("")
       }, 3000)
     } catch (error: any) {
-      console.error('Erro ao atualizar status da IA:', error)
+      logger.error('Erro ao atualizar status da IA:', error)
     }
   }
 

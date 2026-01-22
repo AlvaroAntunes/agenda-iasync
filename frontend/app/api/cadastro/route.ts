@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { logger } from '@/lib/logger'
 
 export async function POST(request: Request) {
   try {
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
       .or(`email.eq.${email},cnpj.eq.${cnpjClinica}`)
 
     if (checkError) {
-      console.error('Erro ao verificar duplicatas:', checkError)
+      logger.error('Erro ao verificar duplicatas:', checkError)
       return NextResponse.json(
         { error: 'Erro ao verificar dados' },
         { status: 500 }
@@ -93,7 +94,7 @@ export async function POST(request: Request) {
       .single()
 
     if (clinicError) {
-      console.error('Erro ao criar clínica:', clinicError)
+      logger.error('Erro ao criar clínica:', clinicError)
       return NextResponse.json(
         { error: 'Erro ao cadastrar clínica' },
         { status: 500 }
@@ -110,7 +111,7 @@ export async function POST(request: Request) {
     })
 
   } catch (error: any) {
-    console.error('Erro no cadastro:', error)
+    logger.error('Erro no cadastro:', error)
     return NextResponse.json(
       { error: error.message || 'Erro interno do servidor' },
       { status: 500 }

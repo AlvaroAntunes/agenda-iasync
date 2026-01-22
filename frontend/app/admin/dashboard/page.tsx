@@ -49,7 +49,7 @@ export default function AdminDashboardPage() {
       setProfile(profileData)
       loadStats()
     } catch (error) {
-      console.error('Erro ao verificar autenticação:', error)
+      logger.error('Erro ao verificar autenticação:', error)
       router.push('/login/admin')
     } finally {
       setLoading(false)

@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       .single()
 
     if (clinicError) {
-      console.error('Erro ao criar clínica:', clinicError)
+      logger.error('Erro ao criar clínica:', clinicError)
       return NextResponse.json(
         { error: `Erro ao criar clínica: ${clinicError.message}` },
         { status: 500 }
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     if (authError) {
       // Se falhar ao criar usuário, deletar a clínica
       await supabaseAdmin.from('clinicas').delete().eq('id', newClinic.id)
-      console.error('Erro ao criar usuário:', authError)
+      logger.error('Erro ao criar usuário:', authError)
       return NextResponse.json(
         { error: `Erro ao criar usuário: ${authError.message}` },
         { status: 500 }
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
       // Se falhar, deletar usuário e clínica
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
       await supabaseAdmin.from('clinicas').delete().eq('id', newClinic.id)
-      console.error('Erro ao atualizar profile:', profileError)
+      logger.error('Erro ao atualizar profile:', profileError)
       return NextResponse.json(
         { error: `Erro ao atualizar profile: ${profileError.message}` },
         { status: 500 }
@@ -157,7 +157,7 @@ export async function POST(request: Request) {
       { status: 201 }
     )
   } catch (error) {
-    console.error("Erro ao criar clínica:", error)
+    logger.error("Erro ao criar clínica:", error)
     return NextResponse.json(
       { error: "Erro interno do servidor" },
       { status: 500 }

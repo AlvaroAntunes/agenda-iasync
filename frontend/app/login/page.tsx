@@ -12,6 +12,7 @@ import { Building2, ArrowLeft, Eye, EyeOff, AlertCircle, Sparkles } from "lucide
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { logger } from '@/lib/logger'
 
 export default function ClinicLoginPage() {
   const router = useRouter()
@@ -134,7 +135,7 @@ export default function ClinicLoginPage() {
       // Redirecionar para o dashboard da clínica
       router.push("/dashboard")
     } catch (error: any) {
-      console.error('Erro ao fazer login:', error)
+      logger.error('Erro ao fazer login:', error)
       setError(error.message || 'Erro ao fazer login. Tente novamente.')
       
       // Limpar mensagem de erro após 3 segundos
@@ -168,7 +169,7 @@ export default function ClinicLoginPage() {
         setResetEmail("")
       }, 5000)
     } catch (error: any) {
-      console.error('Erro ao enviar email de recuperação:', error)
+      logger.error('Erro ao enviar email de recuperação:', error)
       setError('Erro ao enviar email de recuperação. Verifique se o email está correto.')
       
       // Limpar mensagem de erro após 3 segundos
