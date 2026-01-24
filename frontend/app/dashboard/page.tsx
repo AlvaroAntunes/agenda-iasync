@@ -13,16 +13,19 @@ import {
   User, 
   Phone, 
   Bot, 
-  Settings, 
-  Building2, 
   ChevronRight,
-  CheckCircle2
+  CheckCircle2,
+  QrCode,
+  Trash2,
+  Link2
 } from "lucide-react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { useSubscriptionCheck } from "@/lib/use-subscription-check"
 import { logger } from '@/lib/logger'
+import { toast } from "sonner"
+import { ClinicHeader } from "@/components/Header"
+import { useClinic } from "@/app/contexts/ClinicContext"
 
 type Appointment = {
   id: string
@@ -39,36 +42,27 @@ type Appointment = {
   } | null
 }
 
-type ClinicData = {
-  id: string
-  nome: string
-  email: string
-  telefone: string
-  endereco: string
-  uf: string
-  cidade: string
-  prompt_ia: string
-  ia_ativa: boolean
-  plano: 'basic' | 'premium' | 'enterprise'
-  tipo_calendario: 'google' | 'outlook'
-  calendar_refresh_token: string | null
-}
-
 export default function ClinicDashboard() {
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
   useSubscriptionCheck() // Verificar status da assinatura automaticamente
+
+  const { clinicData, setClinicData } = useClinic()
   
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(true)
   const [success, setSuccess] = useState("")
-  const [clinicData, setClinicData] = useState<ClinicData | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([])
   const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([])
+  const [uazapiStatus, setUazapiStatus] = useState("not_configured")
+  const [uazapiQrCode, setUazapiQrCode] = useState<string | null>(null)
+  const [uazapiPairingCode, setUazapiPairingCode] = useState<string | null>(null)
+  const [uazapiLoading, setUazapiLoading] = useState(false)
 
   useEffect(() => {
     checkAuthAndLoadClinic()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const checkAuthAndLoadClinic = async () => {
@@ -141,7 +135,7 @@ export default function ClinicDashboard() {
 
       if (appointmentsError) throw appointmentsError
 
-      const appointments = appointmentsData || []
+      const appointments = (appointmentsData || []) as Appointment[]
       setAppointments(appointments)
 
       // Filtrar consultas de hoje
@@ -193,8 +187,135 @@ export default function ClinicDashboard() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
-    router.push('/')
+    setClinicData(null)
   }
+
+  const apiBaseUrl = process.env.BACKEND_URL || ""
+
+  const normalizeQrCode = (value?: string | null) => {
+    if (!value) return null
+    if (value.startsWith("data:")) return value
+    return `data:image/png;base64,${value}`
+  }
+
+  const resolveUazapiStatus = (data: any) => {
+    return (
+      data?.status ||
+      data?.instance?.status ||
+      data?.instance?.state ||
+      data?.state ||
+      "unknown"
+    )
+  }
+
+  const resolveUazapiQr = (data: any) => {
+    return (
+      data?.qrcode ||
+      data?.qr ||
+      data?.qrCode ||
+      data?.code ||
+      data?.data?.qrcode ||
+      null
+    )
+  }
+
+  const resolveUazapiPairingCode = (data: any) => {
+    return data?.pairingCode || data?.pairing_code || data?.code || null
+  }
+
+  const fetchUazapiStatus = async (clinicId: string) => {
+    if (!apiBaseUrl) return
+    try {
+      const response = await fetch(`${apiBaseUrl}/uazapi/instance/status/${clinicId}`)
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.detail || "Erro ao consultar status")
+      }
+      const status = resolveUazapiStatus(data)
+      setUazapiStatus(status)
+      setUazapiQrCode(normalizeQrCode(resolveUazapiQr(data)))
+      setUazapiPairingCode(resolveUazapiPairingCode(data))
+    } catch (err) {
+      logger.error("Erro ao buscar status Uazapi:", err)
+      setUazapiStatus("error")
+    }
+  }
+
+  const handleCreateUazapiInstance = async () => {
+    if (!clinicData?.id || !apiBaseUrl) return
+    setUazapiLoading(true)
+    try {
+      const response = await fetch(`${apiBaseUrl}/uazapi/instance/create/${clinicData.id}`, {
+        method: "POST",
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.detail || "Erro ao criar instância")
+      }
+      toast.success("Instância criada")
+      await fetchUazapiStatus(clinicData.id)
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao criar instância")
+    } finally {
+      setUazapiLoading(false)
+    }
+  }
+
+  const handleConnectUazapi = async () => {
+    if (!clinicData?.id || !apiBaseUrl) return
+    setUazapiLoading(true)
+    try {
+      const response = await fetch(`${apiBaseUrl}/uazapi/instance/connect/${clinicData.id}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.detail || "Erro ao gerar QR code")
+      }
+      setUazapiStatus(resolveUazapiStatus(data))
+      setUazapiQrCode(normalizeQrCode(resolveUazapiQr(data)))
+      setUazapiPairingCode(resolveUazapiPairingCode(data))
+      toast.success("QR Code gerado")
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao gerar QR code")
+    } finally {
+      setUazapiLoading(false)
+    }
+  }
+
+  const handleDeleteUazapiInstance = async () => {
+    if (!clinicData?.id || !apiBaseUrl) return
+    setUazapiLoading(true)
+    try {
+      const response = await fetch(`${apiBaseUrl}/uazapi/instance/${clinicData.id}`, {
+        method: "DELETE",
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.detail || "Erro ao excluir instância")
+      }
+      setUazapiStatus("not_configured")
+      setUazapiQrCode(null)
+      setUazapiPairingCode(null)
+      toast.success("Instância excluída")
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao excluir instância")
+    } finally {
+      setUazapiLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!clinicData?.id) return
+    fetchUazapiStatus(clinicData.id)
+    const interval = setInterval(() => fetchUazapiStatus(clinicData.id), 12000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clinicData?.id])
 
   if (loading) {
     return (
@@ -222,30 +343,7 @@ export default function ClinicDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="w-full px-4 md:px-8 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-                <Building2 className="h-6 w-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold text-foreground">{clinicData?.nome || 'Carregando...'}</h1>
-                <p className="text-sm text-muted-foreground">Dashboard</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard/settings">
-                <Button variant="outline" size="icon">
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </Link>
-              <Button variant="outline" onClick={handleSignOut}>Sair</Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <ClinicHeader clinicName={clinicData?.nome} onSignOut={handleSignOut} />
 
       <main className="container mx-auto px-6 py-8">
         {/* Trial Banner */}
@@ -462,6 +560,69 @@ export default function ClinicDashboard() {
                 <Button variant="outline" className="w-full mt-4 bg-transparent">
                   Ver Todas
                 </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="mt-6">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Instância WhatsApp</CardTitle>
+                  <CardDescription>Uazapi</CardDescription>
+                </div>
+                <QrCode className="h-5 w-5 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Status</span>
+                  <Badge
+                    variant={uazapiStatus === "connected" ? "default" : "secondary"}
+                  >
+                    {uazapiStatus === "connected"
+                      ? "Conectado"
+                      : uazapiStatus === "connecting"
+                      ? "Conectando"
+                      : uazapiStatus === "disconnected"
+                      ? "Desconectado"
+                      : uazapiStatus === "not_configured"
+                      ? "Sem instância"
+                      : uazapiStatus === "error"
+                      ? "Erro"
+                      : "Desconhecido"}
+                  </Badge>
+                </div>
+
+                {uazapiQrCode ? (
+                  <div className="rounded-lg border border-dashed border-border p-4 text-center">
+                    <img src={uazapiQrCode} alt="QR Code da instância" className="mx-auto h-48 w-48" />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Escaneie o QR Code no WhatsApp da clínica.
+                    </p>
+                  </div>
+                ) : uazapiPairingCode ? (
+                  <div className="rounded-lg border border-dashed border-border p-4 text-center">
+                    <p className="text-xs text-muted-foreground">Código de pareamento</p>
+                    <p className="text-lg font-semibold mt-2">{uazapiPairingCode}</p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                    Gere um QR Code ou código de pareamento para conectar.
+                  </div>
+                )}
+
+                <div className="grid gap-2">
+                  <Button onClick={handleCreateUazapiInstance} disabled={uazapiLoading}>
+                    <Link2 className="mr-2 h-4 w-4" />
+                    Criar instância
+                  </Button>
+                  <Button variant="outline" onClick={handleConnectUazapi} disabled={uazapiLoading}>
+                    <QrCode className="mr-2 h-4 w-4" />
+                    Gerar QR Code
+                  </Button>
+                  <Button variant="ghost" onClick={handleDeleteUazapiInstance} disabled={uazapiLoading}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir instância
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
