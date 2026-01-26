@@ -8,7 +8,9 @@ import json
 import asyncio
 import os
 import requests
-from fastapi import APIRouter, Request, BackgroundTasks
+from typing import Optional
+from fastapi import APIRouter, Request, BackgroundTasks, HTTPException
+from pydantic import BaseModel
 from dotenv import load_dotenv
 from app.services.audio_service import AudioService
 from app.services.tasks import processar_mensagem_ia
@@ -25,9 +27,136 @@ supabase = get_supabase()
 router = APIRouter()
 
 UAZAPI_URL = os.getenv("UAZAPI_URL")
+UAZAPI_GLOBAL_TOKEN = os.getenv("UAZAPI_GLOBAL_TOKEN")
 
 buffer_service = BufferService()
 BUFFER_DELAY = 10  # Segundos de espera
+
+def get_uazapi_headers(token: str):
+    return {
+        "Content-Type": "application/json",
+        "token": token
+    }
+
+def get_clinic_uazapi_token(clinic_id: str):
+    try:
+        resp = supabase.table('clinicas')\
+            .select('uazapi_token')\
+            .eq('id', clinic_id)\
+            .single()\
+            .execute()
+        return resp.data.get('uazapi_token') if resp.data else None
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar clínica: {e}")
+
+class ConnectInstanceBody(BaseModel):
+    phone: Optional[str] = None
+
+@router.post("/uazapi/instance/create/{clinic_id}")
+def create_uazapi_instance(clinic_id: str):
+    if not UAZAPI_URL or not UAZAPI_GLOBAL_TOKEN:
+        raise HTTPException(status_code=500, detail="UAZAPI_URL ou UAZAPI_GLOBAL_TOKEN não configurado")
+
+    existing_token = get_clinic_uazapi_token(clinic_id)
+    if existing_token:
+        return {"status": "already_created", "token": existing_token}
+
+    url = f"{UAZAPI_URL}/instance/create"
+    body = {
+        "name": clinic_id
+    }
+
+    response = requests.post(url, json=body, headers=get_uazapi_headers(UAZAPI_GLOBAL_TOKEN))
+    if response.status_code not in [200, 201]:
+        raise HTTPException(status_code=500, detail=response.text)
+
+    data = response.json()
+    print("📦 Resposta Uazapi create:", json.dumps(data, indent=2))
+    token = (
+        data.get("token")
+        or data.get("instance", {}).get("token")
+        or data.get("data", {}).get("token")
+    )
+
+    if not token:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Token da instância não retornado pela Uazapi: {data}"
+        )
+
+    update_resp = supabase.table('clinicas')\
+        .update({'uazapi_token': token})\
+        .eq('id', clinic_id)\
+        .execute()
+
+    if getattr(update_resp, "error", None):
+        raise HTTPException(status_code=500, detail=str(update_resp.error))
+
+    return {"status": "created", "token": token, "data": data}
+
+@router.post("/uazapi/instance/connect/{clinic_id}")
+def connect_uazapi_instance(clinic_id: str, body: ConnectInstanceBody):
+    if not UAZAPI_URL:
+        raise HTTPException(status_code=500, detail="UAZAPI_URL não configurado")
+
+    token = get_clinic_uazapi_token(clinic_id)
+    if not token:
+        return {"status": "not_configured"}
+
+    url = f"{UAZAPI_URL}/instance/connect"
+    payload = {}
+    if body.phone:
+        payload["phone"] = body.phone
+
+    response = requests.post(url, json=payload, headers=get_uazapi_headers(token))
+    if response.status_code not in [200, 201]:
+        raise HTTPException(status_code=500, detail=response.text)
+
+    data = response.json()
+    print("📦 Resposta Uazapi connect:", json.dumps(data, indent=2))
+    return data
+
+@router.get("/uazapi/instance/status/{clinic_id}")
+def status_uazapi_instance(clinic_id: str):
+    if not UAZAPI_URL:
+        raise HTTPException(status_code=500, detail="UAZAPI_URL não configurado")
+
+    token = get_clinic_uazapi_token(clinic_id)
+    if not token:
+        return {"status": "not_configured"}
+
+    url = f"{UAZAPI_URL}/instance/status"
+    response = requests.get(url, headers=get_uazapi_headers(token))
+    if response.status_code not in [200, 201]:
+        raise HTTPException(status_code=500, detail=response.text)
+
+    data = response.json()
+    print("📦 Resposta Uazapi status:", json.dumps(data, indent=2))
+    return data
+
+@router.delete("/uazapi/instance/{clinic_id}")
+def delete_uazapi_instance(clinic_id: str):
+    if not UAZAPI_URL:
+        raise HTTPException(status_code=500, detail="UAZAPI_URL não configurado")
+
+    token = get_clinic_uazapi_token(clinic_id)
+    if not token:
+        return {"status": "not_configured"}
+
+    url = f"{UAZAPI_URL}/instance"
+    response = requests.delete(url, headers=get_uazapi_headers(token))
+    if response.status_code not in [200, 201]:
+        raise HTTPException(status_code=500, detail=response.text)
+
+    update_resp = supabase.table('clinicas')\
+        .update({'uazapi_token': None})\
+        .eq('id', clinic_id)\
+        .execute()
+
+    if getattr(update_resp, "error", None):
+        raise HTTPException(status_code=500, detail=str(update_resp.error))
+
+    return {"status": "deleted"}
 
 async def esperar_e_processar(clinic_id: str, telefone_cliente: str, token_instancia: str, lid: str):
     """

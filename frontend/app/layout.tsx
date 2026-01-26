@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import Script from 'next/script'
+import { ClinicProvider } from "./contexts/ClinicContext"
 
 // Configuração das fontes
 const geistSans = Geist({
@@ -15,17 +16,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'IASync',
+  title: "IASync",
   icons: {
     icon: "/favicon.ico",
   },
-};
+}
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
   return (
     <html lang="pt-BR">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans`}>
@@ -45,9 +46,11 @@ export default function RootLayout({
             fbq('track', 'PageView');
           `}
         </Script>
-
-        {children}
-
+        
+        <ClinicProvider>
+          {children}
+        </ClinicProvider>
+        
         {/* Fallback para navegadores com JS desativado (Obrigatório no body) */}
         <noscript>
           <img 
