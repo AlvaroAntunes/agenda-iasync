@@ -22,7 +22,7 @@ export default function RenovarAssinaturaPage() {
   const loadClinicData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         router.push('/login')
         return
@@ -41,12 +41,29 @@ export default function RenovarAssinaturaPage() {
 
       const { data: clinic } = await supabase
         .from('clinicas')
-        .select('nome, telefone, status_assinatura')
+        .select('nome, telefone')
         .eq('id', profile.clinic_id)
         .single()
 
-      // Se a assinatura está ativa, redirecionar para o dashboard
-      if (clinic?.status_assinatura === 'ativa') {
+      // Verificar assinatura ativa
+      const { data: subscription } = await supabase
+        .from('assinaturas')
+        .select('status, data_fim') // Fetch data_fim
+        .eq('clinic_id', profile.clinic_id)
+        .single()
+
+      // Verificar se expirou por data
+      let isExpired = false
+      if (subscription?.data_fim) {
+        const now = new Date()
+        const endDate = new Date(subscription.data_fim)
+        if (now > endDate) {
+          isExpired = true
+        }
+      }
+
+      // Se a assinatura está ativa E não expirou, redirecionar para o dashboard
+      if (subscription?.status === 'ativa' && !isExpired) {
         setShouldRedirect(true)
         router.push('/dashboard')
         return
@@ -98,9 +115,9 @@ export default function RenovarAssinaturaPage() {
     <div className="min-h-screen relative overflow-hidden">
       {/* Background com gradiente suave */}
       <div className="absolute inset-0 bg-gradient-to-b from-cyan-50 via-white to-cyan-50" />
-      
+
       {/* Padrão de grid sutil */}
-      <div 
+      <div
         className="absolute inset-0 opacity-[0.02]"
         style={{
           backgroundImage: `radial-gradient(circle at 1px 1px, rgb(6 182 212) 1px, transparent 0)`,
@@ -110,7 +127,7 @@ export default function RenovarAssinaturaPage() {
 
       {/* Elementos decorativos */}
       <motion.div
-        animate={{ 
+        animate={{
           scale: [1, 1.1, 1],
           opacity: [0.1, 0.15, 0.1]
         }}
@@ -118,7 +135,7 @@ export default function RenovarAssinaturaPage() {
         className="absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-cyan-500 rounded-full blur-[120px] opacity-10"
       />
       <motion.div
-        animate={{ 
+        animate={{
           scale: [1.1, 1, 1.1],
           opacity: [0.08, 0.12, 0.08]
         }}
@@ -143,12 +160,12 @@ export default function RenovarAssinaturaPage() {
             >
               <Clock className="h-8 w-8 sm:h-10 sm:w-10 text-white" strokeWidth={1.5} />
             </motion.div>
-            
+
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-cyan-950 tracking-tight mb-3 sm:mb-4 px-2">
               Seu Período de Teste
               <span className="text-gradient block mt-1 sm:mt-2">Chegou ao Fim</span>
             </h1>
-            
+
             <p className="text-base sm:text-lg md:text-xl text-cyan-900/70 max-w-2xl mx-auto px-2">
               Continue automatizando sua clínica e oferecendo a melhor experiência para seus pacientes
             </p>
@@ -177,7 +194,7 @@ export default function RenovarAssinaturaPage() {
                 <h3 className="text-base sm:text-lg font-semibold text-cyan-900 mb-3 sm:mb-4">
                   Continue com acesso completo a:
                 </h3>
-                
+
                 <ul className="space-y-2.5 sm:space-y-3">
                   {benefits.map((benefit, index) => (
                     <motion.li
@@ -202,7 +219,7 @@ export default function RenovarAssinaturaPage() {
               <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">
                 Renove Agora e Continue Crescendo
               </h3>
-              
+
               <p className="text-white/90 mb-5 sm:mb-6 text-base sm:text-lg">
                 Nossa equipe está pronta para reativar sua assinatura imediatamente.
               </p>

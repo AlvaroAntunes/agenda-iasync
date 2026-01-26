@@ -12,6 +12,7 @@ import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Switch } from "@/components/ui/switch"
+import { TrialBanner } from "@/components/TrialBanner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -53,7 +54,7 @@ export default function SettingsPage() {
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
   useSubscriptionCheck() // Verificar status da assinatura automaticamente
-  
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState("")
@@ -79,7 +80,7 @@ export default function SettingsPage() {
   const checkAuthAndLoadClinic = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         router.push('/login/clinic')
         return
@@ -106,7 +107,7 @@ export default function SettingsPage() {
 
       setClinicData(clinic)
       setFormData(clinic)
-      
+
       // Carregar profissionais da clínica
       await loadProfissionais(profile.clinic_id)
     } catch (error) {
@@ -165,7 +166,7 @@ export default function SettingsPage() {
       setIsAddProfissionalOpen(false)
       setProfissionalForm({ nome: '', especialidade: '', external_calendar_id: 'primary' })
       setProfissionalSuccess('Profissional adicionado com sucesso!')
-      
+
       setTimeout(() => {
         setProfissionalSuccess("")
       }, 3000)
@@ -207,14 +208,14 @@ export default function SettingsPage() {
         throw new Error('Nenhum dado retornado após atualização')
       }
 
-      setProfissionais(profissionais.map(p => 
+      setProfissionais(profissionais.map(p =>
         p.id === editingProfissionalId ? updatedProfissional : p
       ))
       setIsEditProfissionalOpen(false)
       setEditingProfissionalId(null)
       setProfissionalForm({ nome: '', especialidade: '', external_calendar_id: 'primary' })
       setProfissionalSuccess('Profissional atualizado com sucesso!')
-      
+
       setTimeout(() => {
         setProfissionalSuccess("")
       }, 3000)
@@ -251,7 +252,7 @@ export default function SettingsPage() {
 
       setProfissionais(profissionais.filter(p => p.id !== id))
       setProfissionalSuccess('Profissional removido com sucesso!')
-      
+
       setTimeout(() => {
         setProfissionalSuccess("")
       }, 3000)
@@ -288,7 +289,7 @@ export default function SettingsPage() {
 
       setClinicData({ ...clinicData, ...formData })
       setSuccess('Dados atualizados com sucesso!')
-      
+
       setTimeout(() => {
         setSuccess("")
       }, 3000)
@@ -344,6 +345,9 @@ export default function SettingsPage() {
       </header>
 
       <main className="container mx-auto px-6 py-8 max-w-5xl">
+        {clinicData?.id && (
+          <TrialBanner clinicId={clinicData.id} blockAccess={false} />
+        )}
         {/* Success/Error Alerts */}
         {success && (
           <Alert className="mb-6 border-green-200 bg-green-50">
@@ -453,8 +457,8 @@ export default function SettingsPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="tipo_calendario">Tipo de Calendário</Label>
-                  <Select 
-                    value={formData.tipo_calendario || 'google'} 
+                  <Select
+                    value={formData.tipo_calendario || 'google'}
                     onValueChange={(value: any) => setFormData({ ...formData, tipo_calendario: value })}
                   >
                     <SelectTrigger>
@@ -472,7 +476,7 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-2">
                     <Badge variant={
                       clinicData?.plano === 'enterprise' ? 'default' :
-                      clinicData?.plano === 'premium' ? 'secondary' : 'outline'
+                        clinicData?.plano === 'premium' ? 'secondary' : 'outline'
                     }>
                       {clinicData?.plano}
                     </Badge>
@@ -602,16 +606,16 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => openEditDialog(profissional)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="text-destructive"
                           onClick={() => handleDeleteProfissional(profissional.id)}
                         >
@@ -671,13 +675,13 @@ export default function SettingsPage() {
               </div>
 
               <DialogFooter>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setIsEditProfissionalOpen(false)
                     setEditingProfissionalId(null)
                     setProfissionalForm({ nome: '', especialidade: '', external_calendar_id: 'primary' })
-                  }} 
+                  }}
                   disabled={saving}
                 >
                   Cancelar

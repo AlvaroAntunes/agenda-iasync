@@ -14,6 +14,7 @@ import { ptBR } from "date-fns/locale"
 import { useSubscriptionCheck } from "@/lib/use-subscription-check"
 import { logger } from "@/lib/logger"
 import { useClinic } from "../../contexts/ClinicContext"
+import { TrialBanner } from "@/components/TrialBanner"
 
 type Conversation = {
   sessionId: string
@@ -88,9 +89,26 @@ export default function ConversasPage() {
 
           if (clinicError) throw clinicError
 
-          // Mantém o mesmo comportamento do dashboard/leads
-          if (clinic?.status_assinatura === "inativa") {
-            router.push("/renovar-assinatura")
+          // Verificar assinatura antes de carregar dados da clínica
+          const { data: subscription } = await supabase
+            .from('assinaturas')
+            .select(`
+            status,
+            plan_id,
+            plano:planos!plan_id(nome)
+          `)
+            .eq('clinic_id', profile.clinic_id)
+            .single()
+
+          const planName = (subscription as any)?.plano?.nome;
+
+          if (subscription?.status === 'inativa' || subscription?.status === 'cancelada') {
+            if (planName === 'trial') {
+              router.push('/renovar-assinatura')
+            }
+            else {
+              router.push('/pagamento-pendente')
+            }
             return
           }
 
@@ -105,7 +123,6 @@ export default function ConversasPage() {
     }
 
     checkAuth()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router])
 
   const loadConversations = async (clinic: string) => {
@@ -266,6 +283,9 @@ export default function ConversasPage() {
       <ClinicHeader clinicName={clinicData?.nome} onSignOut={handleSignOut} />
 
       <main className="container mx-auto px-6 py-8">
+        {clinicData?.id && (
+          <TrialBanner clinicId={clinicData.id} blockAccess={false} />
+        )}
         <div className="grid gap-4 lg:grid-cols-[320px,1fr]">
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -352,14 +372,14 @@ export default function ConversasPage() {
                 {uazapiStatus === "connected"
                   ? "Conectado"
                   : uazapiStatus === "connecting"
-                  ? "Conectando"
-                  : uazapiStatus === "disconnected"
-                  ? "Desconectado"
-                  : uazapiStatus === "not_configured"
-                  ? "Sem instância"
-                  : uazapiStatus === "error"
-                  ? "Erro"
-                  : "Desconhecido"}
+                    ? "Conectando"
+                    : uazapiStatus === "disconnected"
+                      ? "Desconectado"
+                      : uazapiStatus === "not_configured"
+                        ? "Sem instância"
+                        : uazapiStatus === "error"
+                          ? "Erro"
+                          : "Desconhecido"}
               </Badge>
             </CardHeader>
             <CardContent>

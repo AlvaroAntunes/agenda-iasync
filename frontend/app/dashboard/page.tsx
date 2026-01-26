@@ -7,12 +7,12 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Switch } from "@/components/ui/switch"
 import { TrialBanner } from "@/components/TrialBanner"
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  Phone, 
-  Bot, 
+import {
+  Calendar,
+  Clock,
+  User,
+  Phone,
+  Bot,
   ChevronRight,
   CheckCircle2,
   QrCode,
@@ -48,7 +48,7 @@ export default function ClinicDashboard() {
   useSubscriptionCheck() // Verificar status da assinatura automaticamente
 
   const { clinicData, setClinicData } = useClinic()
-  
+
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(true)
   const [success, setSuccess] = useState("")
@@ -68,7 +68,7 @@ export default function ClinicDashboard() {
   const checkAuthAndLoadClinic = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         router.push('/login/clinic')
         return
@@ -94,14 +94,33 @@ export default function ClinicDashboard() {
 
       if (clinicError) throw clinicError
 
-      // Verificar se a assinatura está inativa
-      if (clinic.status_assinatura === 'inativa') {
-        router.push('/renovar-assinatura')
-        return
-      }
+      if (clinicError) throw clinicError
+
+      // Verificar assinatura na tabela assinaturas
+      const { data: subscription } = await supabase
+        .from('assinaturas')
+        .select(`
+          status,
+          plan_id,
+          plano:planos!plan_id(nome)
+        `)
+        .eq('clinic_id', profile.clinic_id)
+        .single()
+
+      const planName = (subscription as any)?.plano?.nome;
+
+      if (subscription?.status === 'inativa' || subscription?.status === 'cancelada') {
+          if (planName === 'trial') {
+            router.push('/renovar-assinatura')
+          }
+          else {
+            router.push('/pagamento-pendente')
+          }
+          return
+        }
 
       setClinicData(clinic)
-      
+
       // Carregar consultas da clínica
       await loadAppointments(profile.clinic_id)
     } catch (error) {
@@ -176,7 +195,7 @@ export default function ClinicDashboard() {
 
       setClinicData({ ...clinicData, ia_ativa: newIAStatus })
       setSuccess(newIAStatus ? "IA ativada com sucesso!" : "IA desativada com sucesso!")
-      
+
       setTimeout(() => {
         setSuccess("")
       }, 3000)
@@ -413,8 +432,8 @@ export default function ClinicDashboard() {
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                {clinicData?.ia_ativa 
-                  ? 'Bot respondendo automaticamente' 
+                {clinicData?.ia_ativa
+                  ? 'Bot respondendo automaticamente'
                   : 'Bot em modo manual'}
               </p>
             </CardContent>
@@ -440,11 +459,11 @@ export default function ClinicDashboard() {
                     </CardDescription>
                   </div>
                   {clinicData?.calendar_refresh_token ? (
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => {
-                        const calendarUrl = clinicData?.tipo_calendario === 'google' 
+                        const calendarUrl = clinicData?.tipo_calendario === 'google'
                           ? 'https://calendar.google.com'
                           : 'https://outlook.live.com/calendar'
                         window.open(calendarUrl, '_blank')
@@ -453,8 +472,8 @@ export default function ClinicDashboard() {
                       Ver Calendário
                     </Button>
                   ) : (
-                    <Button 
-                      variant="default" 
+                    <Button
+                      variant="default"
                       size="sm"
                       onClick={() => {
                         if (clinicData?.id) {
@@ -580,14 +599,14 @@ export default function ClinicDashboard() {
                     {uazapiStatus === "connected"
                       ? "Conectado"
                       : uazapiStatus === "connecting"
-                      ? "Conectando"
-                      : uazapiStatus === "disconnected"
-                      ? "Desconectado"
-                      : uazapiStatus === "not_configured"
-                      ? "Sem instância"
-                      : uazapiStatus === "error"
-                      ? "Erro"
-                      : "Desconhecido"}
+                        ? "Conectando"
+                        : uazapiStatus === "disconnected"
+                          ? "Desconectado"
+                          : uazapiStatus === "not_configured"
+                            ? "Sem instância"
+                            : uazapiStatus === "error"
+                              ? "Erro"
+                              : "Desconhecido"}
                   </Badge>
                 </div>
 

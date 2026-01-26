@@ -5,15 +5,15 @@ import { logger } from '@/lib/logger'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { 
-      nomeClinica, 
-      cnpjClinica, 
-      telefone, 
-      email, 
-      endereco, 
-      cidade, 
-      uf, 
-      senha 
+    const {
+      nomeClinica,
+      cnpjClinica,
+      telefone,
+      email,
+      endereco,
+      cidade,
+      uf,
+      senha
     } = body
 
     // Validações básicas
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     if (existingClinics && existingClinics.length > 0) {
       const hasEmail = existingClinics.some((clinic: any) => clinic.email === email)
       const hasCNPJ = existingClinics.some((clinic: any) => clinic.cnpj === cnpjClinica)
-      
+
       let errorMessage = ''
       if (hasEmail && hasCNPJ) {
         errorMessage = 'Este email e CNPJ já estão cadastrados no sistema'
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       } else if (hasCNPJ) {
         errorMessage = 'Este CNPJ já está cadastrado no sistema'
       }
-      
+
       return NextResponse.json(
         { error: errorMessage },
         { status: 409 }
@@ -83,12 +83,9 @@ export async function POST(request: Request) {
         endereco: endereco,
         cidade: cidade,
         uf: uf,
-        plano: 'trial',
         tipo_calendario: 'google',
         ia_ativa: true,
         prompt_ia: '',
-        trial_ends_at: trialEndsAt.toISOString(),
-        status_assinatura: 'ativa',
       })
       .select()
       .single()
@@ -99,6 +96,33 @@ export async function POST(request: Request) {
         { error: 'Erro ao cadastrar clínica' },
         { status: 500 }
       )
+    }
+
+    // 2.1 Buscar ID do plano trial
+    const { data: planData, error: planError } = await supabaseAdmin
+      .from('planos')
+      .select('id')
+      .eq('nome', 'trial') 
+      .single()
+
+    if (planError || !planData) {
+      logger.error('Erro ao buscar plano trial:', planError)
+    } else {
+      // 2.2 Criar assinatura trial
+      const { error: subError } = await supabaseAdmin
+        .from('assinaturas')
+        .insert({
+          clinic_id: clinicData.id,
+          plan_id: planData.id,
+          status: 'ativa',
+          data_inicio: new Date().toISOString(),
+          data_fim: trialEndsAt.toISOString(),
+          ciclo: 'mensal'
+        })
+
+      if (subError) {
+        logger.error('Erro ao criar assinatura trial:', subError)
+      }
     }
 
     // 3. Retornar sucesso para o frontend fazer o signup

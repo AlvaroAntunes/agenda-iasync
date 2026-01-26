@@ -48,18 +48,18 @@ export function TrialBanner({ clinicId, blockAccess = false }: TrialBannerProps)
     return (
       <Alert variant="destructive" className="mb-4">
         <AlertCircle className="h-4 w-4" />
-        <AlertDescription className="flex items-center justify-between">
+        <AlertDescription className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <strong>Período de teste expirado!</strong>
             <p className="text-sm mt-1">
               Seu período de teste gratuito terminou. Faça upgrade para continuar usando todas as funcionalidades.
             </p>
           </div>
-          <Button 
-            variant="destructive" 
-            size="sm" 
+          <Button
+            variant="destructive"
+            size="sm"
             onClick={() => router.push('/upgrade')}
-            className="ml-4"
+            className="w-full md:w-auto ml-0 md:ml-4 whitespace-nowrap"
           >
             <Crown className="h-4 w-4 mr-2" />
             Fazer Upgrade
@@ -74,22 +74,22 @@ export function TrialBanner({ clinicId, blockAccess = false }: TrialBannerProps)
     return (
       <Alert className="mb-4 border-amber-200 bg-amber-50">
         <Clock className="h-4 w-4 text-amber-600" />
-        <AlertDescription className="flex items-center justify-between">
+        <AlertDescription className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <strong className="text-amber-900">
-              {trialStatus.daysRemaining === 1 
-                ? 'Último dia de teste grátis!' 
-                : `Faltam ${trialStatus.daysRemaining} dias do seu teste grátis`}
+              {trialStatus.daysRemaining === 1
+                ? 'Último dia de teste grátis!'
+                : `Faltam ${trialStatus.daysRemaining} dias para o fim de seu teste grátis`}
             </strong>
             <p className="text-sm mt-1 text-amber-800">
               Faça upgrade agora e continue aproveitando todas as funcionalidades sem interrupção.
             </p>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => router.push('/upgrade')}
-            className="ml-4 border-amber-300 hover:bg-amber-100"
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push('/dashboard/planos')}
+            className="w-full md:w-auto ml-0 md:ml-4 border-amber-300 hover:bg-amber-100 whitespace-nowrap"
           >
             <Crown className="h-4 w-4 mr-2" />
             Ver Planos

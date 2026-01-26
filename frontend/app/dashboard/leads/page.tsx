@@ -23,6 +23,7 @@ import { toast } from "sonner"
 import { useSubscriptionCheck } from "@/lib/use-subscription-check"
 import { logger } from "@/lib/logger"
 import { useClinic } from "../../contexts/ClinicContext"
+import { TrialBanner } from "@/components/TrialBanner"
 
 export default function LeadsPage() {
   const router = useRouter()
@@ -64,6 +65,29 @@ export default function LeadsPage() {
 
         // Carrega clinicData no contexto (pra header e outras telas)
         if (!clinicData?.id || clinicData.id !== profile.clinic_id) {
+          // Verificar assinatura antes de carregar dados da clínica
+          const { data: subscription } = await supabase
+            .from('assinaturas')
+            .select(`
+            status,
+            plan_id,
+            plano:planos!plan_id(nome)
+          `)
+            .eq('clinic_id', profile.clinic_id)
+            .single()
+
+          const planName = (subscription as any)?.plano?.nome;
+
+          if (subscription?.status === 'inativa' || subscription?.status === 'cancelada') {
+            if (planName === 'trial') {
+              router.push('/renovar-assinatura')
+            }
+            else {
+              router.push('/pagamento-pendente')
+            }
+            return
+          }
+
           const { data: clinic, error: clinicError } = await supabase
             .from("clinicas")
             .select("*")
@@ -71,12 +95,6 @@ export default function LeadsPage() {
             .single()
 
           if (clinicError) throw clinicError
-
-          // Se quiser manter o mesmo comportamento do dashboard:
-          if (clinic?.status_assinatura === "inativa") {
-            router.push("/renovar-assinatura")
-            return
-          }
 
           setClinicData(clinic)
         }
@@ -142,68 +160,71 @@ export default function LeadsPage() {
   }
 
   return (
-     <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
 
       <ClinicHeader clinicName={clinicData?.nome} onSignOut={handleSignOut} />
-            <main className="container mx-auto px-6 py-8">
+      <main className="container mx-auto px-6 py-8">
+        {clinicData?.id && (
+          <TrialBanner clinicId={clinicData.id} blockAccess={false} />
+        )}
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Leads</CardTitle>
-          <Button onClick={() => setShowNewLeadModal(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Novo lead
-          </Button>
-        </CardHeader>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Leads</CardTitle>
+            <Button onClick={() => setShowNewLeadModal(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Novo lead
+            </Button>
+          </CardHeader>
 
-        <CardContent>
-          {loading ? (
-            <div className="flex justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Telefone</TableHead>
-                  <TableHead>LID</TableHead>
-                  <TableHead>Data de criação</TableHead>
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {leads.length === 0 ? (
+          <CardContent>
+            {loading ? (
+              <div className="flex justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground h-24">
-                      Nenhum lead encontrado
-                    </TableCell>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Telefone</TableHead>
+                    <TableHead>LID</TableHead>
+                    <TableHead>Data de criação</TableHead>
                   </TableRow>
-                ) : (
-                  leads.map((lead) => (
-                    <TableRow key={lead.id}>
-                      <TableCell className="font-medium">{lead.nome || "Sem nome"}</TableCell>
-                      <TableCell>{lead.telefone || "-"}</TableCell>
-                      <TableCell>{lead.lid || "-"}</TableCell>
-                      <TableCell>
-                        {lead.created_at
-                          ? format(new Date(lead.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })
-                          : "-"}
+                </TableHeader>
+
+                <TableBody>
+                  {leads.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground h-24">
+                        Nenhum lead encontrado
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                  ) : (
+                    leads.map((lead) => (
+                      <TableRow key={lead.id}>
+                        <TableCell className="font-medium">{lead.nome || "Sem nome"}</TableCell>
+                        <TableCell>{lead.telefone || "-"}</TableCell>
+                        <TableCell>{lead.lid || "-"}</TableCell>
+                        <TableCell>
+                          {lead.created_at
+                            ? format(new Date(lead.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })
+                            : "-"}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
 
-      <NewLeadModal
-        open={showNewLeadModal}
-        onOpenChange={setShowNewLeadModal}
-        mode="create"
-        onCreateLead={handleCreateLead}
-      />
+        <NewLeadModal
+          open={showNewLeadModal}
+          onOpenChange={setShowNewLeadModal}
+          mode="create"
+          onCreateLead={handleCreateLead}
+        />
       </main>
     </div>
   )

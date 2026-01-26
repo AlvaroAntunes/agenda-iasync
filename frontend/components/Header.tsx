@@ -3,7 +3,13 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Building2, Settings, Users, MessageSquare, CalendarDays } from "lucide-react"
+import { Building2, Settings, Users, MessageSquare, CalendarDays, CreditCard, Menu } from "lucide-react"
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetTitle,
+} from "@/components/ui/sheet"
 
 type Props = {
   clinicName?: string | null
@@ -54,6 +60,13 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
                   Calendário
                 </Button>
               </Link>
+
+              <Link href="/dashboard/planos">
+                <Button variant="ghost" className="gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  Planos
+                </Button>
+              </Link>
             </nav>
           </div>
 
@@ -74,32 +87,59 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
             >
               Sair
             </Button>
+
+            {/* Mobile Menu */}
+            <div className="md:hidden">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="-mr-2">
+                    <Menu className="h-6 w-6" />
+                    <span className="sr-only">Menu</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right">
+                  <SheetTitle className="hidden">Menu de Navegação</SheetTitle>
+                  <div className="flex flex-col gap-4 mt-6">
+                    <Link href="/dashboard" className="flex items-center gap-2 mb-4">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                        <Building2 className="h-5 w-5 text-primary-foreground" />
+                      </div>
+                      <span className="font-semibold text-lg">{clinicName || "Carregando..."}</span>
+                    </Link>
+
+                    <Link href="/dashboard/leads">
+                      <Button variant="ghost" className="w-full justify-start gap-2">
+                        <Users className="h-4 w-4" />
+                        Leads
+                      </Button>
+                    </Link>
+
+                    <Link href="/dashboard/conversas">
+                      <Button variant="ghost" className="w-full justify-start gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Conversas
+                      </Button>
+                    </Link>
+
+                    <Link href="#">
+                      <Button variant="ghost" className="w-full justify-start gap-2">
+                        <CalendarDays className="h-4 w-4" />
+                        Calendário
+                      </Button>
+                    </Link>
+
+                    <Link href="/dashboard/planos">
+                      <Button variant="ghost" className="w-full justify-start gap-2">
+                        <CreditCard className="h-4 w-4" />
+                        Planos
+                      </Button>
+                    </Link>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
         </div>
-
-        {/* Mobile nav */}
-        <nav className="mt-3 flex md:hidden items-center gap-2 overflow-x-auto">
-          <Link href="/dashboard/leads">
-            <Button variant="ghost" className="gap-2 whitespace-nowrap">
-              <Users className="h-4 w-4" />
-              Leads
-            </Button>
-          </Link>
-
-          <Link href="/dashboard/conversas">
-            <Button variant="ghost" className="gap-2 whitespace-nowrap">
-              <MessageSquare className="h-4 w-4" />
-              Conversas
-            </Button>
-          </Link>
-
-          <Link href="#">
-            <Button variant="ghost" className="gap-2 whitespace-nowrap">
-              <CalendarDays className="h-4 w-4" />
-              Calendário
-            </Button>
-          </Link>
-        </nav>
       </div>
     </header>
   )
