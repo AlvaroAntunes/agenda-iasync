@@ -9,6 +9,11 @@ ASAAS_API_URL = os.getenv("ASAAS_API_URL")
 ASAAS_API_KEY = os.getenv("ASAAS_API_KEY")
 
 def get_headers():
+    if ASAAS_API_KEY:
+        print(f"🔑 Debug Key: Começa com '{ASAAS_API_KEY[:5]}...' e tem tamanho {len(ASAAS_API_KEY)}")
+    else:
+        print("❌ Debug Key: A chave está VAZIA/NONE")
+        
     return {
         "access_token": ASAAS_API_KEY,
         "Content-Type": "application/json"
