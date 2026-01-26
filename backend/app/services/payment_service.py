@@ -14,9 +14,26 @@ def get_headers():
         "Content-Type": "application/json"
     }
 
+def buscar_cliente_por_email(email):
+    """
+    Busca cliente existente pelo email para evitar duplicidade.
+    """
+    url = f"{ASAAS_API_URL}/customers"
+    params = {"email": email, "limit": 1}
+    
+    try:
+        res = requests.get(url, params=params, headers=get_headers())
+        if res.status_code == 200:
+            data = res.json()
+            if data.get('data'):
+                return data['data'][0]['id']
+    except Exception as e:
+        print(f"⚠️ Erro ao buscar cliente por email: {e}")
+    return None
+
 def criar_cliente_asaas(nome, email, cpf_cnpj, telefone):
     """
-    Cria ou recupera um cliente no Asaas.
+    Cria um cliente no Asaas e retorna o ID (cus_...).
     """
     url = f"{ASAAS_API_URL}/customers"
     
@@ -24,9 +41,10 @@ def criar_cliente_asaas(nome, email, cpf_cnpj, telefone):
     mobile = str(telefone).replace("@s.whatsapp.net", "").replace("+", "").replace(" ", "").replace("-", "")
     cpf_clean = "".join(filter(str.isdigit, str(cpf_cnpj))) if cpf_cnpj else None
     
-    # Sandbox Fallback para CPF
-    if "sandbox" in ASAAS_API_URL and (not cpf_clean or len(cpf_clean) < 11):
+    # Sandbox Fallback para CPF (apenas se for sandbox)
+    if "sandbox" in str(ASAAS_API_URL) and (not cpf_clean or len(cpf_clean) < 11):
         cpf_clean = "64736341053" # CPF válido para teste
+        print(f"🧪 Modo Sandbox: Usando CPF de teste {cpf_clean}")
 
     body = {
         "name": nome,
@@ -37,20 +55,18 @@ def criar_cliente_asaas(nome, email, cpf_cnpj, telefone):
     }
     
     try:
-        # Primeiro, tenta buscar se já existe pelo email (evita duplicidade no Asaas)
-        # (Opcional, mas boa prática. O POST direto também retorna erro com ID se já existir)
         response = requests.post(url, json=body, headers=get_headers())
         
         if response.status_code == 200:
             return response.json()['id']
+            
         elif response.status_code == 400 and "PROBABLY_DUPLICATE" in response.text:
-            # Em alguns casos o Asaas avisa que já existe.
-            # Aqui simplificamos retornando o ID se vier na mensagem, ou tratamos o erro.
-            # Para MVP, vamos assumir sucesso ou erro.
-            print(f"⚠️ Cliente Asaas possivelmente duplicado: {response.text}")
-            return None
+            print(f"⚠️ Cliente duplicado no Asaas. Buscando ID existente...")
+            return buscar_cliente_por_email(email)
+            
         else:
-            print(f"❌ Erro criar cliente Asaas: {response.text}")
+            # MUDANÇA AQUI: Imprime o Status Code para sabermos se é 401 (Auth) ou 400 (Dados)
+            print(f"❌ Erro criar cliente Asaas (Status {response.status_code}): {response.text}")
             return None
             
     except Exception as e:
