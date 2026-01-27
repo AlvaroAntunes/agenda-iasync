@@ -94,7 +94,7 @@ async def asaas_webhook(request: Request, asaas_access_token: str = Header(None)
                 # B. Nenhuma sessão pendente = Renovação Recorrente (Mês 2, Mês 3...)
                 print("🔄 Renovação recorrente automática.")
                 
-                sub_atual = supabase.table('assinaturas').select('*').eq('asaas_subscription_id', subscription_id).single().execute()
+                sub_atual = supabase.table('assinaturas').select('*').eq('asaas_subscription_id', subscription_id).maybe_single().execute()
                 
                 if sub_atual.data:
                     # Apenas estendemos a data baseada no ciclo atual
