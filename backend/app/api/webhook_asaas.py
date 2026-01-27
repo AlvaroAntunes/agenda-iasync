@@ -40,7 +40,7 @@ async def asaas_webhook(request: Request, asaas_access_token: str = Header(None)
             return {"status": "ignored_no_subscription_id"}
 
         # 2. Lógica de Pagamento Recebido (Ativação/Renovação)
-        if event == "PAYMENT_RECEIVED":
+        if event in ["PAYMENT_RECEIVED", "PAYMENT_CONFIRMED"]:
             
             # A. Verificar se existe uma intenção de compra (Checkout Session) pendente
             # Isso indica uma Nova Assinatura ou um Upgrade/Troca de Plano
