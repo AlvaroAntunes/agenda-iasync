@@ -83,6 +83,7 @@ def criar_checkout_assinatura(customer_asaas_id, valor, ciclo="MONTHLY"):
     
     # Data de vencimento: +1 dia para dar tempo do cliente pagar
     vencimento = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    parcelas_maximas = 12 if ciclo == "YEARLY" else 1
 
     body_sub = {
         "customer": customer_asaas_id,
@@ -90,6 +91,7 @@ def criar_checkout_assinatura(customer_asaas_id, valor, ciclo="MONTHLY"):
         "value": float(valor),
         "nextDueDate": vencimento,
         "cycle": ciclo,
+        "maxInstallmentCount": parcelas_maximas,
         "description": "Assinatura Agenda IASync"
     }
     
