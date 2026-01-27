@@ -102,7 +102,7 @@ export default function PlanosPage() {
           const res = await fetch(`${apiUrl}/checkout/status/${clinic.id}`);
           const data = await res.json();
 
-          if (data.status === 'active' || data.status === 'ativa') {
+          if (data.status === 'ativa' || data.status === 'active') {
             clearInterval(interval);
             setIsWaitingPayment(false);
             window.location.href = "/dashboard";
