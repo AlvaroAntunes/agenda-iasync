@@ -167,15 +167,16 @@ def get_pending_checkout(clinic_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+
 @router.get("/checkout/status/{clinic_id}")
 def check_subscription_status(clinic_id: str):
     """
-    Verifica se a clínica já está ativa.
-    Usado pelo Frontend para polling (long polling ou intervalo).
+    Verifica o status da intenção de compra (checkout) mais recente.
+    Usado pelo Frontend para polling.
     """
     try:
-        # Busca a assinatura mais recente no banco
-        result = supabase.table('assinaturas')\
+        # Busca o checkout mais recente na tabela checkout_sessions
+        result = supabase.table('checkout_sessions')\
             .select('status')\
             .eq('clinic_id', clinic_id)\
             .order('created_at', desc=True)\
@@ -184,7 +185,12 @@ def check_subscription_status(clinic_id: str):
             .execute()
             
         if result.data:
-            return {"status": result.data['status']} # retorna 'ativa', 'pendente', etc.
+            status = result.data['status']
+            
+            if status == 'pago':
+                return {"status": "ativa"}
+            
+            return {"status": status}
             
         return {"status": "none"}
         
