@@ -1,7 +1,13 @@
 import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.services.payment_service import criar_checkout_assinatura, criar_cliente_asaas, buscar_fatura_pendente
+from app.services.payment_service import (
+    criar_checkout_assinatura, 
+    criar_cliente_asaas, 
+    buscar_fatura_pendente,
+    atualizar_assinatura_asaas,      
+    buscar_link_pagamento_existente 
+)
 from dotenv import load_dotenv
 from app.core.database import get_supabase
 
@@ -13,14 +19,15 @@ supabase = get_supabase()
 router = APIRouter()
 
 class CheckoutInput(BaseModel):
-    clinic_id: str   # UUID da clínica no Supabase
-    plan_id: str     # Nome do plano (ex: 'consultorio', 'clinica_pro')
-    periodo: str = "mensal" # 'mensal' ou 'anual'
+    clinic_id: str   
+    plan_id: str     
+    periodo: str = "mensal" 
 
 @router.post("/checkout/create")
 def create_checkout(dados: CheckoutInput):
     """
-    Gera um link de pagamento (Fatura) do Asaas e registra a intenção de assinatura.
+    Gera um link de pagamento (Fatura) do Asaas.
+    Salva a intenção na tabela 'checkout_sessions'.
     """
     try:
         print(f"💳 Iniciando checkout: Clínica {dados.clinic_id} | Plano {dados.plan_id}")
@@ -37,7 +44,7 @@ def create_checkout(dados: CheckoutInput):
         # 2. Se não tem ID no Asaas, cria o cliente agora
         if not asaas_id:
             print("🆕 Criando cliente no Asaas...")
-
+            
             cpf_cnpj = dados_clinica.get('cnpj')
             
             asaas_id = criar_cliente_asaas(
@@ -48,69 +55,89 @@ def create_checkout(dados: CheckoutInput):
             )
             
             if not asaas_id:
-                raise HTTPException(status_code=500, detail="Falha ao criar cliente no Asaas. Verifique os dados da clínica.")
+                raise HTTPException(status_code=500, detail="Falha ao criar cliente no Asaas.")
             
-            # Salva o ID no Supabase para uso futuro
             supabase.table('clinicas').update({'asaas_customer_id': asaas_id}).eq('id', dados.clinic_id).execute()
 
-        # 3. Buscar Preço do Plano no Banco
-        # Buscamos pelo NOME (que vem do front), mas precisamos do ID (UUID) para a tabela assinaturas
+        # 3. Buscar Preço do Plano no Banco e UUID
+        # Usamos maybe_single para não quebrar se não achar
         plano_db = supabase.table('planos').select('*').eq('nome', dados.plan_id).maybe_single().execute()
         
-        # Lógica de Preço e UUID
         plano_uuid = None
         
+        # Mapeamento do ciclo para a API do Asaas
+        ciclo_asaas = "YEARLY" if dados.periodo == 'anual' else "MONTHLY"
+
         if not plano_db.data:
             print(f"⚠️ Plano '{dados.plan_id}' não achado no banco. Usando fallback.")
-            # Fallback apenas para não travar testes se a tabela estiver vazia
-             
+            
             if dados.plan_id == 'consultorio': 
-                valor = 267.00 if dados.periodo == 'anual' else 297.00
+                valor = 267.00 if ciclo_asaas == "YEARLY" else 297.00
             elif dados.plan_id == 'clinica_pro': 
-                valor = 447.00 if dados.periodo == 'anual' else 497.00
+                valor = 447.00 if ciclo_asaas == "YEARLY" else 497.00
             else: 
-                valor = 897.00 if dados.periodo == 'anual' else 997.00
-                
+                valor = 897.00 if ciclo_asaas == "YEARLY" else 997.00
         else:
-            # Caminho Feliz: Pegamos os dados do banco
             plano_data = plano_db.data
-            plano_uuid = plano_data.get('id') # O UUID do plano
-            valor = plano_data['preco_anual'] if dados.periodo == 'anual' else plano_data['preco_mensal']
-            
-        ciclo = "YEARLY" if dados.periodo == 'anual' else "MONTHLY"
+            plano_uuid = plano_data.get('id') # UUID do plano para a FK
+            valor = plano_data['preco_anual'] if ciclo_asaas == "YEARLY" else plano_data['preco_mensal']
 
-        # 4. Criar Assinatura e Pegar Link
-        checkout = criar_checkout_assinatura(asaas_id, valor, ciclo)
+        # 4. Decisão: Criar Nova ou Atualizar Existente?
         
-        if not checkout:
-            raise HTTPException(status_code=500, detail="Erro ao gerar link de pagamento no Asaas.")
-        
-        # 5. Salvar/Atualizar na Tabela ASSINATURAS
+        # Verifica se já existe assinatura
+        assinatura_existente = supabase.table('assinaturas')\
+            .select('*')\
+            .eq('clinic_id', dados.clinic_id)\
+            .maybe_single()\
+            .execute()
+
+        checkout_url = None
+        sub_id_asaas = None
+        data_vencimento = None
+
+        if assinatura_existente.data and assinatura_existente.data.get('asaas_subscription_id'):
+            # --- CENÁRIO A: ATUALIZAR NO ASAAS (Upgrade/Troca de Ciclo) ---
+            print(f"🔄 Atualizando assinatura existente no Asaas: {assinatura_existente.data['asaas_subscription_id']}")
+            sub_id_asaas = assinatura_existente.data['asaas_subscription_id']
+            
+            if atualizar_assinatura_asaas(sub_id_asaas, valor, ciclo_asaas):
+                dados_fatura = buscar_link_pagamento_existente(sub_id_asaas)
+                
+                if dados_fatura:
+                    checkout_url = dados_fatura['checkout_url']
+                    data_vencimento = dados_fatura['due_date']
+
+        else:
+            # --- CENÁRIO B: CRIAR NOVA NO ASAAS ---
+            print(f"✨ Criando nova assinatura no Asaas...")
+            checkout = criar_checkout_assinatura(asaas_id, valor, ciclo_asaas)
+            
+            if not checkout:
+                raise HTTPException(status_code=500, detail="Erro ao gerar assinatura.")
+            
+            sub_id_asaas = checkout['subscription_id']
+            checkout_url = checkout['checkout_url']
+            data_vencimento = checkout['due_date']
+            
+        if not checkout_url:
+            raise HTTPException(status_code=500, detail="Link de pagamento não encontrado.")
+
+        # 5. Salvar na Tabela de INTENÇÃO (CHECKOUT SESSIONS)
         if plano_uuid:
-            print(f"💾 Atualizando assinatura no banco para {checkout['subscription_id']}...")
+            print(f"💾 Registrando intenção de compra para {sub_id_asaas}...")
             
-            # Verifica se já existe assinatura para esta clínica
-            existing_sub = supabase.table('assinaturas').select('id').eq('clinic_id', dados.clinic_id).execute()
-            
-            payload_assinatura = {
+            supabase.table('checkout_sessions').insert({
                 "clinic_id": dados.clinic_id,
                 "plan_id": plano_uuid,
-                "asaas_subscription_id": checkout['subscription_id'],
-                "status": "inativa", # Inicialmente inativa até o pagamento
-                "ciclo": ciclo
-            }
+                "asaas_subscription_id": sub_id_asaas,
+                "ciclo": dados.periodo,
+                "status": "pendente",
+                "data_vencimento": data_vencimento 
+            }).execute()
 
-            if existing_sub.data and len(existing_sub.data) > 0:
-                # UPDATE: Atualiza a existente
-                sub_id = existing_sub.data[0]['id']
-                supabase.table('assinaturas').update(payload_assinatura).eq('id', sub_id).execute()
-            else:
-                # INSERT: Cria nova se não existir
-                supabase.table('assinaturas').insert(payload_assinatura).execute()
-
-        print(f"✅ Checkout gerado: {checkout['checkout_url']}")
+        print(f"✅ Checkout gerado: {checkout_url}")
         
-        return {"url": checkout['checkout_url']}
+        return {"url": checkout_url}
 
     except Exception as e:
         print(f"❌ Erro crítico na rota checkout: {e}")
@@ -122,7 +149,6 @@ def get_pending_checkout(clinic_id: str):
     Retorna o link da fatura em aberto para a clínica.
     """
     try:
-        # 1. Pegar o ID do Asaas no Banco
         clinica = supabase.table('clinicas').select('asaas_customer_id').eq('id', clinic_id).single().execute()
         
         if not clinica.data or not clinica.data.get('asaas_customer_id'):

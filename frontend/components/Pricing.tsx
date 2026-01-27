@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check, Star, Building2, Sparkles } from "lucide-react";
+import { Check, Star, Building2, Sparkles, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 
@@ -37,10 +37,23 @@ interface PricingProps {
   disableHighlight?: boolean;
   currentPlanId?: string;
   compact?: boolean;
-  onPlanSelect?: (planId: string, period: "mensal" | "anual") => void;
+  onPlanSelect?: (planId: string, period: "mensal" | "anual") => void; 
+  clinicId?: string;
+  loadingPlanId?: string | null; 
 }
 
-const Pricing = ({ title, description, hideGuarantee, ctaText, disableHighlight, currentPlanId, compact, onPlanSelect }: PricingProps) => {
+const Pricing = ({ 
+  title, 
+  description, 
+  hideGuarantee, 
+  ctaText, 
+  disableHighlight, 
+  currentPlanId, 
+  compact, 
+  onPlanSelect, 
+  clinicId,
+  loadingPlanId // Recebe estado de loading externo
+}: PricingProps) => {
   const [billingPeriod, setBillingPeriod] = useState<"mensal" | "anual">("mensal");
   const [plans, setPlans] = useState<UIPlan[]>([]);
   const supabase = getSupabaseBrowserClient();
@@ -89,6 +102,15 @@ const Pricing = ({ title, description, hideGuarantee, ctaText, disableHighlight,
 
     fetchPlans();
   }, []);
+
+  const handleButtonClick = (planId: string) => {
+    if (onPlanSelect) {
+      // Se a página pai passou uma função, usa ela (Fluxo Logado)
+      onPlanSelect(planId, billingPeriod);
+    } else {
+      window.location.href = '/cadastro';
+    }
+  };
 
   return (
     <section id="planos" className={`${compact ? "py-6" : "section-padding"} relative overflow-hidden`}>
@@ -160,8 +182,10 @@ const Pricing = ({ title, description, hideGuarantee, ctaText, disableHighlight,
               : (plan.badge && !disableHighlight ? plan.badge : null);
 
             const hasBadge = !!badgeText;
-
             const isCurrentPlan = currentPlanId === plan.id;
+            
+            // Verifica se este plano específico está carregando
+            const isLoading = loadingPlanId === plan.id;
 
             const buttonText = currentPlanId
               ? (isCurrentPlan ? "Plano atual" : "Mudar para este plano")
@@ -169,7 +193,7 @@ const Pricing = ({ title, description, hideGuarantee, ctaText, disableHighlight,
 
             return (
               <motion.div
-                key={plan.name}
+                key={plan.id}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -188,7 +212,7 @@ const Pricing = ({ title, description, hideGuarantee, ctaText, disableHighlight,
                 )}
 
                 <div
-                  className={`h-full rounded-2xl p-8 transition-all duration-300 
+                  className={`h-full rounded-2xl p-8 transition-all duration-300 flex flex-col
                             ${isHighlighted
                       ? "bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700 text-white shadow-2xl ring-1 ring-cyan-200/60"
                       : plan.enterprise
@@ -247,7 +271,7 @@ const Pricing = ({ title, description, hideGuarantee, ctaText, disableHighlight,
                   </div>
 
                   {/* Features */}
-                  <ul className="space-y-4 mb-8">
+                  <ul className="space-y-4 mb-8 flex-grow">
                     {plan.features.map((feature) => (
                       <li key={feature} className="flex items-start gap-3">
                         <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5
@@ -278,16 +302,9 @@ const Pricing = ({ title, description, hideGuarantee, ctaText, disableHighlight,
                   <motion.button
                     whileHover={isCurrentPlan ? {} : { scale: 1.02 }}
                     whileTap={isCurrentPlan ? {} : { scale: 0.98 }}
-                    onClick={() => {
-                      if (isCurrentPlan) return;
-                      if (onPlanSelect) {
-                        onPlanSelect(plan.id, billingPeriod);
-                      } else {
-                        window.location.href = "/cadastro";
-                      }
-                    }}
-                    disabled={isCurrentPlan}
-                    className={`w-full py-4 px-6 rounded-xl font-semibold transition-all duration-300 ${isCurrentPlan ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                    onClick={() => handleButtonClick(plan.id)}
+                    disabled={isCurrentPlan || isLoading}
+                    className={`w-full py-4 px-6 rounded-xl font-semibold transition-all duration-300 flex justify-center items-center gap-2 ${isCurrentPlan ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
                               ${isHighlighted
                         ? "bg-white text-cyan-900 hover:bg-cyan-50"
                         : plan.enterprise
@@ -295,7 +312,11 @@ const Pricing = ({ title, description, hideGuarantee, ctaText, disableHighlight,
                           : "bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-600"
                       }`}
                   >
-                    {buttonText}
+                    {isLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      buttonText
+                    )}
                   </motion.button>
                 </div>
               </motion.div>
