@@ -25,7 +25,7 @@ const UFS = [
 export default function CadastroClinicaPage() {
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
-  
+
   // Estados do formulário
   const [nomeClinica, setNomeClinica] = useState("")
   const [telefone, setTelefone] = useState("")
@@ -36,7 +36,7 @@ export default function CadastroClinicaPage() {
   const [senha, setSenha] = useState("")
   const [confirmarSenha, setConfirmarSenha] = useState("")
   const [cnpjClinica, setCnpjClinica] = useState("")
-  
+
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -48,7 +48,7 @@ export default function CadastroClinicaPage() {
   // Máscara de telefone
   const formatTelefone = (value: string) => {
     const numbers = value.replace(/\D/g, "")
-    
+
     if (numbers.length === 0) return ""
     if (numbers.length <= 2) return `(${numbers}`
     if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`
@@ -64,7 +64,7 @@ export default function CadastroClinicaPage() {
   // Máscara de CNPJ
   const formatCNPJ = (value: string) => {
     const numbers = value.replace(/\D/g, "")
-    
+
     if (numbers.length === 0) return ""
     if (numbers.length <= 2) return numbers
     if (numbers.length <= 5) return `${numbers.slice(0, 2)}.${numbers.slice(2)}`
@@ -81,12 +81,12 @@ export default function CadastroClinicaPage() {
   // Validar CNPJ
   const validarCNPJ = (cnpj: string): boolean => {
     const numbers = cnpj.replace(/\D/g, "")
-    
+
     if (numbers.length !== 14) return false
-    
+
     // Rejeitar CNPJs com todos os dígitos iguais
     if (/^(\d)\1+$/.test(numbers)) return false
-    
+
     // Validar primeiro dígito verificador
     let sum = 0
     let weight = 5
@@ -96,7 +96,7 @@ export default function CadastroClinicaPage() {
     }
     let digit = sum % 11 < 2 ? 0 : 11 - (sum % 11)
     if (digit !== parseInt(numbers[12])) return false
-    
+
     // Validar segundo dígito verificador
     sum = 0
     weight = 6
@@ -106,7 +106,7 @@ export default function CadastroClinicaPage() {
     }
     digit = sum % 11 < 2 ? 0 : 11 - (sum % 11)
     if (digit !== parseInt(numbers[13])) return false
-    
+
     return true
   }
 
@@ -123,7 +123,7 @@ export default function CadastroClinicaPage() {
   const isPasswordValid = Object.values(passwordValidation).every(Boolean)
 
   // Verificar se todos os campos estão preenchidos
-  const isFormValid = 
+  const isFormValid =
     nomeClinica.trim() !== "" &&
     cnpjClinica.replace(/\D/g, "").length === 14 &&
     isCNPJValid &&
@@ -207,10 +207,10 @@ export default function CadastroClinicaPage() {
     const cnpjNumeros = cnpjClinica.replace(/\D/g, "")
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_URL_SITE 
+      const apiUrl = process.env.NEXT_PUBLIC_URL_SITE && process.env.NODE_ENV === 'production'
         ? `${process.env.NEXT_PUBLIC_URL_SITE}/api/cadastro`
         : '/api/cadastro'
-              
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -272,23 +272,17 @@ export default function CadastroClinicaPage() {
         }
       }
 
-      setSuccess(true)
-      
-      // Scroll para o topo para mostrar a mensagem de sucesso
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-      
-      // Redirecionar para página de confirmação após 8 segundos
-      setTimeout(() => {
-        router.push("/login")
-      }, 8000)
+      // Redirecionamento imediato para a tela de confirmação
+      const encodedEmail = encodeURIComponent(email)
+      router.push(`/cadastro/confirmacao?email=${encodedEmail}`)
 
     } catch (error: any) {
       logger.error('Erro ao cadastrar:', error)
       setError(error.message || 'Erro ao cadastrar. Tente novamente.')
-      
+
       // Scroll para o topo da página para mostrar a mensagem de erro
       window.scrollTo({ top: 0, behavior: 'smooth' })
-      
+
       // Limpar mensagem de erro após 5 segundos
       setTimeout(() => {
         setError("")
@@ -302,9 +296,9 @@ export default function CadastroClinicaPage() {
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4 py-12">
       {/* Background com gradiente suave */}
       <div className="absolute inset-0 bg-gradient-to-b from-cyan-50 via-sky-50 to-cyan-50" />
-      
+
       {/* Padrão de grid sutil */}
-      <div 
+      <div
         className="absolute inset-0 opacity-[0.02]"
         style={{
           backgroundImage: `radial-gradient(circle at 1px 1px, rgb(15 23 42) 1px, transparent 0)`,
@@ -314,7 +308,7 @@ export default function CadastroClinicaPage() {
 
       {/* Elementos decorativos */}
       <motion.div
-        animate={{ 
+        animate={{
           scale: [1, 1.1, 1],
           opacity: [0.1, 0.15, 0.1]
         }}
@@ -322,7 +316,7 @@ export default function CadastroClinicaPage() {
         className="absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-blue-500 rounded-full blur-[120px] opacity-10"
       />
       <motion.div
-        animate={{ 
+        animate={{
           scale: [1.1, 1, 1.1],
           opacity: [0.08, 0.12, 0.08]
         }}
@@ -332,16 +326,16 @@ export default function CadastroClinicaPage() {
 
       <div className="relative z-10 w-full max-w-2xl">
         {/* Botão Voltar */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="mb-6"
         >
           <Link href="/login">
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               className="gap-2 text-cyan-600"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -428,7 +422,7 @@ export default function CadastroClinicaPage() {
                 />
               </div>
 
-                {/* CNPJ da Clínica */}
+              {/* CNPJ da Clínica */}
               <div className="space-y-2">
                 <Label htmlFor="cnpjClinica" className="text-cyan-900 font-medium">
                   CNPJ *
@@ -686,8 +680,8 @@ export default function CadastroClinicaPage() {
             {/* Termos e Política de Privacidade */}
             <div className="space-y-3 pt-2">
               <label className="flex items-start gap-3 cursor-pointer group">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={aceitoTermos}
                   onChange={(e) => setAceitoTermos(e.target.checked)}
                   className="mt-0.5 rounded border-cyan-300 text-cyan-600 focus:ring-cyan-500"
@@ -703,8 +697,8 @@ export default function CadastroClinicaPage() {
               </label>
 
               <label className="flex items-start gap-3 cursor-pointer group">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={aceitoPrivacidade}
                   onChange={(e) => setAceitoPrivacidade(e.target.checked)}
                   className="mt-0.5 rounded border-cyan-300 text-cyan-600 focus:ring-cyan-500"
@@ -736,9 +730,9 @@ export default function CadastroClinicaPage() {
 
             {/* Botão de Cadastro */}
             <div className="pt-2">
-              <Button 
-                type="submit" 
-                className="w-full h-12 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold shadow-lg shadow-cyan-500/30 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-cyan-600 disabled:hover:to-blue-600" 
+              <Button
+                type="submit"
+                className="w-full h-12 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold shadow-lg shadow-cyan-500/30 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-cyan-600 disabled:hover:to-blue-600"
                 disabled={!isFormValid || isLoading || success}
               >
                 {isLoading ? "Cadastrando..." : success ? "Cadastrado com sucesso!" : "Cadastrar"}
@@ -748,7 +742,7 @@ export default function CadastroClinicaPage() {
         </motion.div>
 
         {/* Footer */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.4 }}
