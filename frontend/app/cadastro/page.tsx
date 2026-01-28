@@ -211,7 +211,7 @@ export default function CadastroClinicaPage() {
         ? `${process.env.NEXT_PUBLIC_URL_SITE}/api/cadastro`
         : '/api/cadastro'
               
-      const response = await fetch('/api/cadastro', {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
