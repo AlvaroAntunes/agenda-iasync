@@ -332,16 +332,21 @@ export default function CadastroClinicaPage() {
           transition={{ duration: 0.5 }}
           className="mb-6"
         >
-          <Link href="/login">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-2 text-cyan-600"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Voltar
-            </Button>
-          </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-cyan-600 hover:bg-transparent hover:text-cyan-700"
+            onClick={() => {
+              if (window.history.length > 1 && document.referrer.includes(window.location.origin)) {
+                router.back()
+              } else {
+                router.push('/')
+              }
+            }}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar
+          </Button>
         </motion.div>
 
         {/* Card de Cadastro */}
@@ -748,7 +753,7 @@ export default function CadastroClinicaPage() {
           transition={{ duration: 0.6, delay: 0.4 }}
           className="mt-6 text-center"
         >
-          <p className="text-sm text-cyan-900/70">
+          <p className="text-md md:text-lg text-cyan-900/70">
             Já tem uma conta?{" "}
             <Link href="/login" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
               Fazer login

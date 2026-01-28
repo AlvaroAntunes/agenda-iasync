@@ -436,7 +436,7 @@ export default function ClinicLoginPage() {
             transition={{ duration: 0.6, delay: 0.4 }}
             className="mt-6 text-center"
           >
-            <p className="text-sm text-cyan-900/70">
+            <p className="text-md md:text-lg text-cyan-900/70">
               Não tem uma conta?{" "}
               <Link href="/cadastro" className="text-cyan-700 hover:text-cyan-800 font-semibold hover:underline">
                 Cadastre-se

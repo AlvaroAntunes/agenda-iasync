@@ -8,7 +8,7 @@ const Footer = () => {
   const handleScrollTo = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     if (href.startsWith('#')) {
       e.preventDefault();
-      
+
       // Se estiver em outra página, redireciona para home
       if (window.location.pathname !== '/') {
         // Salva o ID da seção para scroll depois
@@ -35,8 +35,8 @@ const Footer = () => {
       { name: "Contato", href: "/contato" }
     ],
     Legal: [
-      { name: "Política de Privacidade", href: "/politica-de-privacidade" },
-      { name: "Termos de Uso", href: "/termos-de-uso" }
+      { name: "Política de Privacidade", href: "/politica-de-privacidade", target: "_blank" },
+      { name: "Termos de Uso", href: "/termos-de-uso", target: "_blank" }
     ]
   };
 
@@ -44,7 +44,7 @@ const Footer = () => {
     <footer id="contato" className="relative overflow-hidden bg-white text-slate-700">
       {/* Subtle gradient overlay */}
       <div className="absolute inset-0" />
-      
+
       {/* Noise texture */}
       <div className="absolute inset-0 noise-bg opacity-[0.03]" />
 
@@ -66,7 +66,7 @@ const Footer = () => {
                   </div>
                   <span className="font-bold text-xl tracking-tight text-slate-900">Agenda IASync</span>
                 </a>
-                
+
                 <p className="text-slate-500 text-sm leading-relaxed mb-6 max-w-xs">
                   Elevando o padrão do atendimento para clínicas que não aceitam nada menos que excelência.
                 </p>
@@ -104,10 +104,11 @@ const Footer = () => {
               >
                 <h4 className="font-semibold text-slate-900 mb-2">{category}</h4>
                 <ul className="space-y-2">
-                  {links.map((link) => (
+                  {links.map((link: any) => (
                     <li key={link.name}>
                       <a
                         href={link.href}
+                        target={link.target}
                         onClick={(e) => handleScrollTo(e, link.href)}
                         className="text-slate-600 text-sm hover:text-cyan-700 transition-colors cursor-pointer"
                       >
@@ -128,7 +129,7 @@ const Footer = () => {
               <p className="text-slate-500 text-sm">
                 © {new Date().getFullYear()} Agenda IASync. Todos os direitos reservados.
               </p>
-              
+
               <motion.p
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}
