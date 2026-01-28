@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import Script from 'next/script'
 import { ClinicProvider } from "./contexts/ClinicContext"
+import { MobileMotionConfig } from "@/components/MobileMotionConfig"
+
 
 // Configuração das fontes
 const geistSans = Geist({
@@ -30,7 +32,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans`}>
-        
+
         {/* META PIXEL CODE */}
         <Script id="meta-pixel" strategy="afterInteractive">
           {`
@@ -46,17 +48,19 @@ export default function RootLayout({
             fbq('track', 'PageView');
           `}
         </Script>
-        
-        <ClinicProvider>
-          {children}
-        </ClinicProvider>
-        
+
+        <MobileMotionConfig>
+          <ClinicProvider>
+            {children}
+          </ClinicProvider>
+        </MobileMotionConfig>
+
         {/* Fallback para navegadores com JS desativado (Obrigatório no body) */}
         <noscript>
-          <img 
-            height="1" 
-            width="1" 
-            style={{display: "none"}}
+          <img
+            height="1"
+            width="1"
+            style={{ display: "none" }}
             src="https://www.facebook.com/tr?id=4375140349410134&ev=PageView&noscript=1"
             alt="facebook pixel"
           />

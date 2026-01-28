@@ -10,9 +10,9 @@ const Hero = () => {
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background with subtle gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-cyan-50 via-sky-50 to-cyan-50" />
-      
+
       {/* Subtle grid pattern */}
-      <div 
+      <div
         className="absolute inset-0 opacity-[0.02]"
         style={{
           backgroundImage: `radial-gradient(circle at 1px 1px, rgb(15 23 42) 1px, transparent 0)`,
@@ -22,20 +22,20 @@ const Hero = () => {
 
       {/* Decorative elements */}
       <motion.div
-        animate={{ 
+        animate={{
           scale: [1, 1.1, 1],
           opacity: [0.1, 0.15, 0.1]
         }}
         transition={{ duration: 8, repeat: Infinity }}
-        className="absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-blue-500 rounded-full blur-[120px] opacity-10"
+        className="hidden md:block absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-blue-500 rounded-full blur-[120px] opacity-10"
       />
       <motion.div
-        animate={{ 
+        animate={{
           scale: [1.1, 1, 1.1],
           opacity: [0.08, 0.12, 0.08]
         }}
         transition={{ duration: 10, repeat: Infinity }}
-        className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-slate-400 rounded-full blur-[100px] opacity-10"
+        className="hidden md:block absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-slate-400 rounded-full blur-[100px] opacity-10"
       />
 
       <div className="relative z-10 container-narrow px-6 pt-32">
@@ -76,7 +76,7 @@ const Hero = () => {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed"
           >
-            Automatize o agendamento de pacientes em clínicas médicas e odontológicas 
+            Automatize o agendamento de pacientes em clínicas médicas e odontológicas
             com a elegância de uma secretária executiva e a precisão da Inteligência Artificial.
           </motion.p>
 
@@ -91,14 +91,14 @@ const Hero = () => {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="btn-primary flex items-center gap-3 group w-full sm:w-auto min-w-[200px] justify-center cursor-pointer bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-600" 
-                          
+                className="btn-primary flex items-center gap-3 group w-full sm:w-auto min-w-[200px] justify-center cursor-pointer bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-600"
+
               >
                 Conhecer a Solução
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" strokeWidth={2} />
               </motion.button>
             </Link>
-            
+
             <Link href="/cadastro">
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -110,7 +110,7 @@ const Hero = () => {
               </motion.button>
             </Link>
 
-            </motion.div>
+          </motion.div>
 
           {/* Trust Indicators */}
           <motion.div

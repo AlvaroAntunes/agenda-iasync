@@ -313,7 +313,7 @@ export default function CadastroClinicaPage() {
           opacity: [0.1, 0.15, 0.1]
         }}
         transition={{ duration: 8, repeat: Infinity }}
-        className="absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-blue-500 rounded-full blur-[120px] opacity-10"
+        className="hidden md:block absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-blue-500 rounded-full blur-[120px] opacity-10"
       />
       <motion.div
         animate={{
@@ -321,7 +321,7 @@ export default function CadastroClinicaPage() {
           opacity: [0.08, 0.12, 0.08]
         }}
         transition={{ duration: 10, repeat: Infinity }}
-        className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-400 rounded-full blur-[100px] opacity-10"
+        className="hidden md:block absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-400 rounded-full blur-[100px] opacity-10"
       />
 
       <div className="relative z-10 w-full max-w-2xl">

@@ -36,13 +36,13 @@ export default function ClinicLoginPage() {
       // e havia uma sessão, significa que o navegador foi fechado
       const wasTempSession = sessionStorage.getItem("clinic_temp_session")
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       if (session && !wasTempSession) {
         // Havia uma sessão mas não tem o flag de sessão temporária
         // Isso significa que o navegador foi fechado e reaberto
         // Verificar se o usuário tinha marcado "lembrar de mim"
         const shouldRemember = localStorage.getItem("clinic_remember") === "true"
-        
+
         if (!shouldRemember) {
           // Não marcou "lembrar de mim", fazer logout
           await supabase.auth.signOut()
@@ -122,7 +122,7 @@ export default function ClinicLoginPage() {
         // A sessão ainda estará ativa no navegador atual, mas será perdida ao fechar
         localStorage.removeItem("clinic_email")
         localStorage.removeItem("clinic_remember")
-        
+
         // Salvar um flag para fazer logout ao fechar o navegador
         sessionStorage.setItem("clinic_temp_session", "true")
       } else {
@@ -137,7 +137,7 @@ export default function ClinicLoginPage() {
     } catch (error: any) {
       logger.error('Erro ao fazer login:', error)
       setError(error.message || 'Erro ao fazer login. Tente novamente.')
-      
+
       // Limpar mensagem de erro após 3 segundos
       setTimeout(() => {
         setError("")
@@ -171,7 +171,7 @@ export default function ClinicLoginPage() {
     } catch (error: any) {
       logger.error('Erro ao enviar email de recuperação:', error)
       setError('Erro ao enviar email de recuperação. Verifique se o email está correto.')
-      
+
       // Limpar mensagem de erro após 3 segundos
       setTimeout(() => {
         setError("")
@@ -185,9 +185,9 @@ export default function ClinicLoginPage() {
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
       {/* Background com gradiente suave */}
       <div className="absolute inset-0 bg-gradient-to-b from-cyan-50 via-sky-50 to-cyan-50" />
-      
+
       {/* Padrão de grid sutil */}
-      <div 
+      <div
         className="absolute inset-0 opacity-[0.02]"
         style={{
           backgroundImage: `radial-gradient(circle at 1px 1px, rgb(15 23 42) 1px, transparent 0)`,
@@ -197,35 +197,35 @@ export default function ClinicLoginPage() {
 
       {/* Elementos decorativos */}
       <motion.div
-        animate={{ 
+        animate={{
           scale: [1, 1.1, 1],
           opacity: [0.1, 0.15, 0.1]
         }}
         transition={{ duration: 8, repeat: Infinity }}
-        className="absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-blue-500 rounded-full blur-[120px] opacity-10"
+        className="hidden md:block absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-blue-500 rounded-full blur-[120px] opacity-10"
       />
       <motion.div
-        animate={{ 
+        animate={{
           scale: [1.1, 1, 1.1],
           opacity: [0.08, 0.12, 0.08]
         }}
         transition={{ duration: 10, repeat: Infinity }}
-        className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-400 rounded-full blur-[100px] opacity-10"
+        className="hidden md:block absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-400 rounded-full blur-[100px] opacity-10"
       />
 
       <div className="relative z-10 w-full max-w-md">
         {/* Botão Voltar */}
         {!showForgotPassword && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
             className="mb-6"
           >
             <Link href="/">
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className="gap-2 text-cyan-600"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -259,8 +259,8 @@ export default function ClinicLoginPage() {
               {showForgotPassword ? "Recuperar Senha" : "Área da Clínica"}
             </h1>
             <p className="text-cyan-900/70 mb-8 lg:mb-4">
-              {showForgotPassword 
-                ? "Digite seu email para receber o link de recuperação" 
+              {showForgotPassword
+                ? "Digite seu email para receber o link de recuperação"
                 : "Entre com suas credenciais para acessar o dashboard"}
             </p>
 
@@ -274,91 +274,91 @@ export default function ClinicLoginPage() {
           {/* Form de Login */}
           {!showForgotPassword ? (
             <form onSubmit={handleLogin} className="space-y-5">
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <Alert variant="destructive" className="border-red-200 bg-red-50">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="text-red-800">{error}</AlertDescription>
-                </Alert>
-              </motion.div>
-            )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-cyan-900 font-medium">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isLoading}
-                className="h-12 border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 bg-white"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-cyan-900 font-medium">Senha</Label>
-              <div className="relative">
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <Alert variant="destructive" className="border-red-200 bg-red-50">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-red-800">{error}</AlertDescription>
+                  </Alert>
+                </motion.div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-cyan-900 font-medium">Email</Label>
                 <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  id="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={isLoading}
-                  className="h-12 pr-12 border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 bg-white"
+                  className="h-12 border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 bg-white"
                 />
-                <Button
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-cyan-900 font-medium">Senha</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    className="h-12 pr-12 border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 bg-white"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-cyan-600 hover:text-cyan-700"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={isLoading}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-sm">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="rounded border-cyan-300 text-cyan-600 focus:ring-cyan-500"
+                    disabled={isLoading}
+                  />
+                  <span className="text-cyan-900/70">Lembrar de mim</span>
+                </label>
+                <button
                   type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-cyan-600 hover:text-cyan-700"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-cyan-700 hover:text-cyan-800 font-medium hover:underline cursor-pointer"
                   disabled={isLoading}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5" />
-                  ) : (
-                    <Eye className="h-5 w-5" />
-                  )}
-                </Button>
+                  Esqueci minha senha
+                </button>
               </div>
-            </div>
-            
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="rounded border-cyan-300 text-cyan-600 focus:ring-cyan-500"
-                  disabled={isLoading}
-                />
-                <span className="text-cyan-900/70">Lembrar de mim</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowForgotPassword(true)}
-                className="text-cyan-700 hover:text-cyan-800 font-medium hover:underline cursor-pointer"
+
+              <Button
+                type="submit"
+                className="w-full h-12 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold shadow-lg shadow-cyan-500/30 transition-all duration-300"
                 disabled={isLoading}
               >
-                Esqueci minha senha
-              </button>
-            </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full h-12 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold shadow-lg shadow-cyan-500/30 transition-all duration-300" 
-              disabled={isLoading}
-            >
-              {isLoading ? "Entrando..." : "Entrar"}
-            </Button>
-          </form>
+                {isLoading ? "Entrando..." : "Entrar"}
+              </Button>
+            </form>
           ) : (
             /* Form de Recuperação de Senha */
             <form onSubmit={handleForgotPassword} className="space-y-5">
@@ -385,7 +385,7 @@ export default function ClinicLoginPage() {
                   </Alert>
                 </motion.div>
               )}
-              
+
               <div className="space-y-2">
                 <Label htmlFor="reset-email" className="text-cyan-900 font-medium">Email</Label>
                 <Input
@@ -399,17 +399,17 @@ export default function ClinicLoginPage() {
                   className="h-12 border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 bg-white"
                 />
               </div>
-              
+
               <div className="space-y-3">
-                <Button 
-                  type="submit" 
-                  className="w-full h-12 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold shadow-lg shadow-cyan-500/30 transition-all duration-300" 
+                <Button
+                  type="submit"
+                  className="w-full h-12 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold shadow-lg shadow-cyan-500/30 transition-all duration-300"
                   disabled={isResetting || resetSuccess}
                 >
                   {isResetting ? "Enviando..." : "Enviar link de recuperação"}
                 </Button>
-                
-                <Button 
+
+                <Button
                   type="button"
                   variant="ghost"
                   onClick={() => {
@@ -430,7 +430,7 @@ export default function ClinicLoginPage() {
 
         {/* Footer */}
         {!showForgotPassword && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.4 }}
