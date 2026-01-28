@@ -21,7 +21,7 @@ const ContactSection = () => {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitStatus("idle");
-    
+
     try {
       const response = await fetch('/api/contact', {
         method: 'POST',
@@ -52,7 +52,7 @@ const ContactSection = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    
+
     if (name === 'phone') {
       const formatted = formatTelefone(value);
       setFormData(prev => ({ ...prev, phone: formatted }));
@@ -63,7 +63,7 @@ const ContactSection = () => {
 
   const formatTelefone = (value: string) => {
     const numbers = value.replace(/\D/g, "");
-    
+
     if (numbers.length === 0) return "";
     if (numbers.length <= 2) return `(${numbers}`;
     if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
@@ -99,9 +99,9 @@ const ContactSection = () => {
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden py-32">
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-white to-slate-50" />
-      
+
       {/* Subtle grid pattern */}
-      <div 
+      <div
         className="absolute inset-0 opacity-[0.02]"
         style={{
           backgroundImage: `radial-gradient(circle at 1px 1px, rgb(15 23 42) 1px, transparent 0)`,
@@ -111,20 +111,20 @@ const ContactSection = () => {
 
       {/* Decorative elements */}
       <motion.div
-        animate={{ 
+        animate={{
           scale: [1, 1.1, 1],
           opacity: [0.1, 0.15, 0.1]
         }}
         transition={{ duration: 8, repeat: Infinity }}
-        className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-cyan-400 rounded-full blur-[120px] opacity-10"
+        className="hidden md:block absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-cyan-400 rounded-full blur-[120px] opacity-10"
       />
       <motion.div
-        animate={{ 
+        animate={{
           scale: [1.1, 1, 1.1],
           opacity: [0.08, 0.12, 0.08]
         }}
         transition={{ duration: 10, repeat: Infinity }}
-        className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-blue-400 rounded-full blur-[100px] opacity-10"
+        className="hidden md:block absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-blue-400 rounded-full blur-[100px] opacity-10"
       />
 
       <div className="relative z-10 container-narrow px-6">
@@ -150,7 +150,7 @@ const ContactSection = () => {
           </h1>
 
           <p className="text-lg text-slate-600 leading-relaxed">
-            Nossa equipe está pronta para responder suas dúvidas e ajudar você a escolher 
+            Nossa equipe está pronta para responder suas dúvidas e ajudar você a escolher
             a melhor solução para sua clínica.
           </p>
         </motion.div>
@@ -229,11 +229,10 @@ const ContactSection = () => {
                     <button
                       type="button"
                       onClick={() => setFormData(prev => ({ ...prev, preferredContact: "email" }))}
-                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${
-                        formData.preferredContact === "email"
+                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${formData.preferredContact === "email"
                           ? "border-cyan-500 bg-cyan-50 text-cyan-700"
                           : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                      }`}
+                        }`}
                     >
                       <Mail className="w-4 h-4" strokeWidth={1.5} />
                       <span className="font-medium">Email</span>
@@ -241,11 +240,10 @@ const ContactSection = () => {
                     <button
                       type="button"
                       onClick={() => setFormData(prev => ({ ...prev, preferredContact: "whatsapp" }))}
-                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${
-                        formData.preferredContact === "whatsapp"
+                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${formData.preferredContact === "whatsapp"
                           ? "border-cyan-500 bg-cyan-50 text-cyan-700"
                           : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                      }`}
+                        }`}
                     >
                       <FaWhatsapp className="w-4 h-4" />
                       <span className="font-medium">WhatsApp</span>
@@ -383,8 +381,8 @@ const ContactSection = () => {
                 </h3>
               </div>
               <p className="text-slate-600 leading-relaxed mb-4">
-                Nossa equipe está disponível para uma demonstração personalizada 
-                e consultoria gratuita sobre como a Agenda IASync pode transformar 
+                Nossa equipe está disponível para uma demonstração personalizada
+                e consultoria gratuita sobre como a Agenda IASync pode transformar
                 o atendimento da sua clínica.
               </p>
               <ul className="space-y-2 text-sm text-slate-600">

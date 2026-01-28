@@ -37,9 +37,9 @@ const SobreNosPage = () => {
       <section className="relative min-h-[60vh] flex items-center justify-center overflow-hidden pt-32">
         {/* Background */}
         <div className="absolute inset-0 bg-gradient-to-b from-cyan-50 via-sky-50 to-white" />
-        
+
         {/* Subtle grid pattern */}
-        <div 
+        <div
           className="absolute inset-0 opacity-[0.02]"
           style={{
             backgroundImage: `radial-gradient(circle at 1px 1px, rgb(15 23 42) 1px, transparent 0)`,
@@ -49,7 +49,7 @@ const SobreNosPage = () => {
 
         {/* Decorative elements */}
         <motion.div
-          animate={{ 
+          animate={{
             scale: [1, 1.1, 1],
             opacity: [0.1, 0.15, 0.1]
           }}
@@ -78,7 +78,7 @@ const SobreNosPage = () => {
             </h1>
 
             <p className="text-lg md:text-xl text-slate-600 leading-relaxed mb-8 md:mb-12">
-              Somos a IASync, uma empresa de software especializada em Inteligência Artificial 
+              Somos a IASync, uma empresa de software especializada em Inteligência Artificial
               que desenvolve soluções inovadoras, com destaque para o setor de saúde.
             </p>
           </motion.div>
@@ -88,7 +88,7 @@ const SobreNosPage = () => {
       {/* Nossa História */}
       <section className="relative py-24 overflow-hidden">
         <div className="absolute inset-0 bg-white" />
-        
+
         <div className="relative z-10 container-narrow px-6">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <motion.div
@@ -111,19 +111,19 @@ const SobreNosPage = () => {
 
               <div className="space-y-4 text-slate-600 leading-relaxed">
                 <p>
-                  A IASync é uma empresa de tecnologia especializada no desenvolvimento de soluções 
-                  baseadas em Inteligência Artificial para diversos segmentos, com destaque especial 
-                  para o setor de saúde, onde desenvolvemos ferramentas que otimizam processos e elevam 
+                  A IASync é uma empresa de tecnologia especializada no desenvolvimento de soluções
+                  baseadas em Inteligência Artificial para diversos segmentos, com destaque especial
+                  para o setor de saúde, onde desenvolvemos ferramentas que otimizam processos e elevam
                   a qualidade do atendimento.
                 </p>
                 <p>
-                  O <strong>Agenda IASync</strong> é nosso produto principal para o setor de saúde: uma plataforma 
-                  inteligente de agendamento que combina automação via IA com atendimento humanizado, liberando 
+                  O <strong>Agenda IASync</strong> é nosso produto principal para o setor de saúde: uma plataforma
+                  inteligente de agendamento que combina automação via IA com atendimento humanizado, liberando
                   equipes médicas para focarem no que realmente importa - cuidar de pessoas.
                 </p>
                 <p>
-                  Com expertise em machine learning, processamento de linguagem natural e integrações 
-                  avançadas, desenvolvemos soluções personalizadas que atendem às necessidades específicas 
+                  Com expertise em machine learning, processamento de linguagem natural e integrações
+                  avançadas, desenvolvemos soluções personalizadas que atendem às necessidades específicas
                   de cada cliente e mercado.
                 </p>
               </div>
@@ -195,7 +195,7 @@ const SobreNosPage = () => {
       {/* Fundadores */}
       <section className="relative py-24 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-slate-50 to-white" />
-        
+
         <div className="relative z-10 container-narrow px-6">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -221,8 +221,8 @@ const SobreNosPage = () => {
               className="text-center mb-12"
             >
               <p className="text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
-                A IASync foi fundada por um time de <strong>4 empreendedores</strong> com visão de 
-                transformar o mercado através da Inteligência Artificial. Nossa força está na 
+                A IASync foi fundada por um time de <strong>4 empreendedores</strong> com visão de
+                transformar o mercado através da Inteligência Artificial. Nossa força está na
                 diversidade de conhecimentos e experiências que cada fundador traz para a empresa.
               </p>
             </motion.div>
@@ -259,8 +259,8 @@ const SobreNosPage = () => {
                   className="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 hover:border-cyan-200 transition-all hover:shadow-xl"
                 >
                   <div className="w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden bg-gradient-to-br from-cyan-50 to-blue-50 border-4 border-white shadow-md">
-                    <img 
-                      src={founder.image} 
+                    <img
+                      src={founder.image}
                       alt={founder.name}
                       className="w-full h-full object-cover"
                     />
@@ -284,19 +284,19 @@ const SobreNosPage = () => {
             >
               <div className="space-y-6 text-slate-600 leading-relaxed">
                 <p>
-                  Nossa equipe reúne <strong>especialistas em Engenharia de Computação</strong> com profundo 
-                  conhecimento em desenvolvimento de software, arquitetura de sistemas e implementação de 
-                  soluções baseadas em IA, garantindo robustez técnica em cada projeto. Contamos também 
-                  com expertise em <strong>gestão financeira, estratégia de negócios e segurança de dados</strong>, 
-                  fundamental para entender as necessidades do mercado e garantir proteção total das informações. 
-                  Completando o time, temos um <strong>desenvolvedor sênior</strong> com vasta experiência 
-                  de mercado, que traz maturidade técnica e visão prática para transformar ideias em 
+                  Nossa equipe reúne <strong>especialistas em Engenharia de Computação</strong> com profundo
+                  conhecimento em desenvolvimento de software, arquitetura de sistemas e implementação de
+                  soluções baseadas em IA, garantindo robustez técnica em cada projeto. Contamos também
+                  com expertise em <strong>gestão financeira, estratégia de negócios e segurança de dados</strong>,
+                  fundamental para entender as necessidades do mercado e garantir proteção total das informações.
+                  Completando o time, temos um <strong>desenvolvedor sênior</strong> com vasta experiência
+                  de mercado, que traz maturidade técnica e visão prática para transformar ideias em
                   produtos reais e escaláveis.
                 </p>
 
                 <p className="pt-4">
-                  Com raízes na <strong>Universidade Federal do Espírito Santo (Ufes)</strong>, nossa equipe 
-                  fundadora une conhecimento técnico aprofundado com visão empreendedora prática, 
+                  Com raízes na <strong>Universidade Federal do Espírito Santo (Ufes)</strong>, nossa equipe
+                  fundadora une conhecimento técnico aprofundado com visão empreendedora prática,
                   resultando em soluções tecnológicas que realmente agregam valor ao mercado.
                 </p>
               </div>
@@ -308,7 +308,7 @@ const SobreNosPage = () => {
       {/* Missão e Visão */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-white" />
-        
+
         <div className="relative z-10 container-narrow px-6">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -325,7 +325,7 @@ const SobreNosPage = () => {
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-4">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -338,8 +338,8 @@ const SobreNosPage = () => {
               </div>
               <h3 className="text-2xl font-bold text-slate-900 mb-4">Missão</h3>
               <p className="text-slate-600 leading-relaxed">
-                Desenvolver soluções de software e Inteligência Artificial que transformam 
-                processos e negócios, com foco especial no setor de saúde, tornando a gestão 
+                Desenvolver soluções de software e Inteligência Artificial que transformam
+                processos e negócios, com foco especial no setor de saúde, tornando a gestão
                 mais eficiente e humanizada, permitindo que profissionais se dediquem ao essencial.
               </p>
             </motion.div>
@@ -356,8 +356,8 @@ const SobreNosPage = () => {
               </div>
               <h3 className="text-2xl font-bold text-slate-900 mb-4">Visão</h3>
               <p className="text-slate-600 leading-relaxed">
-                Ser uma empresa de tecnologia referência em soluções de Inteligência Artificial, 
-                reconhecida pela inovação, excelência técnica e pelo impacto positivo em diversos 
+                Ser uma empresa de tecnologia referência em soluções de Inteligência Artificial,
+                reconhecida pela inovação, excelência técnica e pelo impacto positivo em diversos
                 setores, com destaque para o segmento de saúde.
               </p>
             </motion.div>
@@ -368,7 +368,7 @@ const SobreNosPage = () => {
       {/* Nossos Valores */}
       <section className="relative py-24 overflow-hidden">
         <div className="absolute inset-0 bg-white" />
-        
+
         <div className="relative z-10 container-narrow px-6">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -409,7 +409,7 @@ const SobreNosPage = () => {
       {/* CTA Section */}
       <section className="relative py-24 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-cyan-100 to-blue-100" />
-        
+
         {/* Noise texture */}
         <div className="absolute inset-0 noise-bg opacity-[0.03]" />
 
@@ -423,7 +423,7 @@ const SobreNosPage = () => {
           >
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight mb-6">
               Pronto para Elevar o
-            <span className="text-gradient"> Padrão da Sua Clínica?</span>
+              <span className="text-gradient"> Padrão da Sua Clínica?</span>
             </h2>
             <p className="text-lg text-slate-700 mb-8 leading-relaxed">
               Faça parte da nova geração de clínicas que utilizam IA para oferecer atendimento excepcional.
