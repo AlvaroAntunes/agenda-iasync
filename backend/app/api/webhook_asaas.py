@@ -1,5 +1,6 @@
 import os
 import datetime as dt
+from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Request, Header, HTTPException
 from dotenv import load_dotenv
 from app.core.database import get_supabase
@@ -33,10 +34,13 @@ async def asaas_webhook(request: Request, asaas_access_token: str = Header(None)
         
         # ID da assinatura no Asaas
         subscription_id = payment.get("subscription")
+        installment_id = payment.get("installment")
+        payment_id = payment.get("id")
+        asaas_id_referencia = subscription_id or installment_id or payment_id
         
-        print(f"💰 Webhook Asaas: {event} | Sub: {subscription_id}")
+        print(f"💰 Webhook Asaas: {event} | Asaas id: {asaas_id_referencia}")
 
-        if not subscription_id:
+        if not asaas_id_referencia:
             return {"status": "ignored_no_subscription_id"}
 
         # 2. Lógica de Pagamento Recebido (Ativação/Renovação)
@@ -46,7 +50,7 @@ async def asaas_webhook(request: Request, asaas_access_token: str = Header(None)
             # Isso indica uma Nova Assinatura ou um Upgrade/Troca de Plano
             sessao_query = supabase.table('checkout_sessions')\
                 .select('*')\
-                .eq('asaas_subscription_id', subscription_id)\
+                .eq('asaas_id', asaas_id_referencia)\
                 .eq('status', 'pendente')\
                 .order('created_at', desc=True)\
                 .limit(1)\
@@ -58,15 +62,17 @@ async def asaas_webhook(request: Request, asaas_access_token: str = Header(None)
                 
                 # Calcular datas
                 data_inicio = dt.datetime.now()
-                # Se ciclo for anual, soma 365 dias, senão 30 dias
-                dias_adicionar = 365 if sessao.get('ciclo') in ['anual', 'annual', 'YEARLY'] else 30
-                data_fim = data_inicio + dt.timedelta(days=dias_adicionar)
+                
+                if sessao.get('ciclo') in ['anual', 'annual', 'YEARLY']:
+                    data_fim = data_inicio + relativedelta(years=1)
+                else:
+                    data_fim = data_inicio + relativedelta(months=1)
                 
                 # Dados para a tabela oficial de assinaturas
                 dados_assinatura = {
                     "clinic_id": sessao['clinic_id'],
                     "plan_id": sessao['plan_id'],
-                    "asaas_subscription_id": subscription_id,
+                    "asaas_id": asaas_id_referencia,
                     "status": "ativa", 
                     "ciclo": sessao.get('ciclo', 'mensal'),
                     "data_inicio": data_inicio.isoformat(),
@@ -94,16 +100,17 @@ async def asaas_webhook(request: Request, asaas_access_token: str = Header(None)
                 # B. Nenhuma sessão pendente = Renovação Recorrente (Mês 2, Mês 3...)
                 print("🔄 Renovação recorrente automática.")
                 
-                sub_atual = supabase.table('assinaturas').select('*').eq('asaas_subscription_id', subscription_id).maybe_single().execute()
+                sub_atual = supabase.table('assinaturas').select('*').eq('asaas_id', asaas_id_referencia).maybe_single().execute()
                 
-                if sub_atual.data:
-                    # Apenas estendemos a data baseada no ciclo atual
-                    ciclo_atual = sub_atual.data.get('ciclo', 'mensal')
-                    dias_adicionar = 365 if ciclo_atual in ['anual', 'annual', 'YEARLY'] else 30
+                if sub_atual.data:                    
+                    # Calcular datas
+                    data_inicio = dt.datetime.now()
                     
-                    # Usando agora garante que a conta fique ativa a partir do pagamento
-                    nova_data_fim = dt.datetime.now() + dt.timedelta(days=dias_adicionar)
-                    
+                    if sub_atual.data.get('ciclo', 'mensal') in ['anual', 'annual', 'YEARLY']:
+                        nova_data_fim = data_inicio + relativedelta(years=1)
+                    else:
+                        nova_data_fim = data_inicio + relativedelta(months=1)
+                
                     supabase.table('assinaturas').update({
                         'status': 'ativa',
                         'data_fim': nova_data_fim.isoformat(),
@@ -117,14 +124,14 @@ async def asaas_webhook(request: Request, asaas_access_token: str = Header(None)
             print(f"⚠️ Pagamento com problemas: {event}")
             supabase.table('assinaturas')\
                 .update({'status': 'inativa', 'updated_at': dt.datetime.now().isoformat()})\
-                .eq('asaas_subscription_id', subscription_id)\
+                .eq('asaas_id', asaas_id_referencia)\
                 .execute()
                 
         elif event == "SUBSCRIPTION_DELETED":
             print(f"🛑 Assinatura cancelada no Asaas.")
             supabase.table('assinaturas')\
                 .update({'status': 'cancelada', 'updated_at': dt.datetime.now().isoformat()})\
-                .eq('asaas_subscription_id', subscription_id)\
+                .eq('asaas_id', asaas_id_referencia)\
                 .execute()
 
         return {"status": "processed"}

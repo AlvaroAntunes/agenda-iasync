@@ -116,7 +116,7 @@ export default function PlanosPage() {
     return () => clearInterval(interval);
   }, [isWaitingPayment, clinic?.id]);
 
-  const handleCheckout = async (planId: string, billingPeriod: "mensal" | "anual") => {
+  const handleCheckout = async (planId: string, billingPeriod: "mensal" | "anual", parcelas_cartao: number) => {
     if (!clinic?.id) return
 
     try {
@@ -133,7 +133,8 @@ export default function PlanosPage() {
         body: JSON.stringify({
           plan_id: planId,      
           periodo: billingPeriod, 
-          clinic_id: clinic.id
+          clinic_id: clinic.id,
+          parcelas_cartao: parcelas_cartao
         }),
       })
 

@@ -28,10 +28,13 @@ def buscar_cliente_por_email(email):
     
     try:
         res = requests.get(url, params=params, headers=get_headers())
+        
         if res.status_code == 200:
             data = res.json()
+            
             if data.get('data'):
                 return data['data'][0]['id']
+            
     except Exception as e:
         print(f"⚠️ Erro ao buscar cliente por email: {e}")
     return None
@@ -75,7 +78,7 @@ def criar_cliente_asaas(nome, email, cpf_cnpj, telefone):
         print(f"❌ Erro conexão Asaas (Cliente): {e}")
         return None
 
-def criar_checkout_assinatura(customer_asaas_id, valor, ciclo="MONTHLY"):
+def criar_checkout_assinatura_mensal(customer_asaas_id, valor):
     """
     Cria a assinatura e retorna o link da primeira fatura (Checkout).
     """
@@ -83,15 +86,13 @@ def criar_checkout_assinatura(customer_asaas_id, valor, ciclo="MONTHLY"):
     
     # Data de vencimento: +1 dia para dar tempo do cliente pagar
     vencimento = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-    parcelas_maximas = 12 if ciclo == "YEARLY" else 1
 
     body_sub = {
         "customer": customer_asaas_id,
-        "billingType": "UNDEFINED", 
+        "billingType": "CREDIT_CARD", 
         "value": float(valor),
         "nextDueDate": vencimento,
-        "cycle": ciclo,
-        "maxInstallmentCount": parcelas_maximas,
+        "cycle": "MONTHLY",
         "description": "Assinatura Agenda IASync"
     }
     
@@ -115,7 +116,7 @@ def criar_checkout_assinatura(customer_asaas_id, valor, ciclo="MONTHLY"):
             
             if payments:
                 return {
-                    "subscription_id": sub_id,
+                    "asaas_id": sub_id,
                     "checkout_url": payments[0]['invoiceUrl'],
                     "due_date": payments[0]['dueDate'] 
                 }
@@ -123,6 +124,48 @@ def criar_checkout_assinatura(customer_asaas_id, valor, ciclo="MONTHLY"):
         return None
     except Exception as e:
         print(f"❌ Erro conexão Asaas (Assinatura): {e}")
+        return None
+
+def criar_checkout_anual(valor_total, parcelas_cartao=1):
+    """
+    Cria cobrança ANUAL no Asaas.
+    
+    - PIX, boleto e cartão de débito: pagamento à vista
+    - Cartão de crédito: parcelado
+    - Não cria assinatura
+    """
+
+    url = f"{ASAAS_API_URL}/paymentLinks"    
+    vencimento = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    body = {
+        "name": "Assinatura Anual Agenda IASync",
+        "billingType": "UNDEFINED" if parcelas_cartao == 1 else "CREDIT_CARD",
+        "chargeType": "INSTALLMENT", 
+        "value": float(valor_total),
+        "maxInstallmentCount": parcelas_cartao,
+        "endDate": vencimento,
+        "dueDateLimitDays": 3,
+        "description": "Plano Anual Agenda IASync"
+    }
+
+    try:
+        response = requests.post(url, json=body, headers=get_headers())
+
+        if response.status_code not in (200, 201):
+            print(f"❌ Erro Criar Cobrança Anual: {response.text}")
+            return None
+
+        pay = response.json()
+
+        return {
+            "asaas_id": pay["id"],
+            "checkout_url": pay["url"],
+            "due_date": pay["endDate"]
+        }
+
+    except Exception as e:
+        print(f"❌ Erro conexão Asaas (Anual): {e}")
         return None
 
 def atualizar_assinatura_asaas(subscription_id, novo_valor, novo_ciclo):
@@ -164,9 +207,11 @@ def buscar_link_pagamento_existente(subscription_id):
         response = requests.get(url, headers=get_headers())
         if response.status_code == 200:
             data = response.json()
+            
             if data.get('data') and len(data['data']) > 0:
                 # Retorna a primeira fatura pendente ou vencida
                 for fatura in data['data']:
+                    
                     if fatura['status'] in ['PENDING', 'OVERDUE']:
                         return {
                             "checkout_url": fatura['invoiceUrl'],

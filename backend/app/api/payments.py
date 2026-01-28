@@ -2,11 +2,12 @@ import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.services.payment_service import (
-    criar_checkout_assinatura, 
+    criar_checkout_assinatura_mensal, 
     criar_cliente_asaas, 
     buscar_fatura_pendente,
     atualizar_assinatura_asaas,      
-    buscar_link_pagamento_existente 
+    buscar_link_pagamento_existente ,
+    criar_checkout_anual
 )
 from dotenv import load_dotenv
 from app.core.database import get_supabase
@@ -22,6 +23,7 @@ class CheckoutInput(BaseModel):
     clinic_id: str   
     plan_id: str     
     periodo: str = "mensal" 
+    parcelas_cartao: int = 1
 
 @router.post("/checkout/create")
 def create_checkout(dados: CheckoutInput):
@@ -39,25 +41,25 @@ def create_checkout(dados: CheckoutInput):
             raise HTTPException(status_code=404, detail="Clínica não encontrada")
         
         dados_clinica = clinica.data
-        asaas_id = dados_clinica.get('asaas_customer_id')
+        asaas_customer_id = dados_clinica.get('asaas_customer_id')
 
         # 2. Se não tem ID no Asaas, cria o cliente agora
-        if not asaas_id:
+        if not asaas_customer_id:
             print("🆕 Criando cliente no Asaas...")
             
             cpf_cnpj = dados_clinica.get('cnpj')
             
-            asaas_id = criar_cliente_asaas(
+            asaas_customer_id = criar_cliente_asaas(
                 nome=dados_clinica['nome'],
                 email=dados_clinica['email'],
                 cpf_cnpj=cpf_cnpj,
                 telefone=dados_clinica['telefone']
             )
             
-            if not asaas_id:
+            if not asaas_customer_id:
                 raise HTTPException(status_code=500, detail="Falha ao criar cliente no Asaas.")
             
-            supabase.table('clinicas').update({'asaas_customer_id': asaas_id}).eq('id', dados.clinic_id).execute()
+            supabase.table('clinicas').update({'asaas_customer_id': asaas_customer_id}).eq('id', dados.clinic_id).execute()
 
         # 3. Buscar Preço do Plano no Banco e UUID
         # Usamos maybe_single para não quebrar se não achar
@@ -92,16 +94,24 @@ def create_checkout(dados: CheckoutInput):
             .execute()
 
         checkout_url = None
-        sub_id_asaas = None
+        asaas_id = None
         data_vencimento = None
-
-        if assinatura_existente.data and assinatura_existente.data.get('asaas_subscription_id'):
-            # --- CENÁRIO A: ATUALIZAR NO ASAAS (Upgrade/Troca de Ciclo) ---
-            print(f"🔄 Atualizando assinatura existente no Asaas: {assinatura_existente.data['asaas_subscription_id']}")
-            sub_id_asaas = assinatura_existente.data['asaas_subscription_id']
+        
+        pode_atualizar = False
+        
+        if assinatura_existente.data:
+            id_atual = assinatura_existente.data.get('asaas_id', '')
             
-            if atualizar_assinatura_asaas(sub_id_asaas, valor, ciclo_asaas):
-                dados_fatura = buscar_link_pagamento_existente(sub_id_asaas)
+            if id_atual and id_atual.startswith('sub_') and dados.periodo == 'mensal':
+                pode_atualizar = True
+
+        if pode_atualizar:
+            # --- CENÁRIO A: ATUALIZAR NO ASAAS (Upgrade/Troca de Ciclo) ---
+            print(f"🔄 Atualizando assinatura existente no Asaas: {assinatura_existente.data['asaas_id']}")
+            asaas_id = assinatura_existente.data['asaas_id']
+            
+            if atualizar_assinatura_asaas(asaas_id, valor, ciclo_asaas):
+                dados_fatura = buscar_link_pagamento_existente(asaas_id)
                 
                 if dados_fatura:
                     checkout_url = dados_fatura['checkout_url']
@@ -110,12 +120,16 @@ def create_checkout(dados: CheckoutInput):
         else:
             # --- CENÁRIO B: CRIAR NOVA NO ASAAS ---
             print(f"✨ Criando nova assinatura no Asaas...")
-            checkout = criar_checkout_assinatura(asaas_id, valor, ciclo_asaas)
+            
+            if dados.periodo == 'mensal':
+                checkout = criar_checkout_assinatura_mensal(asaas_customer_id, valor)
+            else:
+                checkout = criar_checkout_anual(valor, dados.parcelas_cartao)
             
             if not checkout:
                 raise HTTPException(status_code=500, detail="Erro ao gerar assinatura.")
             
-            sub_id_asaas = checkout['subscription_id']
+            asaas_id = checkout['asaas_id']
             checkout_url = checkout['checkout_url']
             data_vencimento = checkout['due_date']
             
@@ -124,12 +138,12 @@ def create_checkout(dados: CheckoutInput):
 
         # 5. Salvar na Tabela de INTENÇÃO (CHECKOUT SESSIONS)
         if plano_uuid:
-            print(f"💾 Registrando intenção de compra para {sub_id_asaas}...")
+            print(f"💾 Registrando intenção de compra para {asaas_id}...")
             
             supabase.table('checkout_sessions').insert({
                 "clinic_id": dados.clinic_id,
                 "plan_id": plano_uuid,
-                "asaas_subscription_id": sub_id_asaas,
+                "asaas_id": asaas_id,
                 "ciclo": dados.periodo,
                 "status": "pendente",
                 "data_vencimento": data_vencimento 
@@ -154,10 +168,10 @@ def get_pending_checkout(clinic_id: str):
         if not clinica.data or not clinica.data.get('asaas_customer_id'):
             raise HTTPException(status_code=404, detail="Clínica sem cadastro financeiro")
             
-        asaas_id = clinica.data['asaas_customer_id']
+        asaas_customer_id = clinica.data['asaas_customer_id']
         
         # 2. Buscar link no Asaas
-        link_fatura = buscar_fatura_pendente(asaas_id)
+        link_fatura = buscar_fatura_pendente(asaas_customer_id)
         
         if not link_fatura:
             return {"url": "https://www.asaas.com/customerPortal", "status": "no_pending_invoice"}

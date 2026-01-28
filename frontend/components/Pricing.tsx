@@ -37,24 +37,25 @@ interface PricingProps {
   disableHighlight?: boolean;
   currentPlanId?: string;
   compact?: boolean;
-  onPlanSelect?: (planId: string, period: "mensal" | "anual") => void; 
+  onPlanSelect?: (planId: string, period: "mensal" | "anual", parcelas_cartao: number) => void;
   clinicId?: string;
-  loadingPlanId?: string | null; 
+  loadingPlanId?: string | null;
 }
 
-const Pricing = ({ 
-  title, 
-  description, 
-  hideGuarantee, 
-  ctaText, 
-  disableHighlight, 
-  currentPlanId, 
-  compact, 
-  onPlanSelect, 
+const Pricing = ({
+  title,
+  description,
+  hideGuarantee,
+  ctaText,
+  disableHighlight,
+  currentPlanId,
+  compact,
+  onPlanSelect,
   clinicId,
   loadingPlanId // Recebe estado de loading externo
 }: PricingProps) => {
   const [billingPeriod, setBillingPeriod] = useState<"mensal" | "anual">("mensal");
+  const [installments, setInstallments] = useState<1 | 12>(12);
   const [plans, setPlans] = useState<UIPlan[]>([]);
   const supabase = getSupabaseBrowserClient();
 
@@ -104,9 +105,11 @@ const Pricing = ({
   }, []);
 
   const handleButtonClick = (planId: string) => {
+    const finalInstallments = billingPeriod === "mensal" ? 1 : installments;
+
     if (onPlanSelect) {
       // Se a página pai passou uma função, usa ela (Fluxo Logado)
-      onPlanSelect(planId, billingPeriod);
+      onPlanSelect(planId, billingPeriod, finalInstallments);
     } else {
       window.location.href = '/cadastro';
     }
@@ -145,29 +148,64 @@ const Pricing = ({
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="flex items-center justify-center gap-4 mb-12"
+          className="flex flex-col items-center justify-center gap-8 mb-12"
         >
-          <button
-            onClick={() => setBillingPeriod("mensal")}
-            className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 cursor-pointer ${billingPeriod === "mensal"
-              ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-[0_15px_35px_rgba(6,182,212,0.35)]"
-              : "bg-white text-cyan-800/70 border border-cyan-100 hover:border-cyan-200"
-              }`}
-          >
-            Mensal
-          </button>
-          <button
-            onClick={() => setBillingPeriod("anual")}
-            className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 relative cursor-pointer ${billingPeriod === "anual"
-              ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-[0_15px_35px_rgba(6,182,212,0.35)]"
-              : "bg-white text-cyan-800/70 border border-cyan-100 hover:border-cyan-200"
-              }`}
-          >
-            Anual
-            <span className="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">
-              -10%
-            </span>
-          </button>
+          {/* Main Toggle (Mensal/Anual) */}
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={() => setBillingPeriod("mensal")}
+              className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 cursor-pointer ${billingPeriod === "mensal"
+                ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-[0_15px_35px_rgba(6,182,212,0.35)]"
+                : "bg-white text-cyan-800/70 border border-cyan-100 hover:border-cyan-200"
+                }`}
+            >
+              Mensal
+            </button>
+            <button
+              onClick={() => {
+                setBillingPeriod("anual");
+                setInstallments(12); // Reset to 12x default when searching to annual
+              }}
+              className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 relative cursor-pointer ${billingPeriod === "anual"
+                ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-[0_15px_35px_rgba(6,182,212,0.35)]"
+                : "bg-white text-cyan-800/70 border border-cyan-100 hover:border-cyan-200"
+                }`}
+            >
+              Anual
+              <span className="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">
+                -10%
+              </span>
+            </button>
+          </div>
+
+          {/* Sub Toggle (À vista/Parcelado) - Only for Annual */}
+          {billingPeriod === "anual" && hideGuarantee && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="flex items-center justify-center gap-2 bg-slate-100 p-1 rounded-lg"
+            >
+              <button
+                onClick={() => setInstallments(1)}
+                className={`cursor-pointer px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${installments === 1
+                  ? "bg-white text-cyan-700 shadow-sm"
+                  : "text-slate-500 hover:text-cyan-700"
+                  }`}
+              >
+                À vista (1x)
+              </button>
+              <button
+                onClick={() => setInstallments(12)}
+                className={`cursor-pointer px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${installments === 12
+                  ? "bg-white text-cyan-700 shadow-sm"
+                  : "text-slate-500 hover:text-cyan-700"
+                  }`}
+              >
+                Parcelado (até 12x sem juros)
+              </button>
+            </motion.div>
+          )}
         </motion.div>
 
         {/* Pricing Cards */}
@@ -183,7 +221,7 @@ const Pricing = ({
 
             const hasBadge = !!badgeText;
             const isCurrentPlan = currentPlanId === plan.id;
-            
+
             // Verifica se este plano específico está carregando
             const isLoading = loadingPlanId === plan.id;
 
@@ -239,9 +277,14 @@ const Pricing = ({
 
                   {/* Price */}
                   <div className="mb-8 text-center">
-                    {billingPeriod === "anual" && (
+                    {billingPeriod === "anual" && installments === 12 && (
                       <div className={`text-xs mb-1 ${isHighlighted ? "text-white/70" : plan.enterprise ? "text-cyan-900/60" : "text-cyan-900/60"}`}>
                         12x de
+                      </div>
+                    )}
+                    {billingPeriod === "anual" && installments === 1 && (
+                      <div className={`text-xs mb-1 ${isHighlighted ? "text-white/70" : plan.enterprise ? "text-cyan-900/60" : "text-cyan-900/60"}`}>
+                        À vista
                       </div>
                     )}
                     <div className="flex items-baseline gap-1 justify-center">
@@ -250,13 +293,21 @@ const Pricing = ({
                       </span>
                       <span className={`text-5xl font-bold tracking-tight 
                                       ${isHighlighted ? "text-white" : "text-cyan-900"}`}>
-                        {billingPeriod === "mensal" ? plan.monthlyPrice : parseFloat(plan.annualPrice) / 12}
+                        {billingPeriod === "mensal"
+                          ? plan.monthlyPrice
+                          : installments === 12
+                            ? (parseFloat(plan.annualPrice) / 12)
+                            : parseFloat(plan.annualPrice).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+                        }
                       </span>
-                      <span className={`text-sm ${isHighlighted ? "text-white/80" : plan.enterprise ? "text-cyan-900/60" : "text-cyan-900/60"}`}>
-                        {plan.period}
-                      </span>
+                      {/* Show /mês only if monthly or if it's 12x annual */}
+                      {(billingPeriod === "mensal" || installments === 12) && (
+                        <span className={`text-sm ${isHighlighted ? "text-white/80" : plan.enterprise ? "text-cyan-900/60" : "text-cyan-900/60"}`}>
+                          {plan.period}
+                        </span>
+                      )}
                     </div>
-                    {billingPeriod === "anual" && (
+                    {billingPeriod === "anual" && installments === 12 && (
                       <>
                         <p className={`text-xs mt-2 ${isHighlighted ? "text-white/70" : plan.enterprise ? "text-cyan-900/60" : "text-cyan-900/60"}`}>
                           Valor total: R${(parseInt(plan.annualPrice)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -267,6 +318,13 @@ const Pricing = ({
                           </p>
                         </div>
                       </>
+                    )}
+                    {billingPeriod === "anual" && installments === 1 && (
+                      <div className="flex justify-center mt-2">
+                        <p className={`text-xs text-emerald-500 font-medium bg-emerald-100 rounded-md px-2 py-1`}>
+                          Economize R${(((parseFloat(plan.monthlyPrice) * 12) - parseFloat(plan.annualPrice))).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
                     )}
                   </div>
 
@@ -325,7 +383,7 @@ const Pricing = ({
         </div>
 
         {/* Guarantee */}
-        {!hideGuarantee && (
+        {!hideGuarantee ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -337,7 +395,21 @@ const Pricing = ({
               ✓ 7 dias de teste grátis &nbsp;•&nbsp; ✓ Cancele quando quiser &nbsp;•&nbsp; ✓ Setup gratuito
             </p>
           </motion.div>
-        )}
+        ) :
+        billingPeriod == "mensal" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="mt-12 text-center"
+          >
+            <p className="text-cyan-900/70 text-sm">
+              ✓ Cancele quando quiser
+            </p>
+          </motion.div>
+        )
+      }
       </div>
     </section>
   );

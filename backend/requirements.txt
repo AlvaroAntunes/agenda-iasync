@@ -18,6 +18,7 @@ schedule
 python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
+python-dateutil
 # LangChain (Sem fixar sub-dependências como 'core')
 langchain==0.2.1
 langchain-community==0.2.1
