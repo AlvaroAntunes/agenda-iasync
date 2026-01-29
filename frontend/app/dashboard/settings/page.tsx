@@ -47,6 +47,7 @@ type ClinicData = {
   subscription_status?: 'active' | 'past_due' | 'canceled' | 'trialing' | 'inactive'
   subscription_interval?: 'monthly' | 'yearly'
   subscription_end_date?: string
+  plan_id?: string
 }
 
 const UFS = [
@@ -83,6 +84,7 @@ export default function SettingsPage() {
   const [isEditProfissionalOpen, setIsEditProfissionalOpen] = useState(false)
   const [isDeleteProfissionalOpen, setIsDeleteProfissionalOpen] = useState(false)
   const [isCancelSubscriptionOpen, setIsCancelSubscriptionOpen] = useState(false)
+  const [isRenewSubscriptionOpen, setIsRenewSubscriptionOpen] = useState(false)
   const [editingProfissionalId, setEditingProfissionalId] = useState<string | null>(null)
   const [deletingProfissionalId, setDeletingProfissionalId] = useState<string | null>(null)
   const [profissionalForm, setProfissionalForm] = useState({
@@ -127,10 +129,10 @@ export default function SettingsPage() {
       setClinicData(clinic)
       let clinicWithSub = { ...clinic }
 
-      // Buscar assinatura ativa ou mais recente
+      // Buscar assinatura ativa ou mais recente com plano
       const { data: assinaturas } = await supabase
         .from('assinaturas')
-        .select('*')
+        .select('*, planos(nome)')
         .eq('clinic_id', profile.clinic_id)
         .order('data_fim', { ascending: false })
         .limit(1)
@@ -150,7 +152,8 @@ export default function SettingsPage() {
           asaas_id: assinatura.asaas_id,
           subscription_status: statusMap[assinatura.status] || 'inactive',
           subscription_interval: assinatura.ciclo === 'mensal' ? 'monthly' : 'yearly',
-          subscription_end_date: assinatura.data_fim
+          subscription_end_date: assinatura.data_fim,
+          plan_id: assinatura.planos?.nome || assinatura.plan_id
         }
       }
 
@@ -405,6 +408,50 @@ export default function SettingsPage() {
       setFormData(clinicData)
       setSuccess("Alterações descartadas.")
       setTimeout(() => setSuccess(""), 2000)
+    }
+  }
+
+  const handleRenewSamePlan = async () => {
+    if (!clinicData?.id || !clinicData?.plan_id) return
+
+    setSaving(true)
+    setError("")
+    setSuccess("")
+
+    try {
+     // const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
+     const apiUrl = "http://localhost:8000"
+
+      const response = await fetch(`${apiUrl}/checkout/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          plan_id: clinicData.plan_id,
+          periodo: 'anual',
+          clinic_id: clinicData.id,
+          parcelas_cartao: 1
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Erro ao gerar pagamento")
+      }
+
+      if (data.url) {
+        window.open(data.url, '_blank')
+        setIsRenewSubscriptionOpen(false)
+        setSuccess('Link de pagamento aberto em nova aba!')
+        setTimeout(() => setSuccess(""), 3000)
+      }
+    } catch (error: any) {
+      logger.error('Erro ao renovar assinatura:', error)
+      setError(error.message || 'Erro ao iniciar renovação. Tente novamente.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -695,33 +742,78 @@ export default function SettingsPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <Label className="text-lg font-bold text-slate-900"></Label>
             {clinicData?.subscription_status === 'active' && (
-              <Dialog open={isCancelSubscriptionOpen} onOpenChange={setIsCancelSubscriptionOpen}>
-                <DialogTrigger asChild>
-                  <Button
-                    size="sm"
-                    className="h-8 px-3 py-1 text-xs border border-slate-200 bg-white text-red-400 hover:text-red-500 hover:bg-slate-100 shadow-none font-normal rounded-md"
-                  >
-                    Cancelar Assinatura
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md rounded-2xl">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2 text-red-600">
-                      <AlertTriangle className="h-5 w-5" />
-                      Cancelar Assinatura
-                    </DialogTitle>
-                    <DialogDescription className="pt-2 text-slate-600">
-                      Ao cancelar, você perderá acesso aos recursos premium em <strong>{clinicData.subscription_end_date ? new Date(clinicData.subscription_end_date).toLocaleDateString('pt-BR') : 'breve'}</strong>. Tem certeza?
-                    </DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter className="gap-2 sm:gap-0">
-                    <Button variant="outline" className="rounded-xl border-slate-200 hover:text-green-900" onClick={() => setIsCancelSubscriptionOpen(false)}>Manter Plano</Button>
-                    <Button onClick={handleCancelSubscription} disabled={saving} className="mx-4 rounded-xl bg-red-600 hover:bg-red-700">
-                      {saving ? 'Cancelando...' : 'Sim, cancelar'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              <>
+                {clinicData?.subscription_interval === 'yearly' ? (
+                  <Dialog open={isRenewSubscriptionOpen} onOpenChange={setIsRenewSubscriptionOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        className="h-8 px-3 py-1 text-xs border border-cyan-200 bg-white text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 shadow-none font-normal rounded-md"
+                      >
+                        Renovar Assinatura
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md rounded-2xl">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-cyan-600">
+                          <Calendar className="h-5 w-5" />
+                          Renovar Assinatura
+                        </DialogTitle>
+                        <DialogDescription className="pt-2 text-slate-600">
+                          Escolha como deseja renovar sua assinatura anual.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-3 py-4">
+                        <Button
+                          onClick={handleRenewSamePlan}
+                          disabled={saving}
+                          className="w-full h-12 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all"
+                        >
+                          {saving ? 'Processando...' : 'Manter o Mesmo Plano'}
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setIsRenewSubscriptionOpen(false)
+                            router.push('/dashboard/planos')
+                          }}
+                          disabled={saving}
+                          className="w-full h-12 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-semibold transition-all"
+                        >
+                          Mudar de Plano
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                ) : (
+                  <Dialog open={isCancelSubscriptionOpen} onOpenChange={setIsCancelSubscriptionOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        className="h-8 px-3 py-1 text-xs border border-slate-200 bg-white text-red-400 hover:text-red-500 hover:bg-slate-100 shadow-none font-normal rounded-md"
+                      >
+                        Cancelar Assinatura
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md rounded-2xl">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-red-600">
+                          <AlertTriangle className="h-5 w-5" />
+                          Cancelar Assinatura
+                        </DialogTitle>
+                        <DialogDescription className="pt-2 text-slate-600">
+                          Ao cancelar, você perderá acesso aos recursos premium em <strong>{clinicData.subscription_end_date ? new Date(clinicData.subscription_end_date).toLocaleDateString('pt-BR') : 'breve'}</strong>. Tem certeza?
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" className="rounded-xl border-slate-200 hover:text-green-900" onClick={() => setIsCancelSubscriptionOpen(false)}>Manter Plano</Button>
+                        <Button onClick={handleCancelSubscription} disabled={saving} className="mx-4 rounded-xl bg-red-600 hover:bg-red-700">
+                          {saving ? 'Cancelando...' : 'Sim, cancelar'}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </>
             )}
           </div>
 
