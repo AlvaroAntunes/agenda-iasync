@@ -35,7 +35,7 @@ async def asaas_webhook(request: Request, asaas_access_token: str = Header(None)
         # ID da assinatura no Asaas
         subscription_id = payment.get("subscription")
         installment_id = payment.get("installment")
-        payment_id = payment.get("id")
+        payment_id = payment.get("paymentLink")
         asaas_id_referencia = subscription_id or installment_id or payment_id
         
         print(f"💰 Webhook Asaas: {event} | Asaas id: {asaas_id_referencia}")
