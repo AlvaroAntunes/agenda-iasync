@@ -82,7 +82,7 @@ export default function PagamentoPendente() {
           <button 
             onClick={handleRegularizar}
             disabled={loading}
-            className="w-full bg-red-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-red-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-red-700 transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
             {loading ? (
               <>

@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Building2, Users, Bot, ArrowLeft, Plus, Trash2, CheckCircle2, Edit } from "lucide-react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
+import { ClinicLoading } from "@/components/ClinicLoading"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Switch } from "@/components/ui/switch"
 import { TrialBanner } from "@/components/TrialBanner"
@@ -42,7 +43,7 @@ type ClinicData = {
   prompt_ia: string | null
   plano: 'basic' | 'premium' | 'enterprise'
   ia_ativa: boolean
-  subscription_id?: string
+  asaas_id?: string
   subscription_status?: 'active' | 'past_due' | 'canceled' | 'trialing' | 'inactive'
   subscription_interval?: 'monthly' | 'yearly'
   subscription_end_date?: string
@@ -80,8 +81,10 @@ export default function SettingsPage() {
   const [profissionais, setProfissionais] = useState<Profissional[]>([])
   const [isAddProfissionalOpen, setIsAddProfissionalOpen] = useState(false)
   const [isEditProfissionalOpen, setIsEditProfissionalOpen] = useState(false)
+  const [isDeleteProfissionalOpen, setIsDeleteProfissionalOpen] = useState(false)
   const [isCancelSubscriptionOpen, setIsCancelSubscriptionOpen] = useState(false)
   const [editingProfissionalId, setEditingProfissionalId] = useState<string | null>(null)
+  const [deletingProfissionalId, setDeletingProfissionalId] = useState<string | null>(null)
   const [profissionalForm, setProfissionalForm] = useState({
     nome: '',
     especialidade: '',
@@ -109,7 +112,7 @@ export default function SettingsPage() {
         .single()
 
       if (profileError || !profile || profile.role !== 'clinic_admin') {
-        router.push('/login/clinic')
+        router.push('/')
         return
       }
 
@@ -144,21 +147,27 @@ export default function SettingsPage() {
 
         clinicWithSub = {
           ...clinicWithSub,
-          subscription_id: assinatura.id,
+          asaas_id: assinatura.asaas_id,
           subscription_status: statusMap[assinatura.status] || 'inactive',
           subscription_interval: assinatura.ciclo === 'mensal' ? 'monthly' : 'yearly',
           subscription_end_date: assinatura.data_fim
         }
       }
 
-      setClinicData(clinicWithSub)
-      setFormData(clinicWithSub)
+      // Remover formatação do telefone se houver
+      const clinicDataClean = {
+        ...clinicWithSub,
+        telefone: clinicWithSub.telefone ? unformatTelefone(clinicWithSub.telefone) : clinicWithSub.telefone
+      }
+
+      setClinicData(clinicDataClean)
+      setFormData(clinicDataClean)
 
       // Carregar profissionais da clínica
       await loadProfissionais(profile.clinic_id)
     } catch (error) {
       logger.error('Erro ao carregar dados:', error)
-      router.push('/login/clinic')
+      router.push('/')
     } finally {
       setLoading(false)
     }
@@ -294,18 +303,29 @@ export default function SettingsPage() {
     setIsEditProfissionalOpen(true)
   }
 
-  const handleDeleteProfissional = async (id: string) => {
-    if (!confirm('Tem certeza que deseja remover este profissional?')) return
+  const openDeleteDialog = (id: string) => {
+    setDeletingProfissionalId(id)
+    setIsDeleteProfissionalOpen(true)
+  }
+
+  const handleDeleteProfissional = async () => {
+    if (!deletingProfissionalId) return
+
+    setSaving(true)
+    setProfissionalError("")
+    setProfissionalSuccess("")
 
     try {
       const { error: deleteError } = await supabase
         .from('profissionais')
         .delete()
-        .eq('id', id)
+        .eq('id', deletingProfissionalId)
 
       if (deleteError) throw deleteError
 
-      setProfissionais(profissionais.filter(p => p.id !== id))
+      setProfissionais(profissionais.filter(p => p.id !== deletingProfissionalId))
+      setIsDeleteProfissionalOpen(false)
+      setDeletingProfissionalId(null)
       setProfissionalSuccess('Profissional removido com sucesso!')
 
       setTimeout(() => {
@@ -314,7 +334,25 @@ export default function SettingsPage() {
     } catch (error: any) {
       logger.error('Erro ao remover profissional:', error)
       setProfissionalError(error.message || 'Erro ao remover profissional')
+    } finally {
+      setSaving(false)
     }
+  }
+
+  // Função para remover formatação do telefone (apenas números)
+  const unformatTelefone = (value: string) => {
+    return value.replace(/\D/g, "")
+  }
+
+  // Máscara de telefone (apenas para exibição)
+  const formatTelefone = (value: string) => {
+    const numbers = value.replace(/\D/g, "")
+
+    if (numbers.length === 0) return ""
+    if (numbers.length <= 2) return `(${numbers}`
+    if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`
+    if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`
   }
 
   const handleSaveClinic = async () => {
@@ -325,12 +363,15 @@ export default function SettingsPage() {
     setSuccess("")
 
     try {
+      // Garantir que o telefone seja salvo apenas com números
+      const telefoneClean = formData.telefone ? unformatTelefone(formData.telefone) : (formData.telefone || '')
+
       const { error: updateError } = await supabase
         .from('clinicas')
         .update({
           nome: formData.nome,
           email: formData.email,
-          telefone: formData.telefone,
+          telefone: telefoneClean,
           endereco: formData.endereco,
           cidade: formData.cidade,
           uf: formData.uf,
@@ -342,7 +383,10 @@ export default function SettingsPage() {
 
       if (updateError) throw updateError
 
-      setClinicData({ ...clinicData, ...formData })
+      // Atualizar estado com telefone sem formatação
+      const updatedData = { ...clinicData, ...formData, telefone: telefoneClean }
+      setClinicData(updatedData)
+      setFormData(updatedData)
       setSuccess('Dados atualizados com sucesso!')
 
       setTimeout(() => {
@@ -365,26 +409,45 @@ export default function SettingsPage() {
   }
 
   const handleCancelSubscription = async () => {
-    if (!clinicData?.subscription_id) return
+    // Verificações de segurança
+    if (!clinicData?.asaas_id || !clinicData?.id) return
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
 
     setSaving(true)
     setError("")
     setSuccess("")
 
     try {
-      const { error } = await supabase
-        .from('assinaturas')
-        .update({ status: 'cancelada' })
-        .eq('id', clinicData.subscription_id)
+      // 1. Chamada para o seu Backend Python
+      const response = await fetch(`${apiUrl}/cancel-subscription`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // O corpo deve bater com o modelo 'CancelRequest' do Python (snake_case)
+        body: JSON.stringify({
+          asaas_id: clinicData.asaas_id,
+          clinic_id: clinicData.id
+        }),
+      })
 
-      if (error) throw error
+      const data = await response.json()
 
+      // 2. Tratamento de Erros da API
+      if (!response.ok) {
+        // O backend Python retorna o erro em 'detail' (padrão FastAPI)
+        throw new Error(data.detail || 'Falha ao cancelar assinatura no servidor')
+      }
+
+      // 3. Sucesso: Atualiza a interface
       setClinicData(prev => prev ? ({ ...prev, subscription_status: 'canceled' }) : null)
-      setSuccess('Assinatura cancelada com sucesso.')
+      setSuccess(data.message || 'Assinatura cancelada com sucesso.')
+      setTimeout(() => setSuccess(""), 2000)
       setIsCancelSubscriptionOpen(false)
+
     } catch (error: any) {
       logger.error('Erro ao cancelar assinatura:', error)
-      setError(error.message || 'Erro ao cancelar assinatura')
+      setError(error.message || 'Erro ao cancelar assinatura. Tente novamente.')
     } finally {
       setSaving(false)
     }
@@ -396,14 +459,7 @@ export default function SettingsPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando...</p>
-        </div>
-      </div>
-    )
+    return <ClinicLoading />
   }
 
   return (
@@ -488,9 +544,13 @@ export default function SettingsPage() {
                 <Label htmlFor="telefone" className="text-slate-700 font-medium">Telefone *</Label>
                 <Input
                   id="telefone"
-                  value={formData.telefone || ''}
-                  onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                  value={formatTelefone(formData.telefone || '')}
+                  onChange={(e) => {
+                    const numbersOnly = unformatTelefone(e.target.value)
+                    setFormData({ ...formData, telefone: numbersOnly })
+                  }}
                   placeholder="(11) 99999-9999"
+                  maxLength={15}
                   className="h-12 rounded-xl border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20"
                 />
               </div>
@@ -589,13 +649,16 @@ export default function SettingsPage() {
                             clinicData?.plano === 'premium' ? 'Plano Clinic Pro' :
                               clinicData?.plano === 'basic' ? 'Plano Basic' : clinicData?.plano}
                         </h3>
-                        <Badge className={`rounded-md px-2 py-0.5 text-xs font-semibold
-                              ${clinicData?.subscription_status === 'active'
-                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'}
-                            `}>
-                          {clinicData?.subscription_status === 'active' ? 'Ativo' : 'Inativo'}
-                        </Badge>
+                        {clinicData?.subscription_status === 'active' && (
+                          <Badge className="rounded-md px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200">
+                            Ativa
+                          </Badge>
+                        )}
+                        {clinicData?.subscription_status === 'canceled' && (
+                          <Badge className="rounded-md px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 border-red-200">
+                            Cancelada
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-slate-500 text-sm">
                         {clinicData?.subscription_interval === 'yearly' ? 'Ciclo Anual' : 'Ciclo Mensal'}
@@ -607,7 +670,7 @@ export default function SettingsPage() {
                     {clinicData?.subscription_end_date ? (
                       <div>
                         <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">
-                          {clinicData.subscription_status === 'active' ? (clinicData.subscription_interval === 'yearly' ? 'Vencimento' : 'Renovação') : 'Expira em'}
+                          {clinicData.subscription_status === 'active' ? (clinicData.subscription_interval === 'yearly' ? 'Vencimento em' : 'Renovação automática em') : 'Acesso atual expira em'}
                         </p>
                         <div className="flex items-center gap-2 text-slate-900 font-medium">
                           <Calendar className="h-4 w-4 text-cyan-600" />
@@ -826,7 +889,7 @@ export default function SettingsPage() {
                       variant="ghost"
                       size="icon"
                       className="hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-600"
-                      onClick={() => handleDeleteProfissional(profissional.id)}
+                      onClick={() => openDeleteDialog(profissional.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -897,19 +960,52 @@ export default function SettingsPage() {
 
             <DialogFooter>
               <Button
-                variant="outline"
                 onClick={() => {
                   setIsEditProfissionalOpen(false)
                   setEditingProfissionalId(null)
                   setProfissionalForm({ nome: '', especialidade: '', genero: '', external_calendar_id: 'primary' })
                 }}
                 disabled={saving}
-                className="rounded-xl border-slate-200"
+                className="rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-500 transition-colors"
               >
                 Cancelar
               </Button>
-              <Button onClick={handleEditProfissional} disabled={saving || !profissionalForm.nome} className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white">
+              <Button onClick={handleEditProfissional} disabled={saving || !profissionalForm.nome} className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all">
                 {saving ? 'Salvando...' : 'Salvar Alterações'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Excluir Profissional */}
+        <Dialog open={isDeleteProfissionalOpen} onOpenChange={setIsDeleteProfissionalOpen}>
+          <DialogContent className="sm:max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+                Excluir Profissional
+              </DialogTitle>
+              <DialogDescription className="pt-2 text-slate-600">
+                Tem certeza que deseja remover este profissional? Esta ação não pode ser desfeita.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                onClick={() => {
+                  setIsDeleteProfissionalOpen(false)
+                  setDeletingProfissionalId(null)
+                }}
+                disabled={saving}
+                className="rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-500 transition-colors"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleDeleteProfissional}
+                disabled={saving}
+                className="mx-4 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20 font-semibold transition-all"
+              >
+                {saving ? 'Excluindo...' : 'Sim, excluir'}
               </Button>
             </DialogFooter>
           </DialogContent>

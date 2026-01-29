@@ -248,3 +248,27 @@ def buscar_fatura_pendente(customer_asaas_id):
     except Exception as e:
         print(f"❌ Erro ao buscar fatura: {e}")
         return None
+    
+def cancelar_assinatura_asaas(subscription_id):
+    """
+    Cancela uma assinatura no Asaas.
+    """
+    url = f"{ASAAS_API_URL}/subscriptions/{subscription_id}"
+    
+    try:
+        response = requests.delete(url, headers=get_headers())
+        
+        # 200: OK, 204: Deleted, 404: Not Found (Já deletado)
+        if response.status_code in [200, 204, 404]:
+            return True
+            
+        # Adicional: Verificar se é um erro de "Assinatura já removida" que retorna 400 as vezes
+        if response.status_code == 400 and "removed" in response.text:
+            return True
+
+        print(f"❌ Erro Cancelar Assinatura Asaas: {response.text}")
+        return False
+        
+    except Exception as e:
+        print(f"❌ Erro conexão Asaas (Cancelar): {e}")
+        return False

@@ -7,7 +7,8 @@ from app.services.payment_service import (
     buscar_fatura_pendente,
     atualizar_assinatura_asaas,      
     buscar_link_pagamento_existente ,
-    criar_checkout_anual
+    criar_checkout_anual,
+    cancelar_assinatura_asaas
 )
 from dotenv import load_dotenv
 from app.core.database import get_supabase
@@ -24,6 +25,10 @@ class CheckoutInput(BaseModel):
     plan_id: str     
     periodo: str = "mensal" 
     parcelas_cartao: int = 1
+
+class CancelRequest(BaseModel):
+    asaas_id: str
+    clinic_id: str
 
 @router.post("/checkout/create")
 def create_checkout(dados: CheckoutInput):
@@ -210,3 +215,42 @@ def check_subscription_status(clinic_id: str):
         
     except Exception as e:
         return {"status": "error"}
+    
+@router.post("/cancel-subscription")
+async def cancel_subscription(data: CancelRequest):
+    """
+    Cancela a assinatura no Asaas e atualiza o status no Supabase.
+    Recebe: asaas_id (id da assinatura no Asaas) e clinic_id
+    """
+    try:
+        # 1. Validações básicas
+        if not data.asaas_id or not data.clinic_id:
+            raise HTTPException(status_code=400, detail="Dados incompletos.")
+
+        
+        # 2. Cancelar no Asaas usando o Serviço
+        # Se tiver ID do Asaas, tenta cancelar lá primeiro
+        if data.asaas_id:
+            sucesso_asaas = cancelar_assinatura_asaas(data.asaas_id)
+            
+            if not sucesso_asaas:
+                raise HTTPException(status_code=502, detail="Erro ao processar cancelamento no gateway de pagamento (Asaas).")
+        
+        # 3. Atualizar status no Supabase para 'cancelada'
+        # Isso garante que o usuário não seja mais cobrado no seu sistema
+        update_resp = supabase.table("assinaturas")\
+            .update({"status": "cancelada", "asaas_id": None})\
+            .eq("asaas_id", data.asaas_id)\
+            .execute()
+
+        return {
+            "message": "Assinatura cancelada com sucesso.", 
+            "details": "Acesso mantido até o fim do ciclo atual.",
+            "status": "canceled"
+        }
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Erro interno no cancelamento: {str(e)}")
+        raise HTTPException(status_code=500, detail="Erro interno ao cancelar assinatura.")

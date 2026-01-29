@@ -91,6 +91,12 @@ async def asaas_webhook(request: Request, asaas_access_token: str = Header(None)
                     # Insert
                     supabase.table('assinaturas').insert(dados_assinatura).execute()
 
+                # Reativar IA da clínica quando assinatura é ativada
+                supabase.table('clinicas')\
+                    .update({'ia_ativa': True})\
+                    .eq('id', sessao['clinic_id'])\
+                    .execute()
+
                 # Marcar a sessão como PAGO
                 supabase.table('checkout_sessions').update({'status': 'pago'}).eq('id', sessao['id']).execute()
                 
@@ -111,28 +117,69 @@ async def asaas_webhook(request: Request, asaas_access_token: str = Header(None)
                     else:
                         nova_data_fim = data_inicio + relativedelta(months=1)
                 
+                    clinic_id = sub_atual.data.get('clinic_id')
+                    
                     supabase.table('assinaturas').update({
                         'status': 'ativa',
                         'data_fim': nova_data_fim.isoformat(),
                         'updated_at': dt.datetime.now().isoformat()
                     }).eq('id', sub_atual.data['id']).execute()
                     
+                    # Garantir que IA está ativa quando assinatura é renovada
+                    if clinic_id:
+                        supabase.table('clinicas')\
+                            .update({'ia_ativa': True})\
+                            .eq('id', clinic_id)\
+                            .execute()
+                    
                     print(f"📅 Assinatura renovada até {nova_data_fim}")
 
         # 3. Lógica de Problemas (Inadimplência/Cancelamento)
         elif event in ["PAYMENT_OVERDUE", "PAYMENT_REFUNDED"]:
             print(f"⚠️ Pagamento com problemas: {event}")
-            supabase.table('assinaturas')\
-                .update({'status': 'inativa', 'updated_at': dt.datetime.now().isoformat()})\
+            # Buscar clinic_id da assinatura para desativar IA
+            assinatura_data = supabase.table('assinaturas')\
+                .select('clinic_id')\
                 .eq('asaas_id', asaas_id_referencia)\
+                .single()\
                 .execute()
+            
+            if assinatura_data.data:
+                clinic_id = assinatura_data.data['clinic_id']
+                # Atualizar status da assinatura
+                supabase.table('assinaturas')\
+                    .update({'status': 'inativa', 'updated_at': dt.datetime.now().isoformat()})\
+                    .eq('asaas_id', asaas_id_referencia)\
+                    .execute()
+                # Desativar IA da clínica
+                supabase.table('clinicas')\
+                    .update({'ia_ativa': False})\
+                    .eq('id', clinic_id)\
+                    .execute()
+                print(f"🔒 IA desativada para clínica {clinic_id}")
                 
         elif event == "SUBSCRIPTION_DELETED":
             print(f"🛑 Assinatura cancelada no Asaas.")
-            supabase.table('assinaturas')\
-                .update({'status': 'cancelada', 'updated_at': dt.datetime.now().isoformat()})\
+            # Buscar clinic_id da assinatura para desativar IA
+            assinatura_data = supabase.table('assinaturas')\
+                .select('clinic_id')\
                 .eq('asaas_id', asaas_id_referencia)\
+                .single()\
                 .execute()
+            
+            if assinatura_data.data:
+                clinic_id = assinatura_data.data['clinic_id']
+                # Atualizar status da assinatura
+                supabase.table('assinaturas')\
+                    .update({'status': 'cancelada', 'updated_at': dt.datetime.now().isoformat()})\
+                    .eq('asaas_id', asaas_id_referencia)\
+                    .execute()
+                # Desativar IA da clínica
+                supabase.table('clinicas')\
+                    .update({'ia_ativa': False})\
+                    .eq('id', clinic_id)\
+                    .execute()
+                print(f"🔒 IA desativada para clínica {clinic_id}")
 
         return {"status": "processed"}
 

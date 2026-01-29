@@ -19,6 +19,7 @@ import {
   Trash2,
   Link2
 } from "lucide-react"
+import { ClinicLoading } from "@/components/ClinicLoading"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { useSubscriptionCheck } from "@/lib/use-subscription-check"
@@ -95,29 +96,6 @@ export default function ClinicDashboard() {
       if (clinicError) throw clinicError
 
       if (clinicError) throw clinicError
-
-      // Verificar assinatura na tabela assinaturas
-      const { data: subscription } = await supabase
-        .from('assinaturas')
-        .select(`
-          status,
-          plan_id,
-          plano:planos!plan_id(nome)
-        `)
-        .eq('clinic_id', profile.clinic_id)
-        .single()
-
-      const planName = (subscription as any)?.plano?.nome;
-
-      if (subscription?.status === 'inativa' || subscription?.status === 'cancelada') {
-          if (planName === 'trial') {
-            router.push('/renovar-assinatura')
-          }
-          else {
-            router.push('/pagamento-pendente')
-          }
-          return
-        }
 
       setClinicData(clinic)
 
@@ -337,14 +315,7 @@ export default function ClinicDashboard() {
   }, [clinicData?.id])
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando...</p>
-        </div>
-      </div>
-    )
+    return <ClinicLoading />
   }
 
   const confirmedCount = todayAppointments.filter((a) => a.status === "confirmed").length

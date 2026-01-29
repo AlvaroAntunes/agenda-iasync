@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Loader2, Plus } from "lucide-react"
+import { ClinicLoading } from "@/components/ClinicLoading"
 import { toast } from "sonner"
 import { useSubscriptionCheck } from "@/lib/use-subscription-check"
 import { logger } from "@/lib/logger"
@@ -65,29 +66,6 @@ export default function LeadsPage() {
 
         // Carrega clinicData no contexto (pra header e outras telas)
         if (!clinicData?.id || clinicData.id !== profile.clinic_id) {
-          // Verificar assinatura antes de carregar dados da clínica
-          const { data: subscription } = await supabase
-            .from('assinaturas')
-            .select(`
-            status,
-            plan_id,
-            plano:planos!plan_id(nome)
-          `)
-            .eq('clinic_id', profile.clinic_id)
-            .single()
-
-          const planName = (subscription as any)?.plano?.nome;
-
-          if (subscription?.status === 'inativa' || subscription?.status === 'cancelada') {
-            if (planName === 'trial') {
-              router.push('/renovar-assinatura')
-            }
-            else {
-              router.push('/pagamento-pendente')
-            }
-            return
-          }
-
           const { data: clinic, error: clinicError } = await supabase
             .from("clinicas")
             .select("*")
@@ -152,11 +130,7 @@ export default function LeadsPage() {
   }
 
   if (authLoading) {
-    return (
-      <div className="flex justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <ClinicLoading />
   }
 
   return (
@@ -178,9 +152,7 @@ export default function LeadsPage() {
 
           <CardContent>
             {loading ? (
-              <div className="flex justify-center p-8">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
+              <ClinicLoading message="Carregando leads..." />
             ) : (
               <Table>
                 <TableHeader>

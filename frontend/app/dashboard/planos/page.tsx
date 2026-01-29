@@ -6,6 +6,8 @@ import Pricing from "@/components/Pricing"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { TrialBanner } from "@/components/TrialBanner"
+import { CanceledSubscriptionBanner } from "@/components/CanceledSubscriptionBanner"
+import { ClinicLoading } from "@/components/ClinicLoading"
 import { logger } from '@/lib/logger'
 import { ClinicHeader } from "@/components/Header"
 
@@ -15,6 +17,7 @@ type ClinicData = {
   assinatura?: {
     plan_id: string
     status: string
+    data_fim?: string
     plano: {
       nome: string
     }
@@ -30,6 +33,7 @@ export default function PlanosPage() {
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null) // Controla o loading do botão
   const [isWaitingPayment, setIsWaitingPayment] = useState(false)
   const [error, setError] = useState("")
+  const [isSubscriptionCanceled, setIsSubscriptionCanceled] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -63,6 +67,7 @@ export default function PlanosPage() {
           assinatura:assinaturas!clinic_id(
             plan_id,
             status,
+            data_fim,
             plano:planos!plan_id(nome)
           )
         `)
@@ -75,6 +80,18 @@ export default function PlanosPage() {
       const activeSubscription = Array.isArray(assinaturas)
         ? assinaturas[0]
         : assinaturas;
+
+      // Verifica se a assinatura está cancelada e vencida
+      if (activeSubscription && activeSubscription.status === 'cancelada' && activeSubscription.data_fim) {
+        const hoje = new Date()
+        hoje.setHours(0, 0, 0, 0)
+        const dataFim = new Date(activeSubscription.data_fim)
+        dataFim.setHours(0, 0, 0, 0)
+
+        if (hoje > dataFim) {
+          setIsSubscriptionCanceled(true)
+        }
+      }
 
       setClinic({
         id: clinicData.id,
@@ -197,7 +214,9 @@ export default function PlanosPage() {
     );
   }
 
-  if (loading) return <div className="flex h-screen items-center justify-center">Carregando...</div>
+  if (loading) {
+    return <ClinicLoading />
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -205,7 +224,10 @@ export default function PlanosPage() {
 
       <main className="container mx-auto px-6 py-8">
         {clinic?.id && (
-          <TrialBanner clinicId={clinic.id} blockAccess={false} />
+          <>
+            <TrialBanner clinicId={clinic.id} blockAccess={false} />
+            <CanceledSubscriptionBanner clinicId={clinic.id} />
+          </>
         )}
         <Card>
           <CardHeader>
@@ -219,7 +241,7 @@ export default function PlanosPage() {
               hideGuarantee
               ctaText="Selecionar"
               disableHighlight
-              currentPlanId={clinic?.assinatura?.plano?.nome} // Ex: 'consultorio'
+              currentPlanId={isSubscriptionCanceled ? undefined : clinic?.assinatura?.plano?.nome} // Não mostra como atual se cancelada e vencida
               compact
               onPlanSelect={handleCheckout} // Passa a função aqui
               clinicId={clinic?.id}

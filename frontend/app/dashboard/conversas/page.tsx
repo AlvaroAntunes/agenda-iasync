@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Loader2, RefreshCw } from "lucide-react"
+import { ClinicLoading } from "@/components/ClinicLoading"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useSubscriptionCheck } from "@/lib/use-subscription-check"
@@ -88,29 +89,6 @@ export default function ConversasPage() {
             .single()
 
           if (clinicError) throw clinicError
-
-          // Verificar assinatura antes de carregar dados da clínica
-          const { data: subscription } = await supabase
-            .from('assinaturas')
-            .select(`
-            status,
-            plan_id,
-            plano:planos!plan_id(nome)
-          `)
-            .eq('clinic_id', profile.clinic_id)
-            .single()
-
-          const planName = (subscription as any)?.plano?.nome;
-
-          if (subscription?.status === 'inativa' || subscription?.status === 'cancelada') {
-            if (planName === 'trial') {
-              router.push('/renovar-assinatura')
-            }
-            else {
-              router.push('/pagamento-pendente')
-            }
-            return
-          }
 
           setClinicData(clinic)
         }
@@ -271,11 +249,7 @@ export default function ConversasPage() {
   )
 
   if (authLoading) {
-    return (
-      <div className="flex justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <ClinicLoading />
   }
 
   return (
@@ -312,9 +286,7 @@ export default function ConversasPage() {
 
             <CardContent className="space-y-2">
               {loading ? (
-                <div className="flex justify-center p-6">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
+                <ClinicLoading message="Carregando conversas..." />
               ) : uazapiStatus !== "connected" ? (
                 <div className="text-center text-muted-foreground py-10">
                   Instância WhatsApp não conectada
