@@ -60,6 +60,34 @@ def normalizar_output(output) -> str:
     # Fallback final
     return str(output)
 
+def mensagens_para_texto(mensagens):
+    textos = []
+
+    for m in mensagens:
+        if not hasattr(m, "content"):
+            continue
+
+        content = m.content
+
+        if content is None:
+            continue
+
+        if isinstance(content, str):
+            textos.append(content)
+            continue
+
+        # Lista (ex: multimodal ou chunks)
+        if isinstance(content, list):
+            for item in content:
+                textos.append(str(item))
+                
+            continue
+
+        # Dict ou outro objeto
+        textos.append(str(content))
+
+    return "\n".join(textos)
+
 # --- 1. DEFINIÇÃO DOS SCHEMAS (O que o Robô vê) ---
 # Isso garante que o LLM nunca tente enviar 'self'
 
@@ -1084,9 +1112,15 @@ class AgenteClinica:
             # 🤖 Scratchpad do agente
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
+        
+        mensagens = prompt.format_messages(
+            input=mensagem_usuario,
+            chat_history=historico_conversa,
+            agent_scratchpad=[]
+        )
 
         # 3. Criar e Executar o Agente
-        tokens_prompt = self._contar_tokens(prompt)
+        tokens_prompt = self._contar_tokens(mensagens_para_texto(mensagens))
         agent = create_tool_calling_agent(llm, tools, prompt)
         agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
         
