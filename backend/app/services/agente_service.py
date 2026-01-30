@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_community.callbacks import get_openai_callback 
+import tiktoken
 
 # LangChain Imports
 from langchain_openai import ChatOpenAI
@@ -908,6 +909,10 @@ class AgenteClinica:
         except Exception as e:
             return f"Erro ao salvar nome do cliente: {str(e)}"
         
+    def _contar_tokens(self, texto: str, model="gpt-4.1-mini"):
+        enc = tiktoken.encoding_for_model(model)
+        return len(enc.encode(texto))
+        
     def _debitar_tokens(self, tokens_gastos: int, custo_usd: float):
         """
         Debita os tokens gastos do saldo da clínica no Supabase.
@@ -1054,28 +1059,24 @@ class AgenteClinica:
         ])
 
         # 3. Criar e Executar o Agente
+        tokens_prompt = self._contar_tokens(prompt)
         agent = create_tool_calling_agent(llm, tools, prompt)
         agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
         
-        # --- CAPTURA DE TOKENS AQUI ---
-        with get_openai_callback() as cb:
-            resposta = agent_executor.invoke({
-                "input": mensagem_usuario,
-                "chat_history": historico_conversa
-            })
-            
-            # cb.total_tokens contém a soma de entrada + saída + chamadas de ferramenta
-            custo_entrada = cb.prompt_tokens * (0.40 / 1000000)
-            custo_saida = cb.completion_tokens * (1.60 / 1000000)
-            custo_usd = custo_entrada + custo_saida
-            total_tokens = cb.total_tokens
+        resposta = agent_executor.invoke({
+            "input": mensagem_usuario,
+            "chat_history": historico_conversa
+        })
+        
+        tokens_output = self._contar_tokens(resposta["output"])
+        total_tokens = int((tokens_prompt + tokens_output) * 1.1)
+        
+        print(f"💰 Uso nesta interação:")
+        print(f"   - Total Tokens: {total_tokens}")
+        
+        if total_tokens > 0:
+            custo_usd = tokens_prompt * (0.4 / 1000000) + tokens_output * (1.6 / 1000000)
+            print(f"   - Custo Estimado (USD): ${custo_usd:.6f}")
+            self._debitar_tokens(total_tokens, custo_usd)
 
-            print(f"💰 Uso nesta interação:")
-            print(f"   - Total Tokens: {total_tokens}")
-            print(f"   - Custo Estimado: ${custo_usd:.6f}")
-
-            # Debita do banco se houve consumo
-            if total_tokens > 0:
-                self._debitar_tokens(total_tokens, custo_usd)
-                
         return resposta["output"]
