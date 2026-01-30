@@ -21,6 +21,7 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import StructuredTool
+from langchain.schema import BaseMessage
 
 # Seus serviços
 from app.services.factory import get_calendar_service
@@ -32,6 +33,32 @@ load_dotenv()  # Carrega variáveis do .env
 
 # Configuração do Supabase 
 supabase = get_supabase()
+
+
+def normalizar_output(output) -> str:
+    if output is None:
+        return ""
+
+    if isinstance(output, str):
+        return output
+
+    # AIMessage / HumanMessage / SystemMessage
+    if isinstance(output, BaseMessage):
+        return output.content or ""
+
+    # Lista de mensagens
+    if isinstance(output, list):
+        textos = []
+        
+        for item in output:
+            if isinstance(item, BaseMessage):
+                textos.append(item.content or "")
+            else:
+                textos.append(str(item))
+        return "\n".join(textos)
+
+    # Fallback final
+    return str(output)
 
 # --- 1. DEFINIÇÃO DOS SCHEMAS (O que o Robô vê) ---
 # Isso garante que o LLM nunca tente enviar 'self'
@@ -1068,7 +1095,8 @@ class AgenteClinica:
             "chat_history": historico_conversa
         })
         
-        tokens_output = self._contar_tokens(resposta["output"])
+        texto_output = normalizar_output(resposta.get("output"))
+        tokens_output = self._contar_tokens(texto_output)
         total_tokens = int((tokens_prompt + tokens_output) * 1.1)
         
         print(f"💰 Uso nesta interação:")
