@@ -34,7 +34,6 @@ load_dotenv()  # Carrega variáveis do .env
 # Configuração do Supabase 
 supabase = get_supabase()
 
-
 def normalizar_output(output) -> str:
     if output is None:
         return ""
@@ -979,7 +978,7 @@ class AgenteClinica:
                 return
 
             # Busca saldo atual
-            resp = self.supabase.table('clinicas').select('saldo_tokens').eq('id', clinic_id).single().execute()
+            resp = supabase.table('clinicas').select('saldo_tokens').eq('id', clinic_id).single().execute()
             
             if resp.data:
                 saldo_atual = resp.data.get('saldo_tokens', 0) or 0
@@ -987,7 +986,7 @@ class AgenteClinica:
                 novo_saldo = max(0, saldo_atual - tokens_gastos)
                 
                 # Atualiza no banco
-                self.supabase.table('clinicas').update({'saldo_tokens': novo_saldo, 'custo_usd': custo_usd}).eq('id', clinic_id).execute()
+                supabase.table('clinicas').update({'saldo_tokens': novo_saldo, 'custo_usd': custo_usd}).eq('id', clinic_id).execute()
                 print(f"📉 Tokens debitados: -{tokens_gastos} | Saldo restante: {novo_saldo}")
                 
         except Exception as e:
@@ -1135,6 +1134,8 @@ class AgenteClinica:
         
         print(f"💰 Uso nesta interação:")
         print(f"   - Total Tokens: {total_tokens}")
+        print(f"   - Tokens Input: {tokens_prompt}")
+        print(f"   - Tokens Output: {tokens_output}")
         
         if total_tokens > 0:
             custo_usd = tokens_prompt * (0.4 / 1000000) + tokens_output * (1.6 / 1000000)
