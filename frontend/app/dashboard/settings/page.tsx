@@ -760,7 +760,7 @@ export default function SettingsPage() {
                           Renovar Assinatura
                         </DialogTitle>
                         <DialogDescription className="pt-2 text-slate-600">
-                          Escolha como deseja renovar sua assinatura anual.
+                          Escolha como deseja renovar sua assinatura anual. Lembrando que a nova assinatura vai começar imediatamente e vai até {new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toLocaleDateString('pt-BR')}.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="grid gap-3 py-4">
@@ -893,12 +893,12 @@ export default function SettingsPage() {
                       value={profissionalForm.genero}
                       onValueChange={(value) => setProfissionalForm({ ...profissionalForm, genero: value as 'masculino' | 'feminino' })}
                     >
-                      <SelectTrigger id="prof-genero" className="rounded-xl border-slate-200">
+                      <SelectTrigger id="prof-genero" className="rounded-xl border-slate-200 cursor-pointer">
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="masculino">Masculino</SelectItem>
-                        <SelectItem value="feminino">Feminino</SelectItem>
+                        <SelectItem className="cursor-pointer" value="masculino">Masculino</SelectItem>
+                        <SelectItem className="cursor-pointer" value="feminino">Feminino</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -919,7 +919,16 @@ export default function SettingsPage() {
                   <Button onClick={() => setIsAddProfissionalOpen(false)} disabled={saving} className="rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-500 transition-colors">
                     Cancelar
                   </Button>
-                  <Button onClick={handleAddProfissional} disabled={saving || !profissionalForm.nome} className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all">
+                  <Button 
+                    onClick={handleAddProfissional}
+                    disabled={
+                      saving ||
+                      !profissionalForm.nome ||
+                      !profissionalForm.especialidade ||
+                      !profissionalForm.genero
+                    }
+                    className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all"
+                  >
                     {saving ? 'Adicionando...' : 'Adicionar'}
                   </Button>
                 </DialogFooter>
