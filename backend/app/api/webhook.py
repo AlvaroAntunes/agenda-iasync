@@ -211,7 +211,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         # Precisamos converter o ID da Uazapi para o UUID da sua Clínica
         try:
             resp = supabase.table('clinicas')\
-                .select('id, ia_ativa')\
+                .select('id, ia_ativa, saldo_tokens')\
                 .eq('uazapi_token', uazapi_token)\
                 .single()\
                 .execute()
@@ -227,7 +227,11 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
             # Verifica se IA está ativa
             if not clinica_data.get('ia_ativa', True):
                 return {"status": "ia_disabled"}
-
+            
+            if clinica_data.get('saldo_tokens', 0) <= 0:
+                print(f"⚠️ Saldo de tokens insuficiente para a clínica {clinic_id}")
+                return {"status": "insufficient_balance"}
+        
         except Exception as e:
             print(f"❌ Erro ao buscar clínica no banco: {e}")
             return {"status": "db_error"}

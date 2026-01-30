@@ -13,6 +13,7 @@ from unidecode import unidecode
 from zoneinfo import ZoneInfo 
 from dotenv import load_dotenv
 from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_community.callbacks import get_openai_callback 
 
 # LangChain Imports
 from langchain_openai import ChatOpenAI
@@ -906,6 +907,31 @@ class AgenteClinica:
             return f"Nome '{nome_cliente}' salvo com sucesso."
         except Exception as e:
             return f"Erro ao salvar nome do cliente: {str(e)}"
+        
+    def _debitar_tokens(self, tokens_gastos: int, custo_usd: float):
+        """
+        Debita os tokens gastos do saldo da clínica no Supabase.
+        """
+        try:
+            clinic_id = self.dados_clinica.get('id')
+            
+            if not clinic_id:
+                return
+
+            # Busca saldo atual
+            resp = self.supabase.table('clinicas').select('saldo_tokens').eq('id', clinic_id).single().execute()
+            
+            if resp.data:
+                saldo_atual = resp.data.get('saldo_tokens', 0) or 0
+                # Evita saldo negativo, mas permite chegar a 0
+                novo_saldo = max(0, saldo_atual - tokens_gastos)
+                
+                # Atualiza no banco
+                self.supabase.table('clinicas').update({'saldo_tokens': novo_saldo, 'custo_usd': custo_usd}).eq('id', clinic_id).execute()
+                print(f"📉 Tokens debitados: -{tokens_gastos} | Saldo restante: {novo_saldo}")
+                
+        except Exception as e:
+            print(f"❌ Erro ao debitar tokens: {e}")
 
     # --- O CÉREBRO (AGENTE) ---
 
@@ -1030,10 +1056,26 @@ class AgenteClinica:
         # 3. Criar e Executar o Agente
         agent = create_tool_calling_agent(llm, tools, prompt)
         agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+        
+        # --- CAPTURA DE TOKENS AQUI ---
+        with get_openai_callback() as cb:
+            resposta = agent_executor.invoke({
+                "input": mensagem_usuario,
+                "chat_history": historico_conversa
+            })
+            
+            # cb.total_tokens contém a soma de entrada + saída + chamadas de ferramenta
+            custo_entrada = cb.prompt_tokens * (0.40 / 1000000)
+            custo_saida = cb.completion_tokens * (1.60 / 1000000)
+            custo_usd = custo_entrada + custo_saida
+            total_tokens = cb.total_tokens
 
-        resposta = agent_executor.invoke({
-            "input": mensagem_usuario,
-            "chat_history": historico_conversa
-        })
+            print(f"💰 Uso nesta interação:")
+            print(f"   - Total Tokens: {total_tokens}")
+            print(f"   - Custo Estimado: ${custo_usd:.6f}")
 
+            # Debita do banco se houve consumo
+            if total_tokens > 0:
+                self._debitar_tokens(total_tokens, custo_usd)
+                
         return resposta["output"]
