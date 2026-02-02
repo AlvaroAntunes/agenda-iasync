@@ -15,7 +15,6 @@ def processar_mensagem_ia(clinic_id: str, telefone_cliente: str, texto_usuario: 
     try:
         # 1. Histórico
         history_service = HistoryService(clinic_id=clinic_id, session_id=telefone_cliente)
-        history_service.add_user_message(texto_usuario)
         historico = history_service.get_langchain_history(limit=mensagens_contexto)
         
         # 2. Agente

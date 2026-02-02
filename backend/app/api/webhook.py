@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from app.services.audio_service import AudioService
 from app.services.tasks import processar_mensagem_ia
+from app.services.history_service import HistoryService
 from app.utils.whatsapp_utils import enviar_mensagem_whatsapp
 from app.services.buffer_service import BufferService
 from app.core.database import get_supabase
@@ -28,6 +29,11 @@ router = APIRouter()
 
 UAZAPI_URL = os.getenv("UAZAPI_URL")
 UAZAPI_GLOBAL_TOKEN = os.getenv("UAZAPI_GLOBAL_TOKEN")
+UAZAPI_ADMIN_TOKEN = os.getenv("UAZAPI_ADMIN_TOKEN")
+UAZAPI_SYSTEM_NAME = os.getenv("UAZAPI_SYSTEM_NAME", "uazapiGO")
+UAZAPI_WEBHOOK_URL = os.getenv("UAZAPI_WEBHOOK_URL")
+UAZAPI_WEBHOOK_EVENTS = os.getenv("UAZAPI_WEBHOOK_EVENTS", "messages")
+UAZAPI_WEBHOOK_EXCLUDES = os.getenv("UAZAPI_WEBHOOK_EXCLUDES", "wasSentByApi,isGroupYes")
 
 buffer_service = BufferService()
 BUFFER_DELAY = 10  # Segundos de espera
@@ -35,7 +41,13 @@ BUFFER_DELAY = 10  # Segundos de espera
 def get_uazapi_headers(token: str):
     return {
         "Content-Type": "application/json",
-        "token": token
+        "token": token.strip() if token else token
+    }
+
+def get_uazapi_admin_headers(token: str):
+    return {
+        "Content-Type": "application/json",
+        "admintoken": token.strip() if token else token
     }
 
 def get_clinic_uazapi_token(clinic_id: str):
@@ -52,23 +64,53 @@ def get_clinic_uazapi_token(clinic_id: str):
 class ConnectInstanceBody(BaseModel):
     phone: Optional[str] = None
 
+class MessageFindBody(BaseModel):
+    id: Optional[str] = None
+    chatid: Optional[str] = None
+    track_source: Optional[str] = None
+    track_id: Optional[str] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+
 @router.post("/uazapi/instance/create/{clinic_id}")
 def create_uazapi_instance(clinic_id: str):
-    if not UAZAPI_URL or not UAZAPI_GLOBAL_TOKEN:
-        raise HTTPException(status_code=500, detail="UAZAPI_URL ou UAZAPI_GLOBAL_TOKEN não configurado")
+    admin_token = UAZAPI_ADMIN_TOKEN or UAZAPI_GLOBAL_TOKEN
+    if not UAZAPI_URL or not admin_token:
+        raise HTTPException(status_code=500, detail="UAZAPI_URL ou UAZAPI_ADMIN_TOKEN não configurado")
 
     existing_token = get_clinic_uazapi_token(clinic_id)
     if existing_token:
         return {"status": "already_created", "token": existing_token}
 
-    url = f"{UAZAPI_URL}/instance/create"
+    url = f"{UAZAPI_URL}/instance/init"
     body = {
-        "name": clinic_id
+        "name": clinic_id,
+        "systemName": UAZAPI_SYSTEM_NAME,
     }
 
-    response = requests.post(url, json=body, headers=get_uazapi_headers(UAZAPI_GLOBAL_TOKEN))
+    headers = get_uazapi_admin_headers(admin_token)
+    response = requests.post(url, json=body, headers=headers)
     if response.status_code not in [200, 201]:
-        raise HTTPException(status_code=500, detail=response.text)
+        error_text = response.text
+        print(
+            "❌ Uazapi create erro:",
+            json.dumps(
+                {
+                    "status_code": response.status_code,
+                    "error": error_text,
+                    "request": {
+                        "url": url,
+                        "body": body,
+                        "headers": headers,
+                    },
+                },
+                indent=2,
+            ),
+        )
+        raise HTTPException(
+            status_code=response.status_code,
+            detail=error_text or "Erro ao criar instância na Uazapi"
+        )
 
     data = response.json()
     print("📦 Resposta Uazapi create:", json.dumps(data, indent=2))
@@ -91,6 +133,41 @@ def create_uazapi_instance(clinic_id: str):
 
     if getattr(update_resp, "error", None):
         raise HTTPException(status_code=500, detail=str(update_resp.error))
+
+    # Configurar webhook da instância automaticamente
+    if UAZAPI_WEBHOOK_URL:
+        try:
+            webhook_url = f"{UAZAPI_URL}/webhook"
+            events = [e.strip() for e in UAZAPI_WEBHOOK_EVENTS.split(",") if e.strip()]
+            excludes = [e.strip() for e in UAZAPI_WEBHOOK_EXCLUDES.split(",") if e.strip()]
+            webhook_payload = {
+                "enabled": True,
+                "url": UAZAPI_WEBHOOK_URL,
+                "events": events,
+                "excludeMessages": excludes,
+            }
+            webhook_resp = requests.post(
+                webhook_url,
+                json=webhook_payload,
+                headers=get_uazapi_headers(token),
+            )
+            if webhook_resp.status_code not in [200, 201]:
+                print(
+                    "❌ Uazapi webhook erro:",
+                    json.dumps(
+                        {
+                            "status_code": webhook_resp.status_code,
+                            "error": webhook_resp.text,
+                            "request": {
+                                "url": webhook_url,
+                                "body": webhook_payload,
+                            },
+                        },
+                        indent=2,
+                    ),
+                )
+        except Exception as e:
+            print(f"⚠️ Erro ao configurar webhook: {e}")
 
     return {"status": "created", "token": token, "data": data}
 
@@ -116,6 +193,26 @@ def connect_uazapi_instance(clinic_id: str, body: ConnectInstanceBody):
     print("📦 Resposta Uazapi connect:", json.dumps(data, indent=2))
     return data
 
+@router.post("/uazapi/message/find/{clinic_id}")
+def find_uazapi_messages(clinic_id: str, body: MessageFindBody):
+    if not UAZAPI_URL:
+        raise HTTPException(status_code=500, detail="UAZAPI_URL não configurado")
+
+    token = get_clinic_uazapi_token(clinic_id)
+    if not token:
+        return {"status": "not_configured"}
+
+    url = f"{UAZAPI_URL}/message/find"
+    payload = body.dict(exclude_none=True)
+
+    response = requests.post(url, json=payload, headers=get_uazapi_headers(token))
+    if response.status_code not in [200, 201]:
+        raise HTTPException(status_code=500, detail=response.text)
+
+    data = response.json()
+    print("📦 Resposta Uazapi message/find:", json.dumps(data, indent=2))
+    return data
+
 @router.get("/uazapi/instance/status/{clinic_id}")
 def status_uazapi_instance(clinic_id: str):
     if not UAZAPI_URL:
@@ -127,6 +224,12 @@ def status_uazapi_instance(clinic_id: str):
 
     url = f"{UAZAPI_URL}/instance/status"
     response = requests.get(url, headers=get_uazapi_headers(token))
+    if response.status_code in [401, 404]:
+        supabase.table('clinicas')\
+            .update({'uazapi_token': None})\
+            .eq('id', clinic_id)\
+            .execute()
+        return {"status": "not_configured"}
     if response.status_code not in [200, 201]:
         raise HTTPException(status_code=500, detail=response.text)
 
@@ -276,12 +379,35 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         
         # 3. Identificação do Cliente
         # Uazapi manda o telefone limpo ou com sufixo. Vamos limpar.
-        raw_phone = message.get("chatid") or message.get("sender_pn") or payload.get("chat").get("wa_chatid")
+        raw_chatid = message.get("chatid") or (payload.get("chat") or {}).get("wa_chatid")
+        raw_phone = raw_chatid or message.get("sender_pn")
         telefone_cliente = str(raw_phone).replace("@s.whatsapp.net", "").replace("+", "")
         message_id = message.get("messageid")
         lid = message.get("sender") or message.get("from")
 
         print(f"📩 Webhook Uazapi: Clínica {clinic_id} | Cliente: {telefone_cliente}")
+
+        # 4. Criar lead automaticamente se não existir
+        try:
+            lead_resp = supabase.table('leads')\
+                .select('id')\
+                .eq('clinic_id', clinic_id)\
+                .eq('telefone', telefone_cliente)\
+                .limit(1)\
+                .execute()
+            if not lead_resp.data:
+                lead_payload = {
+                    'clinic_id': clinic_id,
+                    'lid': raw_chatid or lid or telefone_cliente,
+                    'telefone': telefone_cliente,
+                    'nome': None
+                }
+                supabase.table('leads').upsert(
+                    lead_payload,
+                    on_conflict='clinic_id, telefone'
+                ).execute()
+        except Exception as e:
+            print(f"⚠️ Erro ao criar lead automaticamente: {e}")
 
         # 5. Extração do Conteúdo (Texto ou Áudio)
         msg_type = message.get("messageType") or message.get("type") or payload.get("messageType")
@@ -318,7 +444,10 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
 
         print(f"💬 Processando: {texto_usuario}")
 
-        # 6. Buffer & Agente
+        # 6. Salvar mensagem no histórico (para aparecer nas conversas)
+        HistoryService(clinic_id=clinic_id, session_id=telefone_cliente).add_user_message(texto_usuario)
+
+        # 7. Buffer & Agente
         buffer_service.add_message(clinic_id, telefone_cliente, texto_usuario)
         devo_iniciar_timer = buffer_service.should_start_timer(clinic_id, telefone_cliente)
 

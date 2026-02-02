@@ -187,7 +187,11 @@ export default function ClinicDashboard() {
     setClinicData(null)
   }
 
-  const apiBaseUrl = process.env.BACKEND_URL || ""
+  const apiBaseUrl =
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_BACKEND ||
+    process.env.BACKEND_URL ||
+    ""
 
   const normalizeQrCode = (value?: string | null) => {
     if (!value) return null
@@ -196,6 +200,9 @@ export default function ClinicDashboard() {
   }
 
   const resolveUazapiStatus = (data: any) => {
+    if (data?.status?.connected === true || data?.status?.loggedIn === true) {
+      return "connected"
+    }
     return (
       data?.status ||
       data?.instance?.status ||
@@ -208,25 +215,36 @@ export default function ClinicDashboard() {
   const resolveUazapiQr = (data: any) => {
     return (
       data?.qrcode ||
+      data?.instance?.qrcode ||
       data?.qr ||
+      data?.instance?.qr ||
       data?.qrCode ||
+      data?.instance?.qrCode ||
       data?.code ||
+      data?.instance?.code ||
       data?.data?.qrcode ||
       null
     )
   }
 
   const resolveUazapiPairingCode = (data: any) => {
-    return data?.pairingCode || data?.pairing_code || data?.code || null
+    return (
+      data?.pairingCode ||
+      data?.pairing_code ||
+      data?.instance?.paircode ||
+      data?.code ||
+      null
+    )
   }
 
   const fetchUazapiStatus = async (clinicId: string) => {
     if (!apiBaseUrl) return
     try {
       const response = await fetch(`${apiBaseUrl}/uazapi/instance/status/${clinicId}`)
-      const data = await response.json()
+      const raw = await response.text()
+      const data = raw ? JSON.parse(raw) : {}
       if (!response.ok) {
-        throw new Error(data?.detail || "Erro ao consultar status")
+        throw new Error((data as any)?.detail || raw || "Erro ao consultar status")
       }
       const status = resolveUazapiStatus(data)
       setUazapiStatus(status)
@@ -240,18 +258,25 @@ export default function ClinicDashboard() {
 
   const handleCreateUazapiInstance = async () => {
     if (!clinicData?.id || !apiBaseUrl) return
+    if (uazapiStatus !== "not_configured" && uazapiStatus !== "error") {
+      toast.info("Você já possui uma instância ativa.")
+      return
+    }
     setUazapiLoading(true)
+    setUazapiStatus("connecting")
     try {
       const response = await fetch(`${apiBaseUrl}/uazapi/instance/create/${clinicData.id}`, {
         method: "POST",
       })
-      const data = await response.json()
+      const raw = await response.text()
+      const data = raw ? JSON.parse(raw) : {}
       if (!response.ok) {
-        throw new Error(data?.detail || "Erro ao criar instância")
+        throw new Error((data as any)?.detail || raw || "Erro ao criar instância")
       }
       toast.success("Instância criada")
       await fetchUazapiStatus(clinicData.id)
     } catch (err: any) {
+      setUazapiStatus("error")
       toast.error(err?.message || "Erro ao criar instância")
     } finally {
       setUazapiLoading(false)
@@ -260,6 +285,10 @@ export default function ClinicDashboard() {
 
   const handleConnectUazapi = async () => {
     if (!clinicData?.id || !apiBaseUrl) return
+    if (uazapiStatus === "not_configured") {
+      toast.info("Crie a instância antes de gerar o QR Code.")
+      return
+    }
     setUazapiLoading(true)
     try {
       const response = await fetch(`${apiBaseUrl}/uazapi/instance/connect/${clinicData.id}`, {
@@ -269,9 +298,10 @@ export default function ClinicDashboard() {
         },
         body: JSON.stringify({}),
       })
-      const data = await response.json()
+      const raw = await response.text()
+      const data = raw ? JSON.parse(raw) : {}
       if (!response.ok) {
-        throw new Error(data?.detail || "Erro ao gerar QR code")
+        throw new Error((data as any)?.detail || raw || "Erro ao gerar QR code")
       }
       setUazapiStatus(resolveUazapiStatus(data))
       setUazapiQrCode(normalizeQrCode(resolveUazapiQr(data)))
@@ -286,14 +316,19 @@ export default function ClinicDashboard() {
 
   const handleDeleteUazapiInstance = async () => {
     if (!clinicData?.id || !apiBaseUrl) return
+    if (uazapiStatus === "not_configured") {
+      toast.info("Nenhuma instância para excluir.")
+      return
+    }
     setUazapiLoading(true)
     try {
       const response = await fetch(`${apiBaseUrl}/uazapi/instance/${clinicData.id}`, {
         method: "DELETE",
       })
-      const data = await response.json()
+      const raw = await response.text()
+      const data = raw ? JSON.parse(raw) : {}
       if (!response.ok) {
-        throw new Error(data?.detail || "Erro ao excluir instância")
+        throw new Error((data as any)?.detail || raw || "Erro ao excluir instância")
       }
       setUazapiStatus("not_configured")
       setUazapiQrCode(null)
@@ -569,10 +604,10 @@ export default function ClinicDashboard() {
                   >
                     {uazapiStatus === "connected"
                       ? "Conectado"
+                      : uazapiStatus === "disconnected"
+                        ? "Criado"
                       : uazapiStatus === "connecting"
                         ? "Conectando"
-                        : uazapiStatus === "disconnected"
-                          ? "Desconectado"
                           : uazapiStatus === "not_configured"
                             ? "Sem instância"
                             : uazapiStatus === "error"
@@ -593,22 +628,40 @@ export default function ClinicDashboard() {
                     <p className="text-xs text-muted-foreground">Código de pareamento</p>
                     <p className="text-lg font-semibold mt-2">{uazapiPairingCode}</p>
                   </div>
-                ) : (
+                ) : uazapiStatus === "connected" ? null : (
                   <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
                     Gere um QR Code ou código de pareamento para conectar.
                   </div>
                 )}
 
                 <div className="grid gap-2">
-                  <Button onClick={handleCreateUazapiInstance} disabled={uazapiLoading}>
-                    <Link2 className="mr-2 h-4 w-4" />
-                    Criar instância
-                  </Button>
-                  <Button variant="outline" onClick={handleConnectUazapi} disabled={uazapiLoading}>
-                    <QrCode className="mr-2 h-4 w-4" />
-                    Gerar QR Code
-                  </Button>
-                  <Button variant="ghost" onClick={handleDeleteUazapiInstance} disabled={uazapiLoading}>
+                  {uazapiStatus === "connected" ? null : (
+                    <>
+                      <Button
+                        onClick={handleCreateUazapiInstance}
+                        disabled={
+                          uazapiLoading ||
+                          (uazapiStatus !== "not_configured" && uazapiStatus !== "error")
+                        }
+                      >
+                        <Link2 className="mr-2 h-4 w-4" />
+                        Criar instância
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleConnectUazapi}
+                        disabled={uazapiLoading || uazapiStatus === "not_configured"}
+                      >
+                        <QrCode className="mr-2 h-4 w-4" />
+                        Gerar QR Code
+                      </Button>
+                    </>
+                  )}
+                  <Button
+                    variant="ghost"
+                    onClick={handleDeleteUazapiInstance}
+                    disabled={uazapiLoading || uazapiStatus === "not_configured"}
+                  >
                     <Trash2 className="mr-2 h-4 w-4" />
                     Excluir instância
                   </Button>

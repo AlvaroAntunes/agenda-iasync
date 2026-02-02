@@ -50,6 +50,25 @@ export default function ConversasPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [uazapiStatus, setUazapiStatus] = useState("not_configured")
+  const testChatId: string | null = null
+
+  const normalizeUazapiTimestamp = (value: any) => {
+    if (!value) return new Date().toISOString()
+    if (typeof value === "string") {
+      const numeric = Number(value)
+      if (!Number.isNaN(numeric)) {
+        const ms = value.length <= 10 ? numeric * 1000 : numeric
+        return new Date(ms).toISOString()
+      }
+      const parsed = new Date(value)
+      return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString()
+    }
+    if (typeof value === "number") {
+      const ms = value < 1e11 ? value * 1000 : value
+      return new Date(ms).toISOString()
+    }
+    return new Date().toISOString()
+  }
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -107,6 +126,24 @@ export default function ConversasPage() {
     setLoading(true)
 
     try {
+      if (testChatId) {
+        const list = [
+          {
+            sessionId: testChatId,
+            lastMessage: "Teste Uazapi",
+            lastSender: "user" as const,
+            lastAt: new Date().toISOString(),
+            leadName: null,
+          },
+        ]
+        setConversations(list)
+        if (!selectedSessionId) {
+          setSelectedSessionId(testChatId)
+        }
+        setLoading(false)
+        return
+      }
+
       const { data, error } = await supabase
         .from("chat_messages")
         .select("session_id, quem_enviou, conteudo, created_at")
@@ -115,6 +152,10 @@ export default function ConversasPage() {
         .limit(400)
 
       if (error) throw error
+      logger.info("Conversas: mensagens carregadas", {
+        clinic_id: clinic,
+        total: data?.length || 0,
+      })
 
       const map = new Map<string, Conversation>()
 
@@ -150,6 +191,11 @@ export default function ConversasPage() {
       }
 
       const list = Array.from(map.values())
+      list.sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime())
+      logger.info("Conversas: sessões agregadas", {
+        clinic_id: clinic,
+        total: list.length,
+      })
       setConversations(list)
 
       if (!selectedSessionId && list.length) {
@@ -162,9 +208,16 @@ export default function ConversasPage() {
     }
   }
 
-  const apiBaseUrl = process.env.BACKEND_URL || ""
+  const apiBaseUrl =
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_BACKEND ||
+    process.env.BACKEND_URL ||
+    ""
 
   const resolveUazapiStatus = (data: any) => {
+    if (data?.status?.connected === true || data?.status?.loggedIn === true) {
+      return "connected"
+    }
     return (
       data?.status ||
       data?.instance?.status ||
@@ -214,7 +267,7 @@ export default function ConversasPage() {
   }, [clinicId])
 
   useEffect(() => {
-    const loadMessages = async () => {
+  const loadMessages = async () => {
       if (!clinicId || !selectedSessionId || uazapiStatus !== "connected") {
         setMessages([])
         return
@@ -223,6 +276,143 @@ export default function ConversasPage() {
       setMessagesLoading(true)
 
       try {
+        const targetSessionId = testChatId || selectedSessionId
+        const chatId = targetSessionId.includes("@s.whatsapp.net")
+          ? targetSessionId
+          : `${targetSessionId}@s.whatsapp.net`
+        const pageLimit = 50
+        let offset = 0
+        let allMessages: ChatMessage[] = []
+        let isDescending: boolean | null = null
+        let pageGuard = 0
+        while (true) {
+          const historyResponse = await fetch(`${apiBaseUrl}/uazapi/message/find/${clinicId}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              chatid: chatId,
+              limit: pageLimit,
+              offset,
+            }),
+          })
+          const historyRaw = await historyResponse.text()
+          let historyJson: any = null
+          try {
+            historyJson = historyRaw ? JSON.parse(historyRaw) : null
+          } catch (parseError) {
+            logger.error("Uazapi history parse error", parseError)
+          }
+          let oldestTs: string | null = null
+          let newestTs: string | null = null
+          if (historyJson?.messages && Array.isArray(historyJson.messages)) {
+            for (const msg of historyJson.messages) {
+              const ts = normalizeUazapiTimestamp(
+                msg?.messageTimestamp ||
+                  msg?.timestamp ||
+                  msg?.created_at ||
+                  msg?.createdAt ||
+                  msg?.t ||
+                  msg?.time
+              )
+              if (!oldestTs || ts < oldestTs) oldestTs = ts
+              if (!newestTs || ts > newestTs) newestTs = ts
+            }
+          }
+          logger.info("Uazapi history raw", {
+            status: historyResponse.status,
+            body: historyRaw,
+            oldestTs,
+            newestTs,
+          })
+
+          if (!historyJson) break
+
+          const historyList =
+            historyJson?.messages ||
+            historyJson?.data?.messages ||
+            historyJson?.data ||
+            historyJson?.items ||
+            []
+          if (Array.isArray(historyList) && historyList.length) {
+            if (isDescending === null) {
+              const firstTs = normalizeUazapiTimestamp(
+                historyList[0]?.messageTimestamp ||
+                  historyList[0]?.timestamp ||
+                  historyList[0]?.created_at ||
+                  historyList[0]?.createdAt ||
+                  historyList[0]?.t ||
+                  historyList[0]?.time
+              )
+              const lastTs = normalizeUazapiTimestamp(
+                historyList[historyList.length - 1]?.messageTimestamp ||
+                  historyList[historyList.length - 1]?.timestamp ||
+                  historyList[historyList.length - 1]?.created_at ||
+                  historyList[historyList.length - 1]?.createdAt ||
+                  historyList[historyList.length - 1]?.t ||
+                  historyList[historyList.length - 1]?.time
+              )
+              isDescending = firstTs >= lastTs
+              logger.info("Uazapi history order", {
+                order: isDescending ? "desc" : "asc",
+                firstTs,
+                lastTs,
+              })
+            }
+            const mapped = historyList.map((msg: any, idx: number) => {
+              const createdAt = normalizeUazapiTimestamp(
+                msg?.messageTimestamp ||
+                  msg?.timestamp ||
+                  msg?.created_at ||
+                  msg?.createdAt ||
+                  msg?.t ||
+                  msg?.time
+              )
+              let content = msg?.text || msg?.content || msg?.message || ""
+              if (content && typeof content !== "string") {
+                content = JSON.stringify(content)
+              }
+              return {
+                id: msg?.id || `${chatId}-${offset}-${idx}`,
+                session_id: targetSessionId,
+                quem_enviou: msg?.fromMe ? "ai" : "user",
+                conteudo: content,
+                created_at: createdAt,
+              }
+            })
+            allMessages = allMessages.concat(mapped)
+            if (allMessages.length > pageLimit * 2) {
+              allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+              allMessages = allMessages.slice(-pageLimit)
+            }
+          }
+
+          const nextOffset = Number(historyJson?.nextOffset)
+          const hasMore = historyJson?.hasMore === true
+          if (isDescending && allMessages.length >= pageLimit) {
+            break
+          }
+          if ((Number.isNaN(nextOffset) || nextOffset === offset) && !hasMore) {
+            break
+          }
+          if (!Number.isNaN(nextOffset) && nextOffset !== offset) {
+            offset = nextOffset
+            pageGuard += 1
+            if (pageGuard > 200) break
+            continue
+          }
+          if (!hasMore) break
+        }
+
+        if (allMessages.length) {
+          allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+          const recent = allMessages.slice(-pageLimit)
+          setMessages(recent)
+          setMessagesLoading(false)
+          return
+        }
+
         const { data, error } = await supabase
           .from("chat_messages")
           .select("id, session_id, quem_enviou, conteudo, created_at")
@@ -232,6 +422,11 @@ export default function ConversasPage() {
 
         if (error) throw error
 
+        logger.info("Mensagens: histórico carregado", {
+          clinic_id: clinicId,
+          session_id: selectedSessionId,
+          total: data?.length || 0,
+        })
         setMessages(data || [])
       } catch (err) {
         logger.error("Erro ao carregar mensagens:", err)
@@ -260,7 +455,7 @@ export default function ConversasPage() {
         {clinicData?.id && (
           <TrialBanner clinicId={clinicData.id} blockAccess={false} />
         )}
-        <div className="grid gap-4 lg:grid-cols-[320px,1fr]">
+        <div className="grid gap-4 grid-cols-[320px_minmax(0,1fr)_320px]">
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Conversas</CardTitle>
@@ -398,6 +593,30 @@ export default function ConversasPage() {
                     )
                   })}
                 </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Contato</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {selectedConversation ? (
+                <>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Nome</div>
+                    <div className="text-base font-semibold">
+                      {selectedConversation.leadName || "Contato sem nome"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Telefone</div>
+                    <div className="text-base">{selectedConversation.sessionId}</div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-sm text-muted-foreground">Selecione uma conversa</div>
               )}
             </CardContent>
           </Card>
