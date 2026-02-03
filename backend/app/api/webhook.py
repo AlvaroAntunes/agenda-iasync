@@ -8,8 +8,10 @@ import json
 import asyncio
 import os
 import requests
+from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Request, BackgroundTasks, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from app.services.audio_service import AudioService
@@ -37,6 +39,30 @@ UAZAPI_WEBHOOK_EXCLUDES = os.getenv("UAZAPI_WEBHOOK_EXCLUDES", "wasSentByApi,isG
 
 buffer_service = BufferService()
 BUFFER_DELAY = 10  # Segundos de espera
+
+class SseManager:
+    def __init__(self):
+        self._subscribers = {}
+
+    def subscribe(self, clinic_id: str) -> asyncio.Queue:
+        queue: asyncio.Queue = asyncio.Queue()
+        self._subscribers.setdefault(clinic_id, set()).add(queue)
+        return queue
+
+    def unsubscribe(self, clinic_id: str, queue: asyncio.Queue):
+        if clinic_id in self._subscribers:
+            self._subscribers[clinic_id].discard(queue)
+            if not self._subscribers[clinic_id]:
+                del self._subscribers[clinic_id]
+
+    async def broadcast(self, clinic_id: str, message: dict):
+        for queue in list(self._subscribers.get(clinic_id, set())):
+            try:
+                queue.put_nowait(message)
+            except Exception:
+                self.unsubscribe(clinic_id, queue)
+
+sse_manager = SseManager()
 
 def get_uazapi_headers(token: str):
     return {
@@ -111,6 +137,32 @@ class MessageFindBody(BaseModel):
     track_id: Optional[str] = None
     limit: Optional[int] = None
     offset: Optional[int] = None
+
+class SendMessageBody(BaseModel):
+    type: str
+    number: str
+    text: Optional[str] = None
+    media_base64: Optional[str] = None
+    mime_type: Optional[str] = None
+    file_name: Optional[str] = None
+    caption: Optional[str] = None
+
+@router.get("/sse/clinics/{clinic_id}")
+async def clinic_sse(clinic_id: str):
+    queue = sse_manager.subscribe(clinic_id)
+
+    async def event_stream():
+        try:
+            while True:
+                try:
+                    message = await asyncio.wait_for(queue.get(), timeout=15)
+                    yield f"data: {json.dumps(message)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"
+        finally:
+            sse_manager.unsubscribe(clinic_id, queue)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 @router.post("/uazapi/instance/create/{clinic_id}")
 def create_uazapi_instance(clinic_id: str):
@@ -222,6 +274,101 @@ def find_uazapi_messages(clinic_id: str, body: MessageFindBody):
     data = response.json()
     print("📦 Resposta Uazapi message/find:", json.dumps(data, indent=2))
     return data
+
+@router.post("/uazapi/message/send/{clinic_id}")
+async def send_uazapi_message(clinic_id: str, body: SendMessageBody):
+    if not UAZAPI_URL:
+        raise HTTPException(status_code=500, detail="UAZAPI_URL não configurado")
+
+    token = get_clinic_uazapi_token(clinic_id)
+    if not token:
+        return {"status": "not_configured"}
+
+    number = (body.number or "").replace("@s.whatsapp.net", "").replace("+", "")
+    if not number:
+        raise HTTPException(status_code=400, detail="Número inválido")
+
+    msg_type = (body.type or "text").lower()
+
+    if msg_type == "text":
+        text = (body.text or "").strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Texto vazio")
+        url = f"{UAZAPI_URL}/send/text"
+        payload = {
+            "number": number,
+            "text": text,
+            "readmessages": True,
+            "delay": 1500,
+            "presence": "composing",
+            "linkPreview": False,
+        }
+        response = requests.post(url, json=payload, headers=get_uazapi_headers(token))
+        if response.status_code not in [200, 201]:
+            raise HTTPException(status_code=500, detail=response.text)
+        supabase.table('chat_messages').insert({
+            'clinic_id': clinic_id,
+            'session_id': number,
+            'quem_enviou': 'ai',
+            'conteudo': text
+        }).execute()
+        await sse_manager.broadcast(clinic_id, {
+            "type": "message",
+            "message": {
+                "id": f"send-{datetime.utcnow().timestamp()}",
+                "session_id": number,
+                "quem_enviou": "ai",
+                "conteudo": text,
+                "created_at": datetime.utcnow().isoformat() + "Z",
+            }
+        })
+        return response.json()
+
+    if msg_type not in ["image", "video", "audio", "file"]:
+        raise HTTPException(status_code=400, detail="Tipo de mensagem inválido")
+
+    if not body.media_base64:
+        raise HTTPException(status_code=400, detail="Arquivo não informado")
+
+    endpoint = "file" if msg_type == "file" else msg_type
+    url = f"{UAZAPI_URL}/send/{endpoint}"
+    payload = {
+        "number": number,
+        "base64": body.media_base64,
+        "fileName": body.file_name,
+        "mimetype": body.mime_type,
+        "caption": body.caption,
+        "readmessages": True,
+        "delay": 1500,
+        "presence": "composing",
+    }
+    response = requests.post(url, json=payload, headers=get_uazapi_headers(token))
+    if response.status_code not in [200, 201]:
+        raise HTTPException(status_code=500, detail=response.text)
+
+    label = body.caption or (
+        "[imagem]" if msg_type == "image"
+        else "[vídeo]" if msg_type == "video"
+        else "[áudio]" if msg_type == "audio"
+        else "[arquivo]"
+    )
+    supabase.table('chat_messages').insert({
+        'clinic_id': clinic_id,
+        'session_id': number,
+        'quem_enviou': 'ai',
+        'conteudo': label
+    }).execute()
+    await sse_manager.broadcast(clinic_id, {
+        "type": "message",
+        "message": {
+            "id": f"send-{datetime.utcnow().timestamp()}",
+            "session_id": number,
+            "quem_enviou": "ai",
+            "conteudo": label,
+            "created_at": datetime.utcnow().isoformat() + "Z",
+        }
+    })
+    return response.json()
 
 @router.get("/uazapi/instance/status/{clinic_id}")
 def status_uazapi_instance(clinic_id: str):
@@ -337,55 +484,12 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                 
             clinic_id = clinica_data['id']
         
-            # Verifica se IA está ativa
-            if not clinica_data.get('ia_ativa', True):
-                return {"status": "ia_disabled"}
-            
-            if clinica_data.get('saldo_tokens', 0) <= 0:
-                print(f"⚠️ Saldo de tokens insuficiente para a clínica {clinic_id}")
-                return {"status": "insufficient_balance"}
+            ia_ativa = clinica_data.get('ia_ativa', True)
+            saldo_tokens = clinica_data.get('saldo_tokens', 0)
         
         except Exception as e:
             print(f"❌ Erro ao buscar clínica no banco: {e}")
             return {"status": "db_error"}
-        
-        # 2.5. RATE LIMITING (após identificar clínica)
-        # Verifica se a clínica está bloqueada
-        is_blocked, ttl = rate_limiter.is_clinic_blocked(clinic_id)
-        if is_blocked:
-            print(f"🚫 [RateLimit] Requisição bloqueada - Clínica {clinic_id} (TTL: {ttl}s)")
-            return {
-                "status": "rate_limit_blocked",
-                "message": f"Clínica temporariamente bloqueada. Aguarde {ttl} segundos.",
-                "retry_after": ttl
-            }
-        
-        # Verifica rate limit global
-        global_allowed, global_msg = rate_limiter.check_global_rate_limit()
-        if not global_allowed:
-            print(f"🚨 [RateLimit] GLOBAL LIMIT - Requisição negada")
-            return {
-                "status": "rate_limit_global",
-                "message": global_msg
-            }
-        
-        # Verifica rate limit por clínica
-        allowed, msg = rate_limiter.check_rate_limit_per_clinic(clinic_id)
-        if not allowed:
-            print(f"⚠️ [RateLimit] Rate limit excedido - Clínica {clinic_id}")
-            return {
-                "status": "rate_limit_exceeded",
-                "message": msg
-            }
-        
-        # Verifica burst protection
-        burst_allowed, burst_msg = rate_limiter.check_burst_protection(clinic_id)
-        if not burst_allowed:
-            print(f"⚠️ [RateLimit] Burst detectado - Clínica {clinic_id}")
-            return {
-                "status": "rate_limit_burst",
-                "message": burst_msg
-            }
         
         # 3. Identificação do Cliente
         # Uazapi manda o telefone limpo ou com sufixo. Vamos limpar.
@@ -416,6 +520,11 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                     lead_payload,
                     on_conflict='clinic_id, telefone'
                 ).execute()
+                await sse_manager.broadcast(clinic_id, {
+                    "type": "lead",
+                    "telefone": telefone_cliente,
+                    "nome": None,
+                })
         except Exception as e:
             print(f"⚠️ Erro ao criar lead automaticamente: {e}")
 
@@ -456,8 +565,59 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
 
         # 6. Salvar mensagem no histórico (para aparecer nas conversas)
         HistoryService(clinic_id=clinic_id, session_id=telefone_cliente).add_user_message(texto_usuario)
+        await sse_manager.broadcast(clinic_id, {
+            "type": "message",
+            "message": {
+                "id": message_id or f"ws-{datetime.utcnow().timestamp()}",
+                "session_id": telefone_cliente,
+                "quem_enviou": "user",
+                "conteudo": texto_usuario,
+                "created_at": datetime.utcnow().isoformat() + "Z",
+            }
+        })
 
-        # 7. Buffer & Agente
+        # 7. Buffer & Agente (só se IA ativa)
+        if not ia_ativa:
+            return {"status": "ia_disabled_logged"}
+
+        if saldo_tokens <= 0:
+            print(f"⚠️ Saldo de tokens insuficiente para a clínica {clinic_id}")
+            return {"status": "insufficient_balance"}
+
+        # 7.5. RATE LIMITING (após salvar mensagem, só para IA)
+        is_blocked, ttl = rate_limiter.is_clinic_blocked(clinic_id)
+        if is_blocked:
+            print(f"🚫 [RateLimit] Requisição bloqueada - Clínica {clinic_id} (TTL: {ttl}s)")
+            return {
+                "status": "rate_limit_blocked",
+                "message": f"Clínica temporariamente bloqueada. Aguarde {ttl} segundos.",
+                "retry_after": ttl
+            }
+        
+        global_allowed, global_msg = rate_limiter.check_global_rate_limit()
+        if not global_allowed:
+            print(f"🚨 [RateLimit] GLOBAL LIMIT - Requisição negada")
+            return {
+                "status": "rate_limit_global",
+                "message": global_msg
+            }
+        
+        allowed, msg = rate_limiter.check_rate_limit_per_clinic(clinic_id)
+        if not allowed:
+            print(f"⚠️ [RateLimit] Rate limit excedido - Clínica {clinic_id}")
+            return {
+                "status": "rate_limit_exceeded",
+                "message": msg
+            }
+        
+        burst_allowed, burst_msg = rate_limiter.check_burst_protection(clinic_id)
+        if not burst_allowed:
+            print(f"⚠️ [RateLimit] Burst detectado - Clínica {clinic_id}")
+            return {
+                "status": "rate_limit_burst",
+                "message": burst_msg
+            }
+
         buffer_service.add_message(clinic_id, telefone_cliente, texto_usuario)
         devo_iniciar_timer = buffer_service.should_start_timer(clinic_id, telefone_cliente)
 

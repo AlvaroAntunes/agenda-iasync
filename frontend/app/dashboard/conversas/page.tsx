@@ -52,6 +52,10 @@ export default function ConversasPage() {
   const [uazapiStatus, setUazapiStatus] = useState("not_configured")
   const testChatId: string | null = null
   const leadNameCacheRef = useRef<Map<string, string | null>>(new Map())
+  const [replyText, setReplyText] = useState("")
+  const [replyFile, setReplyFile] = useState<File | null>(null)
+  const [replySending, setReplySending] = useState(false)
+  const [replyError, setReplyError] = useState<string | null>(null)
 
   const normalizeUazapiTimestamp = (value: any) => {
     if (!value) return new Date().toISOString()
@@ -196,7 +200,9 @@ export default function ConversasPage() {
           }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        logger.info("Realtime chat_messages status:", { status, clinicId })
+      })
 
     const leadsChannel = supabase
       .channel(`leads_${clinicId}`)
@@ -232,7 +238,9 @@ export default function ConversasPage() {
           )
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        logger.info("Realtime leads status:", { status, clinicId })
+      })
 
     return () => {
       supabase.removeChannel(messagesChannel)
@@ -332,6 +340,93 @@ export default function ConversasPage() {
     process.env.BACKEND_URL ||
     ""
 
+  const getReplyPayload = async () => {
+    if (!selectedSessionId) return null
+    if (!replyFile) {
+      const text = replyText.trim()
+      if (!text) return null
+      return { type: "text", number: selectedSessionId, text }
+    }
+    const reader = new FileReader()
+    const base64 = await new Promise<string>((resolve, reject) => {
+      reader.onload = () => resolve(String(reader.result || ""))
+      reader.onerror = () => reject(new Error("Falha ao ler arquivo"))
+      reader.readAsDataURL(replyFile)
+    })
+    const mimeType = replyFile.type || ""
+    const type = mimeType.startsWith("image/")
+      ? "image"
+      : mimeType.startsWith("video/")
+        ? "video"
+        : mimeType.startsWith("audio/")
+          ? "audio"
+          : "file"
+    return {
+      type,
+      number: selectedSessionId,
+      media_base64: base64,
+      mime_type: mimeType,
+      file_name: replyFile.name,
+      caption: replyText.trim() || undefined,
+    }
+  }
+
+  const handleSendReply = async () => {
+    if (!clinicId || !selectedSessionId || !apiBaseUrl || replySending) return
+    setReplyError(null)
+    try {
+      const payload = await getReplyPayload()
+      if (!payload) return
+      setReplySending(true)
+      const response = await fetch(`${apiBaseUrl}/uazapi/message/send/${clinicId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data?.detail || "Erro ao enviar mensagem")
+      }
+      const nowIso = new Date().toISOString()
+      if (payload.type === "text") {
+        const optimisticMessage: ChatMessage = {
+          id: `local-${nowIso}`,
+          session_id: selectedSessionId,
+          quem_enviou: "ai",
+          conteudo: payload.text,
+          created_at: nowIso,
+        }
+        setMessages((prev) => [...prev, optimisticMessage])
+      } else {
+        const label =
+          payload.type === "image"
+            ? "[imagem]"
+            : payload.type === "video"
+              ? "[vídeo]"
+              : payload.type === "audio"
+                ? "[áudio]"
+                : "[arquivo]"
+        const optimisticMessage: ChatMessage = {
+          id: `local-${nowIso}`,
+          session_id: selectedSessionId,
+          quem_enviou: "ai",
+          conteudo: payload.caption || label,
+          created_at: nowIso,
+        }
+        setMessages((prev) => [...prev, optimisticMessage])
+      }
+      setReplyText("")
+      setReplyFile(null)
+    } catch (err: any) {
+      logger.error("Erro ao enviar resposta:", err)
+      setReplyError(err?.message || "Erro ao enviar resposta")
+    } finally {
+      setReplySending(false)
+    }
+  }
+
   const resolveUazapiStatus = (data: any) => {
     if (data?.status?.connected === true || data?.status?.loggedIn === true) {
       return "connected"
@@ -385,166 +480,258 @@ export default function ConversasPage() {
   }, [clinicId])
 
   useEffect(() => {
-  const loadMessages = async () => {
-      if (!clinicId || !selectedSessionId || uazapiStatus !== "connected") {
+    if (!clinicId) return
+    if (typeof window === "undefined") return
+
+    const baseUrl = apiBaseUrl || window.location.origin
+    let sseUrl = baseUrl
+    try {
+      const url = new URL(baseUrl)
+      url.pathname = `/sse/clinics/${clinicId}`
+      sseUrl = url.toString()
+    } catch (err) {
+      logger.error("Erro ao montar URL SSE:", err)
+      return
+    }
+
+    let eventSource: EventSource | null = null
+    let reconnectTimer: NodeJS.Timeout | null = null
+
+    const connect = () => {
+      eventSource = new EventSource(sseUrl)
+      eventSource.onopen = () => {
+        logger.info("SSE conectado", { clinicId })
+      }
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data)
+          if (payload?.type === "message" && payload.message) {
+            const incoming = payload.message as ChatMessage
+            const sessionId = incoming.session_id
+            setConversations((prev) => {
+              const existing = prev.find((conversation) => conversation.sessionId === sessionId)
+              const leadName = leadNameCacheRef.current.get(sessionId) ?? existing?.leadName ?? null
+              const updated: Conversation = {
+                sessionId,
+                lastMessage: incoming.conteudo,
+                lastSender: incoming.quem_enviou,
+                lastAt: incoming.created_at,
+                leadName,
+              }
+              const next = existing
+                ? prev.map((conversation) => (conversation.sessionId === sessionId ? updated : conversation))
+                : [updated, ...prev]
+              next.sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime())
+              return next
+            })
+
+            if (selectedSessionId === sessionId) {
+              setMessages((prev) => {
+                if (prev.some((msg) => msg.id === incoming.id)) return prev
+                const next = [...prev, incoming]
+                next.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                return next
+              })
+            }
+          }
+          if (payload?.type === "lead" && payload.telefone) {
+            leadNameCacheRef.current.set(payload.telefone, payload.nome ?? null)
+            setConversations((prev) =>
+              prev.map((conversation) =>
+                conversation.sessionId === payload.telefone
+                  ? { ...conversation, leadName: payload.nome ?? null }
+                  : conversation
+              )
+            )
+          }
+        } catch (err) {
+          logger.error("Erro ao processar SSE payload:", err)
+        }
+      }
+      eventSource.onerror = (event) => {
+        logger.warn("SSE desconectado", { clinicId, event })
+        eventSource?.close()
+        reconnectTimer = setTimeout(connect, 3000)
+      }
+    }
+
+    connect()
+
+    return () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      eventSource?.close()
+    }
+  }, [clinicId, apiBaseUrl, selectedSessionId])
+
+  useEffect(() => {
+    let running = false
+
+    const loadMessages = async () => {
+      if (!clinicId || !selectedSessionId) {
         setMessages([])
         return
       }
+      if (running) return
+      running = true
 
       setMessagesLoading(true)
 
       try {
         const targetSessionId = testChatId || selectedSessionId
-        const chatId = targetSessionId.includes("@s.whatsapp.net")
-          ? targetSessionId
-          : `${targetSessionId}@s.whatsapp.net`
-        const pageLimit = 50
-        let offset = 0
-        let allMessages: ChatMessage[] = []
-        let isDescending: boolean | null = null
-        let pageGuard = 0
-        while (true) {
-          const historyResponse = await fetch(`${apiBaseUrl}/uazapi/message/find/${clinicId}`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              chatid: chatId,
-              limit: pageLimit,
-              offset,
-            }),
-          })
-          const historyRaw = await historyResponse.text()
-          if (!historyResponse.ok) {
-            logger.error("Uazapi history request error", {
-              status: historyResponse.status,
-              body: historyRaw,
-              clinicId,
-              sessionId: targetSessionId,
-            })
-          }
-          let historyJson: any = null
-          try {
-            historyJson = historyRaw ? JSON.parse(historyRaw) : null
-          } catch (parseError) {
-            logger.error("Uazapi history parse error", parseError)
-          }
-          if (historyJson?.status === "error" || historyJson?.detail || historyJson?.error) {
-            logger.error("Uazapi history response error", {
-              status: historyResponse.status,
-              response: historyJson,
-              clinicId,
-              sessionId: targetSessionId,
-            })
-          }
-          let oldestTs: string | null = null
-          let newestTs: string | null = null
-          if (historyJson?.messages && Array.isArray(historyJson.messages)) {
-            for (const msg of historyJson.messages) {
-              const ts = normalizeUazapiTimestamp(
-                msg?.messageTimestamp ||
-                  msg?.timestamp ||
-                  msg?.created_at ||
-                  msg?.createdAt ||
-                  msg?.t ||
-                  msg?.time
-              )
-              if (!oldestTs || ts < oldestTs) oldestTs = ts
-              if (!newestTs || ts > newestTs) newestTs = ts
-            }
-          }
-          logger.info("Uazapi history raw", {
-            status: historyResponse.status,
-            body: historyRaw,
-            oldestTs,
-            newestTs,
-          })
+        const shouldFetchUazapi = uazapiStatus === "connected" && apiBaseUrl
 
-          if (!historyJson) break
-
-          const historyList =
-            historyJson?.messages ||
-            historyJson?.data?.messages ||
-            historyJson?.data ||
-            historyJson?.items ||
-            []
-          if (Array.isArray(historyList) && historyList.length) {
-            if (isDescending === null) {
-              const firstTs = normalizeUazapiTimestamp(
-                historyList[0]?.messageTimestamp ||
-                  historyList[0]?.timestamp ||
-                  historyList[0]?.created_at ||
-                  historyList[0]?.createdAt ||
-                  historyList[0]?.t ||
-                  historyList[0]?.time
-              )
-              const lastTs = normalizeUazapiTimestamp(
-                historyList[historyList.length - 1]?.messageTimestamp ||
-                  historyList[historyList.length - 1]?.timestamp ||
-                  historyList[historyList.length - 1]?.created_at ||
-                  historyList[historyList.length - 1]?.createdAt ||
-                  historyList[historyList.length - 1]?.t ||
-                  historyList[historyList.length - 1]?.time
-              )
-              isDescending = firstTs >= lastTs
-              logger.info("Uazapi history order", {
-                order: isDescending ? "desc" : "asc",
-                firstTs,
-                lastTs,
+        if (shouldFetchUazapi) {
+          const chatId = targetSessionId.includes("@s.whatsapp.net")
+            ? targetSessionId
+            : `${targetSessionId}@s.whatsapp.net`
+          const pageLimit = 50
+          let offset = 0
+          let allMessages: ChatMessage[] = []
+          let isDescending: boolean | null = null
+          let pageGuard = 0
+          while (true) {
+            const historyResponse = await fetch(`${apiBaseUrl}/uazapi/message/find/${clinicId}`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                chatid: chatId,
+                limit: pageLimit,
+                offset,
+              }),
+            })
+            const historyRaw = await historyResponse.text()
+            if (!historyResponse.ok) {
+              logger.error("Uazapi history request error", {
+                status: historyResponse.status,
+                body: historyRaw,
+                clinicId,
+                sessionId: targetSessionId,
               })
             }
-            const mapped = historyList.map((msg: any, idx: number) => {
-              const createdAt = normalizeUazapiTimestamp(
-                msg?.messageTimestamp ||
-                  msg?.timestamp ||
-                  msg?.created_at ||
-                  msg?.createdAt ||
-                  msg?.t ||
-                  msg?.time
-              )
-              let content = msg?.text || msg?.content || msg?.message || ""
-              if (content && typeof content !== "string") {
-                content = JSON.stringify(content)
-              }
-              return {
-                id: msg?.id || `${chatId}-${offset}-${idx}`,
-                session_id: targetSessionId,
-                quem_enviou: msg?.fromMe ? "ai" : "user",
-                conteudo: content,
-                created_at: createdAt,
-              }
-            })
-            allMessages = allMessages.concat(mapped)
-            if (allMessages.length > pageLimit * 2) {
-              allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-              allMessages = allMessages.slice(-pageLimit)
+            let historyJson: any = null
+            try {
+              historyJson = historyRaw ? JSON.parse(historyRaw) : null
+            } catch (parseError) {
+              logger.error("Uazapi history parse error", parseError)
             }
+            if (historyJson?.status === "error" || historyJson?.detail || historyJson?.error) {
+              logger.error("Uazapi history response error", {
+                status: historyResponse.status,
+                response: historyJson,
+                clinicId,
+                sessionId: targetSessionId,
+              })
+            }
+            let oldestTs: string | null = null
+            let newestTs: string | null = null
+            if (historyJson?.messages && Array.isArray(historyJson.messages)) {
+              for (const msg of historyJson.messages) {
+                const ts = normalizeUazapiTimestamp(
+                  msg?.messageTimestamp ||
+                    msg?.timestamp ||
+                    msg?.created_at ||
+                    msg?.createdAt ||
+                    msg?.t ||
+                    msg?.time
+                )
+                if (!oldestTs || ts < oldestTs) oldestTs = ts
+                if (!newestTs || ts > newestTs) newestTs = ts
+              }
+            }
+            logger.info("Uazapi history raw", {
+              status: historyResponse.status,
+              body: historyRaw,
+              oldestTs,
+              newestTs,
+            })
+
+            if (!historyJson) break
+
+            const historyList =
+              historyJson?.messages ||
+              historyJson?.data?.messages ||
+              historyJson?.data ||
+              historyJson?.items ||
+              []
+            if (Array.isArray(historyList) && historyList.length) {
+              if (isDescending === null) {
+                const firstTs = normalizeUazapiTimestamp(
+                  historyList[0]?.messageTimestamp ||
+                    historyList[0]?.timestamp ||
+                    historyList[0]?.created_at ||
+                    historyList[0]?.createdAt ||
+                    historyList[0]?.t ||
+                    historyList[0]?.time
+                )
+                const lastTs = normalizeUazapiTimestamp(
+                  historyList[historyList.length - 1]?.messageTimestamp ||
+                    historyList[historyList.length - 1]?.timestamp ||
+                    historyList[historyList.length - 1]?.created_at ||
+                    historyList[historyList.length - 1]?.createdAt ||
+                    historyList[historyList.length - 1]?.t ||
+                    historyList[historyList.length - 1]?.time
+                )
+                isDescending = firstTs >= lastTs
+                logger.info("Uazapi history order", {
+                  order: isDescending ? "desc" : "asc",
+                  firstTs,
+                  lastTs,
+                })
+              }
+              const mapped = historyList.map((msg: any, idx: number) => {
+                const createdAt = normalizeUazapiTimestamp(
+                  msg?.messageTimestamp ||
+                    msg?.timestamp ||
+                    msg?.created_at ||
+                    msg?.createdAt ||
+                    msg?.t ||
+                    msg?.time
+                )
+                let content = msg?.text || msg?.content || msg?.message || ""
+                if (content && typeof content !== "string") {
+                  content = JSON.stringify(content)
+                }
+                return {
+                  id: msg?.id || `${chatId}-${offset}-${idx}`,
+                  session_id: targetSessionId,
+                  quem_enviou: msg?.fromMe ? "ai" : "user",
+                  conteudo: content,
+                  created_at: createdAt,
+                }
+              })
+              allMessages = allMessages.concat(mapped)
+              if (allMessages.length > pageLimit * 2) {
+                allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                allMessages = allMessages.slice(-pageLimit)
+              }
+            }
+
+            const nextOffset = Number(historyJson?.nextOffset)
+            const hasMore = historyJson?.hasMore === true
+            if (isDescending && allMessages.length >= pageLimit) {
+              break
+            }
+            if ((Number.isNaN(nextOffset) || nextOffset === offset) && !hasMore) {
+              break
+            }
+            if (!Number.isNaN(nextOffset) && nextOffset !== offset) {
+              offset = nextOffset
+              pageGuard += 1
+              if (pageGuard > 200) break
+              continue
+            }
+            if (!hasMore) break
           }
 
-          const nextOffset = Number(historyJson?.nextOffset)
-          const hasMore = historyJson?.hasMore === true
-          if (isDescending && allMessages.length >= pageLimit) {
-            break
+          if (allMessages.length) {
+            allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+            const recent = allMessages.slice(-pageLimit)
+            setMessages(recent)
+            setMessagesLoading(false)
+            return
           }
-          if ((Number.isNaN(nextOffset) || nextOffset === offset) && !hasMore) {
-            break
-          }
-          if (!Number.isNaN(nextOffset) && nextOffset !== offset) {
-            offset = nextOffset
-            pageGuard += 1
-            if (pageGuard > 200) break
-            continue
-          }
-          if (!hasMore) break
-        }
-
-        if (allMessages.length) {
-          allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-          const recent = allMessages.slice(-pageLimit)
-          setMessages(recent)
-          setMessagesLoading(false)
-          return
         }
 
         const { data, error } = await supabase
@@ -566,6 +753,7 @@ export default function ConversasPage() {
         logger.error("Erro ao carregar mensagens:", err)
       } finally {
         setMessagesLoading(false)
+        running = false
       }
     }
 
@@ -697,18 +885,18 @@ export default function ConversasPage() {
                   Nenhuma mensagem encontrada
                 </div>
               ) : (
-                <div className="space-y-3 max-h-[560px] overflow-y-auto pr-2">
+                <div className="space-y-3 max-h-[520px] overflow-y-auto pr-2">
                   {messages.map((message) => {
-                    const isUser = message.quem_enviou === "user"
+                    const isAgent = message.quem_enviou === "ai"
                     return (
                       <div
                         key={message.id}
-                        className={cn("flex", isUser ? "justify-end" : "justify-start")}
+                        className={cn("flex", isAgent ? "justify-end" : "justify-start")}
                       >
                         <div
                           className={cn(
                             "max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm",
-                            isUser
+                            isAgent
                               ? "bg-emerald-500 text-white"
                               : "bg-muted text-foreground"
                           )}
@@ -717,7 +905,7 @@ export default function ConversasPage() {
                           <div
                             className={cn(
                               "mt-1 text-[10px]",
-                              isUser ? "text-emerald-50/80" : "text-muted-foreground"
+                              isAgent ? "text-emerald-50/80" : "text-muted-foreground"
                             )}
                           >
                             {format(new Date(message.created_at), "dd/MM HH:mm", { locale: ptBR })}
@@ -726,6 +914,60 @@ export default function ConversasPage() {
                       </div>
                     )
                   })}
+                </div>
+              )}
+              {uazapiStatus === "connected" && (
+                <div className="mt-4 border-t border-border/70 pt-3">
+                  <div className="flex items-center gap-2">
+                    <label
+                      className={cn(
+                        "rounded-lg border border-border/70 px-3 py-2 text-xs text-muted-foreground transition",
+                        replySending ? "opacity-60" : "cursor-pointer hover:border-primary/60"
+                      )}
+                    >
+                      Anexo
+                      <input
+                        type="file"
+                        accept="image/*,video/*,audio/*"
+                        className="hidden"
+                        disabled={replySending}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] || null
+                          setReplyFile(file)
+                        }}
+                      />
+                    </label>
+                    <div className="flex-1">
+                      <input
+                        className="w-full rounded-lg border border-border/70 bg-background px-3 py-2 text-sm outline-none transition focus:border-primary/60"
+                        placeholder="Digite uma mensagem..."
+                        value={replyText}
+                        onChange={(event) => setReplyText(event.target.value)}
+                        disabled={replySending || !selectedSessionId}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && !event.shiftKey) {
+                            event.preventDefault()
+                            handleSendReply()
+                          }
+                        }}
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleSendReply}
+                      disabled={replySending || !selectedSessionId || (!replyText.trim() && !replyFile)}
+                    >
+                      {replySending ? "Enviando..." : "Enviar"}
+                    </Button>
+                  </div>
+                  {replyFile && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Anexo: {replyFile.name}
+                    </div>
+                  )}
+                  {replyError && (
+                    <div className="mt-2 text-xs text-red-500">{replyError}</div>
+                  )}
                 </div>
               )}
             </CardContent>
