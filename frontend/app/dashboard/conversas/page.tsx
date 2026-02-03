@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { ClinicHeader } from "@/components/Header"
@@ -51,6 +51,7 @@ export default function ConversasPage() {
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [uazapiStatus, setUazapiStatus] = useState("not_configured")
   const testChatId: string | null = null
+  const leadNameCacheRef = useRef<Map<string, string | null>>(new Map())
 
   const normalizeUazapiTimestamp = (value: any) => {
     if (!value) return new Date().toISOString()
@@ -121,6 +122,123 @@ export default function ConversasPage() {
 
     checkAuth()
   }, [router])
+
+  useEffect(() => {
+    if (!clinicId) return
+
+    const fetchLeadName = async (sessionId: string) => {
+      if (leadNameCacheRef.current.has(sessionId)) return
+      try {
+        const { data, error } = await supabase
+          .from("leads")
+          .select("nome")
+          .eq("clinic_id", clinicId)
+          .eq("telefone", sessionId)
+          .single()
+        if (error) throw error
+        const nome = data?.nome ?? null
+        leadNameCacheRef.current.set(sessionId, nome)
+        setConversations((prev) =>
+          prev.map((conversation) =>
+            conversation.sessionId === sessionId
+              ? { ...conversation, leadName: nome }
+              : conversation
+          )
+        )
+      } catch (err) {
+        logger.error("Erro ao buscar lead para conversa:", err)
+      }
+    }
+
+    const messagesChannel = supabase
+      .channel(`chat_messages_${clinicId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "chat_messages", filter: `clinic_id=eq.${clinicId}` },
+        (payload) => {
+          const newMessage = payload.new as ChatMessage & { clinic_id: string }
+          if (!newMessage?.session_id) return
+
+          setConversations((prev) => {
+            const existing = prev.find((conversation) => conversation.sessionId === newMessage.session_id)
+            const leadName = leadNameCacheRef.current.get(newMessage.session_id) ?? existing?.leadName ?? null
+            const updated: Conversation = {
+              sessionId: newMessage.session_id,
+              lastMessage: newMessage.conteudo,
+              lastSender: newMessage.quem_enviou,
+              lastAt: newMessage.created_at,
+              leadName,
+            }
+            const next = existing
+              ? prev.map((conversation) =>
+                  conversation.sessionId === newMessage.session_id ? updated : conversation
+                )
+              : [updated, ...prev]
+            next.sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime())
+            return next
+          })
+
+          if (!selectedSessionId) {
+            setSelectedSessionId(newMessage.session_id)
+          }
+
+          if (selectedSessionId === newMessage.session_id) {
+            setMessages((prev) => {
+              if (prev.some((msg) => msg.id === newMessage.id)) return prev
+              const next = [...prev, newMessage]
+              next.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+              return next
+            })
+          }
+
+          if (!leadNameCacheRef.current.has(newMessage.session_id)) {
+            fetchLeadName(newMessage.session_id)
+          }
+        }
+      )
+      .subscribe()
+
+    const leadsChannel = supabase
+      .channel(`leads_${clinicId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "leads", filter: `clinic_id=eq.${clinicId}` },
+        (payload) => {
+          const lead = payload.new as { telefone?: string | null; nome?: string | null }
+          if (!lead?.telefone) return
+          leadNameCacheRef.current.set(lead.telefone, lead.nome ?? null)
+          setConversations((prev) =>
+            prev.map((conversation) =>
+              conversation.sessionId === lead.telefone
+                ? { ...conversation, leadName: lead.nome ?? null }
+                : conversation
+            )
+          )
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "leads", filter: `clinic_id=eq.${clinicId}` },
+        (payload) => {
+          const lead = payload.new as { telefone?: string | null; nome?: string | null }
+          if (!lead?.telefone) return
+          leadNameCacheRef.current.set(lead.telefone, lead.nome ?? null)
+          setConversations((prev) =>
+            prev.map((conversation) =>
+              conversation.sessionId === lead.telefone
+                ? { ...conversation, leadName: lead.nome ?? null }
+                : conversation
+            )
+          )
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(messagesChannel)
+      supabase.removeChannel(leadsChannel)
+    }
+  }, [clinicId, selectedSessionId, supabase])
 
   const loadConversations = async (clinic: string) => {
     setLoading(true)
@@ -298,11 +416,27 @@ export default function ConversasPage() {
             }),
           })
           const historyRaw = await historyResponse.text()
+          if (!historyResponse.ok) {
+            logger.error("Uazapi history request error", {
+              status: historyResponse.status,
+              body: historyRaw,
+              clinicId,
+              sessionId: targetSessionId,
+            })
+          }
           let historyJson: any = null
           try {
             historyJson = historyRaw ? JSON.parse(historyRaw) : null
           } catch (parseError) {
             logger.error("Uazapi history parse error", parseError)
+          }
+          if (historyJson?.status === "error" || historyJson?.detail || historyJson?.error) {
+            logger.error("Uazapi history response error", {
+              status: historyResponse.status,
+              response: historyJson,
+              clinicId,
+              sessionId: targetSessionId,
+            })
           }
           let oldestTs: string | null = null
           let newestTs: string | null = null

@@ -50,6 +50,46 @@ def get_uazapi_admin_headers(token: str):
         "admintoken": token.strip() if token else token
     }
 
+def configure_uazapi_webhook(token: str):
+    if not UAZAPI_WEBHOOK_URL:
+        print("⚠️ UAZAPI_WEBHOOK_URL não configurado; webhook não será definido.")
+        return False
+    try:
+        webhook_url = f"{UAZAPI_URL}/webhook"
+        events = [e.strip() for e in UAZAPI_WEBHOOK_EVENTS.split(",") if e.strip()]
+        excludes = [e.strip() for e in UAZAPI_WEBHOOK_EXCLUDES.split(",") if e.strip()]
+        webhook_payload = {
+            "enabled": True,
+            "url": UAZAPI_WEBHOOK_URL,
+            "events": events,
+            "excludeMessages": excludes,
+        }
+        webhook_resp = requests.post(
+            webhook_url,
+            json=webhook_payload,
+            headers=get_uazapi_headers(token),
+        )
+        if webhook_resp.status_code in [200, 201]:
+            print("✅ Webhook Uazapi configurado com sucesso.")
+            return True
+        print(
+            "❌ Uazapi webhook erro:",
+            json.dumps(
+                {
+                    "status_code": webhook_resp.status_code,
+                    "error": webhook_resp.text,
+                    "request": {
+                        "url": webhook_url,
+                        "body": webhook_payload,
+                    },
+                },
+                indent=2,
+            ),
+        )
+    except Exception as e:
+        print(f"⚠️ Erro ao configurar webhook: {e}")
+    return False
+
 def get_clinic_uazapi_token(clinic_id: str):
     try:
         resp = supabase.table('clinicas')\
@@ -80,7 +120,8 @@ def create_uazapi_instance(clinic_id: str):
 
     existing_token = get_clinic_uazapi_token(clinic_id)
     if existing_token:
-        return {"status": "already_created", "token": existing_token}
+        webhook_ok = configure_uazapi_webhook(existing_token)
+        return {"status": "already_created", "token": existing_token, "webhook_configured": webhook_ok}
 
     url = f"{UAZAPI_URL}/instance/init"
     body = {
@@ -135,39 +176,7 @@ def create_uazapi_instance(clinic_id: str):
         raise HTTPException(status_code=500, detail=str(update_resp.error))
 
     # Configurar webhook da instância automaticamente
-    if UAZAPI_WEBHOOK_URL:
-        try:
-            webhook_url = f"{UAZAPI_URL}/webhook"
-            events = [e.strip() for e in UAZAPI_WEBHOOK_EVENTS.split(",") if e.strip()]
-            excludes = [e.strip() for e in UAZAPI_WEBHOOK_EXCLUDES.split(",") if e.strip()]
-            webhook_payload = {
-                "enabled": True,
-                "url": UAZAPI_WEBHOOK_URL,
-                "events": events,
-                "excludeMessages": excludes,
-            }
-            webhook_resp = requests.post(
-                webhook_url,
-                json=webhook_payload,
-                headers=get_uazapi_headers(token),
-            )
-            if webhook_resp.status_code not in [200, 201]:
-                print(
-                    "❌ Uazapi webhook erro:",
-                    json.dumps(
-                        {
-                            "status_code": webhook_resp.status_code,
-                            "error": webhook_resp.text,
-                            "request": {
-                                "url": webhook_url,
-                                "body": webhook_payload,
-                            },
-                        },
-                        indent=2,
-                    ),
-                )
-        except Exception as e:
-            print(f"⚠️ Erro ao configurar webhook: {e}")
+    configure_uazapi_webhook(token)
 
     return {"status": "created", "token": token, "data": data}
 
@@ -191,6 +200,7 @@ def connect_uazapi_instance(clinic_id: str, body: ConnectInstanceBody):
 
     data = response.json()
     print("📦 Resposta Uazapi connect:", json.dumps(data, indent=2))
+    configure_uazapi_webhook(token)
     return data
 
 @router.post("/uazapi/message/find/{clinic_id}")
