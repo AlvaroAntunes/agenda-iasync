@@ -95,6 +95,8 @@ export default function SettingsPage() {
     external_calendar_id: 'primary'
   })
   const [calendars, setCalendars] = useState<{ id: string, summary: string }[]>([])
+  const [pendingSwitchDate, setPendingSwitchDate] = useState<string | null>(null)
+  const [pendingPlanName, setPendingPlanName] = useState<string | null>(null)
 
   useEffect(() => {
     checkAuthAndLoadClinic()
@@ -118,6 +120,21 @@ export default function SettingsPage() {
       if (profileError || !profile || profile.role !== 'clinic_admin') {
         router.push('/')
         return
+      }
+
+
+      // --- SYNC SUBSCRIPTION (DELAYED DOWNGRADE) ---
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL
+        const syncRes = await fetch(`${apiUrl}/subscriptions/sync/${profile.clinic_id}`, { method: 'POST' })
+        const syncData = await syncRes.json()
+
+        if (syncData.status === 'waiting' && syncData.switch_date) {
+          setPendingSwitchDate(new Date(syncData.switch_date).toLocaleDateString('pt-BR'))
+          if (syncData.new_plan_name) setPendingPlanName(syncData.new_plan_name)
+        }
+      } catch (e) {
+        console.error("Sync error", e)
       }
 
       const { data: clinic, error: clinicError } = await supabase
@@ -529,6 +546,20 @@ export default function SettingsPage() {
     return <ClinicLoading />
   }
 
+  type PlanType = 'consultorio' | 'clinica_pro' | 'corporate'
+  
+  const getPlanLabel = (plan?: string) => {
+    const labels: Record<PlanType, string> = {
+      consultorio: 'Consultório',
+      clinica_pro: 'Clínica Pro',
+      corporate: 'Corporate',
+    }
+
+    return plan && plan in labels
+      ? labels[plan as PlanType]
+      : labels.consultorio
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">
       {/* Background Decorativo */}
@@ -699,6 +730,23 @@ export default function SettingsPage() {
 
             {/* Seção de Plano Refatorada */}
             <div className="mt-8 pt-8 border-t border-slate-100">
+
+              {/* Alert de Troca Pendente */}
+              {pendingSwitchDate && (
+                <div className="mb-6 p-4 rounded-xl border border-amber-200 bg-amber-50 flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-2">
+                  <div className="p-2 bg-white rounded-full text-amber-500 shadow-sm border border-amber-100">
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-amber-900 font-bold mb-1">Mudança de Plano Agendada</h4>
+                    <p className="text-amber-700 text-sm leading-relaxed">
+                      Sua solicitação de mudança para o plano <strong>{getPlanLabel(pendingPlanName || 'consultorio')}</strong> foi processada.
+                      O novo plano entrará em vigor automaticamente em <strong>{pendingSwitchDate}</strong>, ao final do ciclo atual.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <Label className="mb-4 text-lg font-bold text-slate-900">Sua Assinatura</Label>
 
               <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-200 p-6 relative overflow-hidden group hover:border-cyan-200 transition-colors duration-300">
@@ -836,20 +884,20 @@ export default function SettingsPage() {
                             <AlertTriangle className="h-5 w-5 text-amber-500" />
                             Alteração de Plano
                           </DialogTitle>
-                          <DialogDescription className="pt-2 text-slate-600 text-left space-y-3">
-                            <p>
-                              Antes de continuar, é importante saber como funciona a mudança:
-                            </p>
-                            <ul className="list-disc pl-4 space-y-1">
-                              <li>
-                                <strong>Upgrade (Plano Superior):</strong> A mudança é imediata. O valor do novo plano será cobrado integralmente e os dias restantes do plano atual não são abatidos (sem pró-rata).
-                              </li>
-                              <li>
-                                <strong>Downgrade (Plano Inferior):</strong> A alteração será agendada e só entrará em vigor no final do ciclo atual da sua assinatura.
-                              </li>
-                            </ul>
-                          </DialogDescription>
                         </DialogHeader>
+                        <div className="py-4 text-slate-600 text-sm space-y-3">
+                          <p>
+                            Antes de continuar, é importante saber como funciona a mudança:
+                          </p>
+                          <ul className="list-disc pl-4 space-y-1">
+                            <li>
+                              <strong>Upgrade (Plano Superior):</strong> A mudança é imediata. O valor do novo plano será cobrado integralmente e os dias restantes do plano atual não são abatidos (sem pró-rata).
+                            </li>
+                            <li>
+                              <strong>Downgrade (Plano Inferior):</strong> A alteração será agendada e só entrará em vigor no final do ciclo atual da sua assinatura.
+                            </li>
+                          </ul>
+                        </div>
                         <DialogFooter>
                           <Button
                             onClick={() => {
@@ -1215,8 +1263,8 @@ export default function SettingsPage() {
           </DialogContent>
         </Dialog>
 
-      </main>
-    </div>
+      </main >
+    </div >
   )
 }
 

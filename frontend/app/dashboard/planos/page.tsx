@@ -65,6 +65,16 @@ export default function PlanosPage() {
         return
       }
 
+
+
+      // --- SYNC SUBSCRIPTION (DELAYED DOWNGRADE) ---
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
+        await fetch(`${apiUrl}/subscriptions/sync/${profile.clinic_id}`, { method: 'POST' })
+      } catch (e) {
+        console.error("Sync error", e)
+      }
+
       const { data: clinicData, error: clinicError } = await supabase
         .from('clinicas')
         .select(`
@@ -125,10 +135,14 @@ export default function PlanosPage() {
           const res = await fetch(`${apiUrl}/checkout/status/${clinic.id}`);
           const data = await res.json();
 
-          if (data.status === 'ativa' || data.status === 'active') {
+          // O endpoint /checkout/status retorna o status da última sessão
+          // Se for 'pago' (Upgrade) ou 'esperando_troca' (Downgrade), redirecionamos
+          if (data.status === 'pago' || data.status === 'active' || data.status === 'ativa' || data.status === 'esperando_troca') {
             clearInterval(interval);
             setIsWaitingPayment(false);
-            window.location.href = "/dashboard";
+            // Se for esperando_troca, melhor ir para settings para ver o aviso
+            const redirectUrl = data.status === 'esperando_troca' ? "/dashboard/settings" : "/dashboard";
+            window.location.href = redirectUrl;
           }
         } catch (error) {
           console.error("Polling error", error);
@@ -276,20 +290,20 @@ export default function PlanosPage() {
                 <AlertTriangle className="h-5 w-5 text-amber-500" />
                 Alteração de Plano
               </DialogTitle>
-              <DialogDescription className="pt-2 text-slate-600 text-left space-y-3">
-                <p>
-                  Antes de continuar, é importante saber como funciona a mudança:
-                </p>
-                <ul className="list-disc pl-4 space-y-1">
-                  <li>
-                    <strong>Upgrade (Plano Superior):</strong> A mudança é imediata. O valor do novo plano será cobrado integralmente e os dias restantes do plano atual não são abatidos (sem pró-rata).
-                  </li>
-                  <li>
-                    <strong>Downgrade (Plano Inferior):</strong> A alteração será agendada e só entrará em vigor no final do ciclo atual da sua assinatura.
-                  </li>
-                </ul>
-              </DialogDescription>
             </DialogHeader>
+            <div className="py-4 text-slate-600 text-sm space-y-3">
+              <p>
+                Antes de continuar, é importante saber como funciona a mudança:
+              </p>
+              <ul className="list-disc pl-4 space-y-1">
+                <li>
+                  <strong>Upgrade (Plano Superior):</strong> A mudança é imediata. O valor do novo plano será cobrado integralmente e os dias restantes do plano atual não são abatidos (sem pró-rata).
+                </li>
+                <li>
+                  <strong>Downgrade (Plano Inferior):</strong> A alteração será agendada e só entrará em vigor no final do ciclo atual da sua assinatura.
+                </li>
+              </ul>
+            </div>
             <DialogFooter>
               <Button
                 onClick={() => {
@@ -306,6 +320,6 @@ export default function PlanosPage() {
           </DialogContent>
         </Dialog>
       </main>
-    </div>
+    </div >
   )
 }

@@ -18,6 +18,7 @@ from app.api.admin_rate_limit import router as admin_rate_limit_router
 from app.api.admin_auth import router as admin_auth_router
 from app.api.payments import router as payments_router
 from app.api.calendars import router as calendars_router
+from app.api.subscriptions import router as subscriptions_router
 from app.core.database import get_supabase
 
 load_dotenv()  # Carrega variáveis do .env
@@ -67,6 +68,7 @@ app.include_router(admin_rate_limit_router, tags=["Admin - Rate Limiting"])
 app.include_router(payments_router, tags=["Pagamentos"])
 app.include_router(webhook_asaas_router, tags=["Pagamentos"])
 app.include_router(calendars_router, tags=["Calendários"])
+app.include_router(subscriptions_router, tags=["Assinaturas"])
 
 @app.get("/")
 def root():

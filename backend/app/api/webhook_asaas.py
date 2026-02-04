@@ -1,7 +1,7 @@
 import os
 import datetime as dt
 from dateutil.relativedelta import relativedelta
-from fastapi import APIRouter, Request, Header, HTTPException
+from fastapi import APIRouter, Request, Header, HTTPException, Body
 from dotenv import load_dotenv
 from app.core.database import get_supabase
 from app.services.payment_service import cancelar_assinatura_asaas
@@ -16,20 +16,31 @@ supabase = get_supabase()
 # Token de segurança definido no Painel do Asaas
 ASAAS_WEBHOOK_TOKEN = os.getenv("ASAAS_WEBHOOK_TOKEN")
 
+PLAN_HIERARCHY = {
+    'trial': 0,
+    'consultorio': 1,
+    'clinica_pro': 2,
+    'corporate': 3
+}
+
 @router.post("/webhook/asaas")
-async def asaas_webhook(request: Request, asaas_access_token: str = Header(None)):
+def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(None)):
     """
     Recebe notificações de pagamento do Asaas.
     Gerencia o ciclo de vida via tabela checkout_sessions e assinaturas.
     Status usados: ativa, inativa, cancelada, pendente, pago.
+    
+    NOTA: Definido como 'def' (síncrono) para que o FastAPI execute em threadpool,
+    já que as chamadas de DB e Requests são bloqueantes.
     """
     
     # 1. Validação de Segurança
     if ASAAS_WEBHOOK_TOKEN and asaas_access_token != ASAAS_WEBHOOK_TOKEN:
-        print(f"⚠️ Tentativa de webhook inválida. Token recebido: {asaas_access_token}")
+        print(f"⛔ Webhook Bloqueado: Token inválido: {asaas_access_token}")
+        raise HTTPException(status_code=401, detail="Invalid Access Token")
 
     try:
-        payload = await request.json()
+        # payload já vem parseado pelo FastAPI (Body)
         event = payload.get("event")
         payment = payload.get("payment", {})
         
@@ -69,47 +80,81 @@ async def asaas_webhook(request: Request, asaas_access_token: str = Header(None)
                 else:
                     data_fim = data_inicio + relativedelta(months=1)
                 
-                # Dados para a tabela oficial de assinaturas
-                dados_assinatura = {
-                    "clinic_id": sessao['clinic_id'],
-                    "plan_id": sessao['plan_id'],
-                    "asaas_id": asaas_id_referencia,
-                    "status": "ativa", 
-                    "ciclo": sessao.get('ciclo', 'mensal'),
-                    "data_inicio": data_inicio.isoformat(),
-                    "data_fim": data_fim.isoformat(),
-                    "updated_at": dt.datetime.now().isoformat()
-                }
-
                 # UPSERT: Se já existe assinatura para a clínica, atualiza. Se não, cria.
-                # Primeiro buscamos o ID da assinatura existente (se houver) para fazer update
                 existing_sub = supabase.table('assinaturas').select('*').eq('clinic_id', sessao['clinic_id']).execute()
                 
+                is_delayed_downgrade = False
+                
                 if existing_sub.data:
-                    # --- SWAP LOGIC: Cancelar assinatura antiga se for diferente da nova ---
                     old_sub = existing_sub.data[0]
                     old_asaas_id = old_sub.get('asaas_id')
+                    old_plan_id = old_sub.get('plan_id')
+                    new_plan_id = sessao.get('plan_id')
                     
-                    if old_asaas_id and old_asaas_id != asaas_id_referencia:
-                        print(f"🔀 Swap: Cancelando assinatura antiga {old_asaas_id} para ativar a nova {asaas_id_referencia}...")
-                        cancelar_assinatura_asaas(old_asaas_id)
-                        
-                    # Update
-                    supabase.table('assinaturas').update(dados_assinatura).eq('id', old_sub['id']).execute()
+                    # Checagem de Downgrade (DELAYED DOWNGRADE)
+                    if old_plan_id and new_plan_id and old_plan_id != new_plan_id:
+                        try:
+                            # Buscar nomes dos planos para comparar hierarquia
+                            # otimização: buscar ambos em uma query usando 'or' se possível, mas simples queries funcionam
+                            p_old = supabase.table('planos').select('nome').eq('id', old_plan_id).single().execute()
+                            p_new = supabase.table('planos').select('nome').eq('id', new_plan_id).single().execute()
+                            
+                            if p_old.data and p_new.data:
+                                level_old = PLAN_HIERARCHY.get(p_old.data['nome'], 0)
+                                level_new = PLAN_HIERARCHY.get(p_new.data['nome'], 0)
+                                
+                                if level_new < level_old:
+                                    print(f"📉 Downgrade detectado ({p_old.data['nome']} -> {p_new.data['nome']}). Agendando troca.")
+                                    is_delayed_downgrade = True
+                                    
+                                    # 1. Marcar sessão como 'esperando_troca' (aguardando troca)
+                                    supabase.table('checkout_sessions').update({'status': 'esperando_troca'}).eq('id', sessao['id']).execute()
+                                    
+                                    # 2. Cancelar renovação da antiga no Asaas (mas MANTEMOS ela ativa no banco até vencer)
+                                    if old_asaas_id and old_asaas_id != asaas_id_referencia:
+                                         cancelar_assinatura_asaas(old_asaas_id)
+                                         
+                        except Exception as e:
+                            print(f"⚠️ Erro ao verificar hierarquia de planos: {e}")
+
+                    if not is_delayed_downgrade:
+                         # --- SWAP LOGIC Padrão (Upgrade ou mesmo nível) ---
+                        if old_asaas_id and old_asaas_id != asaas_id_referencia:
+                            print(f"🔀 Swap: Cancelando assinatura antiga {old_asaas_id} para ativar a nova {asaas_id_referencia}...")
+                            cancelar_assinatura_asaas(old_asaas_id)
+
+                if not is_delayed_downgrade:
+                    # Dados para a tabela oficial de assinaturas
+                    dados_assinatura = {
+                        "clinic_id": sessao['clinic_id'],
+                        "plan_id": sessao['plan_id'],
+                        "asaas_id": asaas_id_referencia,
+                        "status": "ativa", 
+                        "ciclo": sessao.get('ciclo', 'mensal'),
+                        "data_inicio": data_inicio.isoformat(),
+                        "data_fim": data_fim.isoformat(),
+                        "updated_at": dt.datetime.now().isoformat()
+                    }
+
+                    if existing_sub.data:
+                        # Update
+                        supabase.table('assinaturas').update(dados_assinatura).eq('id', existing_sub.data[0]['id']).execute()
+                    else:
+                        # Insert
+                        supabase.table('assinaturas').insert(dados_assinatura).execute()
+
+                    # Reativar IA da clínica quando assinatura é ativada
+                    supabase.table('clinicas')\
+                        .update({'ia_ativa': True})\
+                        .eq('id', sessao['clinic_id'])\
+                        .execute()
+
+                    # Marcar a sessão como PAGO
+                    supabase.table('checkout_sessions').update({'status': 'pago'}).eq('id', sessao['id']).execute()
+                    
+                    print("✅ Assinatura ativada e sessão concluída com sucesso!")
                 else:
-                    # Insert
-                    supabase.table('assinaturas').insert(dados_assinatura).execute()
-
-                # Reativar IA da clínica quando assinatura é ativada
-                supabase.table('clinicas')\
-                    .update({'ia_ativa': True})\
-                    .eq('id', sessao['clinic_id'])\
-                    .execute()
-
-                # Marcar a sessão como PAGO
-                supabase.table('checkout_sessions').update({'status': 'pago'}).eq('id', sessao['id']).execute()
-                
-                print("✅ Assinatura ativada e sessão concluída com sucesso!")
+                    print("⏳ Downgrade agendado. Assinatura antiga mantida até o fim do ciclo.")
 
             else:
                 # B. Nenhuma sessão pendente = Renovação Recorrente (Mês 2, Mês 3...)
@@ -146,11 +191,27 @@ async def asaas_webhook(request: Request, asaas_access_token: str = Header(None)
         # 3. Lógica de Problemas (Inadimplência/Cancelamento)
         elif event in ["PAYMENT_OVERDUE", "PAYMENT_REFUNDED"]:
             print(f"⚠️ Pagamento com problemas: {event}")
+
+            # --- OVERDUE SWAP GUARD: Cancelar assinatura pendente se não for paga ---
+            # Se for uma tentativa de troca de plano (Swap) que venceu, cancelamos para não cobrar.
+            sessao_pendente = supabase.table('checkout_sessions')\
+                .select('*')\
+                .eq('asaas_id', asaas_id_referencia)\
+                .eq('status', 'pendente')\
+                .maybe_single()\
+                .execute()
+
+            if sessao_pendente.data:
+                print(f"🚫 Swap Overdue: Cancelando assinatura pendente {asaas_id_referencia} por falta de pagamento.")
+                cancelar_assinatura_asaas(asaas_id_referencia)
+                supabase.table('checkout_sessions').update({'status': 'cancelado'}).eq('id', sessao_pendente.data['id']).execute()
+            
+            # --- Lógica Existente: Desativar IA se for a assinatura ATIVA ---
             # Buscar clinic_id da assinatura para desativar IA
             assinatura_data = supabase.table('assinaturas')\
                 .select('clinic_id')\
                 .eq('asaas_id', asaas_id_referencia)\
-                .single()\
+                .maybe_single()\
                 .execute()
             
             if assinatura_data.data:

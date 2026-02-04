@@ -272,3 +272,28 @@ def cancelar_assinatura_asaas(subscription_id):
     except Exception as e:
         print(f"❌ Erro conexão Asaas (Cancelar): {e}")
         return False
+
+def atualizar_vencimento_assinatura_asaas(subscription_id, proximo_vencimento):
+    """
+    Atualiza a data do próximo vencimento (cobrança) de uma assinatura.
+    Formato data: YYYY-MM-DD
+    """
+    url = f"{ASAAS_API_URL}/subscriptions/{subscription_id}"
+    
+    body = {
+        "nextDueDate": proximo_vencimento
+    }
+    
+    try:
+        response = requests.post(url, json=body, headers=get_headers())
+        
+        if response.status_code == 200:
+            print(f"📅 Asaas: Vencimento da assinatura {subscription_id} atualizado para {proximo_vencimento}")
+            return True
+        else:
+            print(f"❌ Erro Update Vencimento Asaas: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Erro conexão Asaas (Update Vencimento): {e}")
+        return False
