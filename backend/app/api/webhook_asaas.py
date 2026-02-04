@@ -4,6 +4,7 @@ from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Request, Header, HTTPException
 from dotenv import load_dotenv
 from app.core.database import get_supabase
+from app.services.payment_service import cancelar_assinatura_asaas
 
 load_dotenv()
 
@@ -82,11 +83,19 @@ async def asaas_webhook(request: Request, asaas_access_token: str = Header(None)
 
                 # UPSERT: Se já existe assinatura para a clínica, atualiza. Se não, cria.
                 # Primeiro buscamos o ID da assinatura existente (se houver) para fazer update
-                existing_sub = supabase.table('assinaturas').select('id').eq('clinic_id', sessao['clinic_id']).execute()
+                existing_sub = supabase.table('assinaturas').select('*').eq('clinic_id', sessao['clinic_id']).execute()
                 
                 if existing_sub.data:
+                    # --- SWAP LOGIC: Cancelar assinatura antiga se for diferente da nova ---
+                    old_sub = existing_sub.data[0]
+                    old_asaas_id = old_sub.get('asaas_id')
+                    
+                    if old_asaas_id and old_asaas_id != asaas_id_referencia:
+                        print(f"🔀 Swap: Cancelando assinatura antiga {old_asaas_id} para ativar a nova {asaas_id_referencia}...")
+                        cancelar_assinatura_asaas(old_asaas_id)
+                        
                     # Update
-                    supabase.table('assinaturas').update(dados_assinatura).eq('id', existing_sub.data[0]['id']).execute()
+                    supabase.table('assinaturas').update(dados_assinatura).eq('id', old_sub['id']).execute()
                 else:
                     # Insert
                     supabase.table('assinaturas').insert(dados_assinatura).execute()

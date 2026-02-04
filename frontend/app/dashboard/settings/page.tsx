@@ -85,6 +85,7 @@ export default function SettingsPage() {
   const [isDeleteProfissionalOpen, setIsDeleteProfissionalOpen] = useState(false)
   const [isCancelSubscriptionOpen, setIsCancelSubscriptionOpen] = useState(false)
   const [isRenewSubscriptionOpen, setIsRenewSubscriptionOpen] = useState(false)
+  const [isChangePlanOpen, setIsChangePlanOpen] = useState(false)
   const [editingProfissionalId, setEditingProfissionalId] = useState<string | null>(null)
   const [deletingProfissionalId, setDeletingProfissionalId] = useState<string | null>(null)
   const [profissionalForm, setProfissionalForm] = useState({
@@ -771,12 +772,12 @@ export default function SettingsPage() {
               <>
                 {(clinicData?.plano === 'trial' || clinicData?.plan_id === 'trial') ? (
                   <Button
-                      size="sm"
-                      onClick={() => router.push('/dashboard/planos')}
-                      className="h-8 px-3 py-1 text-xs border border-cyan-200 bg-white text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 shadow-none font-normal rounded-md"
-                    >
-                      Assinar Agora
-                    </Button>
+                    size="sm"
+                    onClick={() => router.push('/dashboard/planos')}
+                    className="h-8 px-3 py-1 text-xs border border-cyan-200 bg-white text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 shadow-none font-normal rounded-md"
+                  >
+                    Assinar Agora
+                  </Button>
                 ) : clinicData?.subscription_interval === 'yearly' ? (
                   <Dialog open={isRenewSubscriptionOpen} onOpenChange={setIsRenewSubscriptionOpen}>
                     <DialogTrigger asChild>
@@ -820,13 +821,49 @@ export default function SettingsPage() {
                   </Dialog>
                 ) : (
                   <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => router.push('/dashboard/planos')}
-                      className="h-8 px-3 py-1 text-xs border border-cyan-200 bg-white text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 shadow-none font-normal rounded-md"
-                    >
-                      Mudar de Plano
-                    </Button>
+                    <Dialog open={isChangePlanOpen} onOpenChange={setIsChangePlanOpen}>
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="h-8 px-3 py-1 text-xs border border-cyan-200 bg-white text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 shadow-none font-normal rounded-md"
+                        >
+                          Mudar de Plano
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md rounded-2xl">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2 text-slate-900">
+                            <AlertTriangle className="h-5 w-5 text-amber-500" />
+                            Alteração de Plano
+                          </DialogTitle>
+                          <DialogDescription className="pt-2 text-slate-600 text-left space-y-3">
+                            <p>
+                              Antes de continuar, é importante saber como funciona a mudança:
+                            </p>
+                            <ul className="list-disc pl-4 space-y-1">
+                              <li>
+                                <strong>Upgrade (Plano Superior):</strong> A mudança é imediata. O valor do novo plano será cobrado integralmente e os dias restantes do plano atual não são abatidos (sem pró-rata).
+                              </li>
+                              <li>
+                                <strong>Downgrade (Plano Inferior):</strong> A alteração será agendada e só entrará em vigor no final do ciclo atual da sua assinatura.
+                              </li>
+                            </ul>
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                          <Button
+                            onClick={() => {
+                              setIsChangePlanOpen(false)
+                              router.push('/dashboard/planos')
+                            }}
+                            className="w-full rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700"
+                          >
+                            Entendi, ir para Planos
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
                     <Dialog open={isCancelSubscriptionOpen} onOpenChange={setIsCancelSubscriptionOpen}>
                       <DialogTrigger asChild>
                         <Button

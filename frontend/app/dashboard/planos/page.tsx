@@ -10,6 +10,9 @@ import { CanceledSubscriptionBanner } from "@/components/CanceledSubscriptionBan
 import { ClinicLoading } from "@/components/ClinicLoading"
 import { logger } from '@/lib/logger'
 import { ClinicHeader } from "@/components/Header"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { AlertTriangle } from "lucide-react"
 
 type ClinicData = {
   id: string
@@ -34,6 +37,9 @@ export default function PlanosPage() {
   const [isWaitingPayment, setIsWaitingPayment] = useState(false)
   const [error, setError] = useState("")
   const [isSubscriptionCanceled, setIsSubscriptionCanceled] = useState(false)
+
+  const [isChangePlanModalOpen, setIsChangePlanModalOpen] = useState(false)
+  const [pendingCheckout, setPendingCheckout] = useState<{ planId: string, billingPeriod: "mensal" | "anual", parcelas_cartao: number } | null>(null)
 
   useEffect(() => {
     loadData()
@@ -113,7 +119,7 @@ export default function PlanosPage() {
 
     if (isWaitingPayment && clinic?.id) {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
-      
+
       interval = setInterval(async () => {
         try {
           const res = await fetch(`${apiUrl}/checkout/status/${clinic.id}`);
@@ -127,13 +133,13 @@ export default function PlanosPage() {
         } catch (error) {
           console.error("Polling error", error);
         }
-      }, 3000); 
+      }, 3000);
     }
 
     return () => clearInterval(interval);
   }, [isWaitingPayment, clinic?.id]);
 
-  const handleCheckout = async (planId: string, billingPeriod: "mensal" | "anual", parcelas_cartao: number) => {
+  const processCheckout = async (planId: string, billingPeriod: "mensal" | "anual", parcelas_cartao: number) => {
     if (!clinic?.id) return
 
     try {
@@ -148,8 +154,8 @@ export default function PlanosPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          plan_id: planId,      
-          periodo: billingPeriod, 
+          plan_id: planId,
+          periodo: billingPeriod,
           clinic_id: clinic.id,
           parcelas_cartao: parcelas_cartao
         }),
@@ -172,6 +178,20 @@ export default function PlanosPage() {
       alert("Erro ao iniciar pagamento: " + error.message) // Feedback rápido
     } finally {
       setProcessingPlanId(null)
+      setPendingCheckout(null)
+    }
+  }
+
+  const handleCheckout = async (planId: string, billingPeriod: "mensal" | "anual", parcelas_cartao: number) => {
+    // Se tiver assinatura ativa e não for trial, pede confirmação
+    const isTrial = clinic?.assinatura?.plano?.nome === 'trial' || clinic?.assinatura?.plan_id === 'trial';
+    const isActive = clinic?.assinatura?.status === 'active' || clinic?.assinatura?.status === 'ativa';
+
+    if (isActive && !isTrial) {
+      setPendingCheckout({ planId, billingPeriod, parcelas_cartao })
+      setIsChangePlanModalOpen(true)
+    } else {
+      processCheckout(planId, billingPeriod, parcelas_cartao)
     }
   }
 
@@ -189,7 +209,7 @@ export default function PlanosPage() {
           <div className="flex flex-col items-center mb-4">
             <div className="animate-spin w-14 h-14 border-4 border-blue-500 border-t-transparent rounded-full mb-2 shadow-lg"></div>
             <span className="absolute top-6 right-6 text-blue-400 animate-pulse">
-              <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeWidth="2" d="M12 2v2m0 16v2m8-10h2M2 12H4m15.07 7.07l1.41 1.41M4.93 4.93L3.52 3.52m15.07-1.41l-1.41 1.41M4.93 19.07l-1.41 1.41"/></svg>
+              <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeWidth="2" d="M12 2v2m0 16v2m8-10h2M2 12H4m15.07 7.07l1.41 1.41M4.93 4.93L3.52 3.52m15.07-1.41l-1.41 1.41M4.93 19.07l-1.41 1.41" /></svg>
             </span>
           </div>
           <h3 className="text-2xl font-extrabold text-blue-700 mb-2 tracking-tight">Aguardando Pagamento...</h3>
@@ -197,13 +217,13 @@ export default function PlanosPage() {
             A guia de pagamento foi aberta em uma nova aba.<br />
             Assim que concluir, esta página atualizará automaticamente.
           </p>
-          <button 
-            onClick={() => window.location.reload()} 
+          <button
+            onClick={() => window.location.reload()}
             className="w-full py-2 mb-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors shadow-md cursor-pointer"
           >
             Já paguei, mas não atualizou?
           </button>
-          <button 
+          <button
             onClick={() => setIsWaitingPayment(false)}
             className="w-full py-1 text-xs text-gray-400 hover:text-blue-600 underline transition-colors cursor-pointer"
           >
@@ -249,6 +269,42 @@ export default function PlanosPage() {
             />
           </CardContent>
         </Card>
+        <Dialog open={isChangePlanModalOpen} onOpenChange={setIsChangePlanModalOpen}>
+          <DialogContent className="sm:max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-slate-900">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                Alteração de Plano
+              </DialogTitle>
+              <DialogDescription className="pt-2 text-slate-600 text-left space-y-3">
+                <p>
+                  Antes de continuar, é importante saber como funciona a mudança:
+                </p>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li>
+                    <strong>Upgrade (Plano Superior):</strong> A mudança é imediata. O valor do novo plano será cobrado integralmente e os dias restantes do plano atual não são abatidos (sem pró-rata).
+                  </li>
+                  <li>
+                    <strong>Downgrade (Plano Inferior):</strong> A alteração será agendada e só entrará em vigor no final do ciclo atual da sua assinatura.
+                  </li>
+                </ul>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                onClick={() => {
+                  if (pendingCheckout) {
+                    setIsChangePlanModalOpen(false)
+                    processCheckout(pendingCheckout.planId, pendingCheckout.billingPeriod, pendingCheckout.parcelas_cartao)
+                  }
+                }}
+                className="w-full rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700"
+              >
+                Entendi, continuar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   )

@@ -5,8 +5,6 @@ from app.services.payment_service import (
     criar_checkout_assinatura_mensal, 
     criar_cliente_asaas, 
     buscar_fatura_pendente,
-    atualizar_assinatura_asaas,      
-    buscar_link_pagamento_existente ,
     criar_checkout_anual,
     cancelar_assinatura_asaas
 )
@@ -91,52 +89,23 @@ def create_checkout(dados: CheckoutInput):
 
         # 4. Decisão: Criar Nova ou Atualizar Existente?
         
-        # Verifica se já existe assinatura
-        assinatura_existente = supabase.table('assinaturas')\
-            .select('*')\
-            .eq('clinic_id', dados.clinic_id)\
-            .maybe_single()\
-            .execute()
-
-        checkout_url = None
-        asaas_id = None
-        data_vencimento = None
+        # 4. SWAP STRATEGY: Sempre criar NOVA assinatura/cobrança
+        # Não atualizamos a existente para não quebrar a cobrança atual se o usuário desistir.
+        # A troca (cancelar velha -> ativar nova) será feita no Webhook após pagamento.
         
-        pode_atualizar = False
+        print(f"✨ Criando NOVA intenção de assinatura no Asaas (Swap Strategy)...")
         
-        if assinatura_existente.data:
-            id_atual = assinatura_existente.data.get('asaas_id', '')
-            
-            if id_atual and id_atual.startswith('sub_') and dados.periodo == 'mensal':
-                pode_atualizar = True
-
-        if pode_atualizar:
-            # --- CENÁRIO A: ATUALIZAR NO ASAAS (Upgrade/Troca de Ciclo) ---
-            print(f"🔄 Atualizando assinatura existente no Asaas: {assinatura_existente.data['asaas_id']}")
-            asaas_id = assinatura_existente.data['asaas_id']
-            
-            if atualizar_assinatura_asaas(asaas_id, valor, ciclo_asaas):
-                dados_fatura = buscar_link_pagamento_existente(asaas_id)
-                
-                if dados_fatura:
-                    checkout_url = dados_fatura['checkout_url']
-                    data_vencimento = dados_fatura['due_date']
-
+        if dados.periodo == 'mensal':
+            checkout = criar_checkout_assinatura_mensal(asaas_customer_id, valor)
         else:
-            # --- CENÁRIO B: CRIAR NOVA NO ASAAS ---
-            print(f"✨ Criando nova assinatura no Asaas...")
-            
-            if dados.periodo == 'mensal':
-                checkout = criar_checkout_assinatura_mensal(asaas_customer_id, valor)
-            else:
-                checkout = criar_checkout_anual(valor, dados.parcelas_cartao)
-            
-            if not checkout:
-                raise HTTPException(status_code=500, detail="Erro ao gerar assinatura.")
-            
-            asaas_id = checkout['asaas_id']
-            checkout_url = checkout['checkout_url']
-            data_vencimento = checkout['due_date']
+            checkout = criar_checkout_anual(valor, dados.parcelas_cartao)
+        
+        if not checkout:
+            raise HTTPException(status_code=500, detail="Erro ao gerar assinatura.")
+        
+        asaas_id = checkout['asaas_id']
+        checkout_url = checkout['checkout_url']
+        data_vencimento = checkout['due_date']
             
         if not checkout_url:
             raise HTTPException(status_code=500, detail="Link de pagamento não encontrado.")
