@@ -134,7 +134,7 @@ export default function SettingsPage() {
           if (syncData.new_plan_name) setPendingPlanName(syncData.new_plan_name)
         }
       } catch (e) {
-        console.error("Sync error", e)
+        logger.error("Sync error", e)
       }
 
       const { data: clinic, error: clinicError } = await supabase
@@ -210,7 +210,7 @@ export default function SettingsPage() {
         setCalendars(data.calendars || [])
       }
     } catch (error) {
-      console.error("Erro ao buscar calendários:", error)
+      logger.error("Erro ao buscar calendários:", error)
     }
   }
 

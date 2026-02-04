@@ -114,7 +114,7 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
       setIsAllowed(true)
       
     } catch (error) {
-      console.error("Erro ao verificar assinatura:", error)
+      logger.error("Erro ao verificar assinatura:", error)
     } finally {
       setIsLoading(false)
     }

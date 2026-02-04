@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Check, Star, Building2, Sparkles, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
+import { logger } from "@/lib/logger";
 
 type PlanFeature = string;
 
@@ -67,7 +68,7 @@ const Pricing = ({
         .order('preco_mensal', { ascending: true });
 
       if (error) {
-        console.error('Error fetching plans:', error);
+        logger.error('Error fetching plans:', error);
         return;
       }
 

@@ -72,7 +72,7 @@ export default function PlanosPage() {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
         await fetch(`${apiUrl}/subscriptions/sync/${profile.clinic_id}`, { method: 'POST' })
       } catch (e) {
-        console.error("Sync error", e)
+        logger.error("Sync error", e)
       }
 
       const { data: clinicData, error: clinicError } = await supabase
@@ -145,7 +145,7 @@ export default function PlanosPage() {
             window.location.href = redirectUrl;
           }
         } catch (error) {
-          console.error("Polling error", error);
+          logger.error("Polling error", error);
         }
       }, 3000);
     }
