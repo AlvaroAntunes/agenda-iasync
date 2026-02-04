@@ -30,18 +30,19 @@ class RateLimiter:
         self.supabase = get_supabase()
         
         # Configurações globais (não dependem do plano)
-        self.BURST_LIMIT = int(os.getenv("RATE_LIMIT_BURST", "10"))
+        self.BURST_LIMIT = int(os.getenv("RATE_LIMIT_BURST", "50"))
         self.BURST_WINDOW = int(os.getenv("RATE_LIMIT_BURST_WINDOW", "10"))
-        self.GLOBAL_RATE_LIMIT = int(os.getenv("RATE_LIMIT_GLOBAL", "1000"))
-        self.BLOCK_DURATION = int(os.getenv("RATE_LIMIT_BLOCK_DURATION", "300"))
-        self.VIOLATION_THRESHOLD = int(os.getenv("RATE_LIMIT_VIOLATION_THRESHOLD", "3"))
+        self.GLOBAL_RATE_LIMIT = int(os.getenv("RATE_LIMIT_GLOBAL", "10000"))
+        self.BLOCK_DURATION = int(os.getenv("RATE_LIMIT_BLOCK_DURATION", "60"))
+        self.VIOLATION_THRESHOLD = int(os.getenv("RATE_LIMIT_VIOLATION_THRESHOLD", "5"))
         self.VIOLATION_WINDOW = int(os.getenv("RATE_LIMIT_VIOLATION_WINDOW", "300"))
         
         # Limites padrão por plano (fallback se não estiver no banco)
         self.DEFAULT_PLAN_LIMITS = {
-            "basic": 30,      # Plano Básico: 30 req/min
-            "premium": 60,   # Plano Profissional: 60 req/min
-            "enterprise": 120     # Plano Enterprise: 120 req/min
+            "trial": 60,
+            "consultorio": 60,   # Plano Consultório: 60 req/min
+            "clinica_pro": 180,   # Plano Clínica Pro: 180 req/min
+            "corporate": 300     # Plano Corporate: 300 req/min
         }
         
         # Cache de limites de clínicas (para evitar consultas repetidas ao banco)
@@ -63,27 +64,37 @@ class RateLimiter:
                 return limit
         
         try:
-            # Busca no banco
-            response = self.supabase.table('clinicas')\
-                .select('plano')\
-                .eq('id', clinic_id)\
+            # 1. Busca assinatura ativa com join na tabela planos
+            # Sintaxe: select('colunas_assinatura, tabela_relacionada(colunas_tabela)')
+            response = self.supabase.table('assinaturas')\
+                .select('plan_id, planos(nome)')\
+                .eq('clinic_id', clinic_id)\
+                .eq('status', 'ativa')\
                 .single()\
                 .execute()
             
-            if response.data:
-                plano = response.data.get('plano', 'basic').lower()
-                limit = self.DEFAULT_PLAN_LIMITS.get(plano, self.DEFAULT_PLAN_LIMITS['basic'])
-                
-                # Armazena no cache
-                self._clinic_limits_cache[clinic_id] = (limit, time.time())
-                
-                return limit
+            plano_nome = 'consultorio'
+            
+            if response.data and response.data.get('planos'):
+                plano_data = response.data.get('planos')
+
+                if plano_data and isinstance(plano_data, dict):
+                    plano_nome = plano_data.get('nome', 'consultorio').lower()
+                elif plano_data and isinstance(plano_data, list) and len(plano_data) > 0:
+                    plano_nome = plano_data[0].get('nome', 'consultorio').lower()
+            
+            limit = self.DEFAULT_PLAN_LIMITS.get(plano_nome, self.DEFAULT_PLAN_LIMITS['consultorio'])
+            
+            # Armazena no cache
+            self._clinic_limits_cache[clinic_id] = (limit, time.time())
+            
+            return limit
                 
         except Exception as e:
             print(f"⚠️ [RateLimit] Erro ao buscar plano da clínica {clinic_id}: {e}")
         
         # Fallback: plano básico
-        return self.DEFAULT_PLAN_LIMITS['basic']
+        return self.DEFAULT_PLAN_LIMITS['consultorio']
     
     def _get_current_minute(self) -> int:
         """Retorna o timestamp do minuto atual (para janelas deslizantes)."""
@@ -285,7 +296,7 @@ class RateLimiter:
             clinic_limit = self._get_clinic_rate_limit(clinic_id)
             
             # Busca informações do plano no banco
-            plano_nome = "basic"
+            plano_nome = "consultorio"
             try:
                 response = self.supabase.table('clinicas')\
                     .select('plano')\
@@ -293,7 +304,7 @@ class RateLimiter:
                     .single()\
                     .execute()
                 if response.data:
-                    plano_nome = response.data.get('plano', 'basic')
+                    plano_nome = response.data.get('plano', 'consultorio')
             except:
                 pass
             

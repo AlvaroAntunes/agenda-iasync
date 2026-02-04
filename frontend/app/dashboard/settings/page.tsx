@@ -41,7 +41,7 @@ type ClinicData = {
   uf: string | null
   tipo_calendario: 'google' | 'outlook'
   prompt_ia: string | null
-  plano: 'basic' | 'premium' | 'enterprise'
+  plano: 'consultorio' | 'clinica_pro' | 'corporate' | 'trial'
   ia_ativa: boolean
   asaas_id?: string
   subscription_status?: 'active' | 'past_due' | 'canceled' | 'trialing' | 'inactive'
@@ -93,6 +93,7 @@ export default function SettingsPage() {
     genero: '' as 'masculino' | 'feminino' | '',
     external_calendar_id: 'primary'
   })
+  const [calendars, setCalendars] = useState<{ id: string, summary: string }[]>([])
 
   useEffect(() => {
     checkAuthAndLoadClinic()
@@ -153,7 +154,8 @@ export default function SettingsPage() {
           subscription_status: statusMap[assinatura.status] || 'inactive',
           subscription_interval: assinatura.ciclo === 'mensal' ? 'monthly' : 'yearly',
           subscription_end_date: assinatura.data_fim,
-          plan_id: assinatura.planos?.nome || assinatura.plan_id
+          plan_id: assinatura.planos?.nome || assinatura.plan_id,
+          plano: (assinatura.planos?.nome || assinatura.plan_id) as any // Atualiza o plano visual com o da assinatura real
         }
       }
 
@@ -168,11 +170,29 @@ export default function SettingsPage() {
 
       // Carregar profissionais da clínica
       await loadProfissionais(profile.clinic_id)
+
+      // Carregar calendários disponíveis
+      await fetchCalendars(profile.clinic_id)
+
     } catch (error) {
       logger.error('Erro ao carregar dados:', error)
       router.push('/')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchCalendars = async (clinicId: string) => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      const response = await fetch(`${apiUrl}/calendars/list/${clinicId}`)
+
+      if (response.ok) {
+        const data = await response.json()
+        setCalendars(data.calendars || [])
+      }
+    } catch (error) {
+      console.error("Erro ao buscar calendários:", error)
     }
   }
 
@@ -419,8 +439,7 @@ export default function SettingsPage() {
     setSuccess("")
 
     try {
-     // const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
-     const apiUrl = "http://localhost:8000"
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
 
       const response = await fetch(`${apiUrl}/checkout/create`, {
         method: "POST",
@@ -686,24 +705,28 @@ export default function SettingsPage() {
 
                   <div className="flex items-center gap-4">
                     <div className="h-14 w-14 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-center justify-center">
-                      {clinicData?.plano === 'enterprise' ? <Building2 className="h-7 w-7 text-blue-600" /> :
-                        clinicData?.plano === 'premium' ? <Bot className="h-7 w-7 text-cyan-600" /> : <Users className="h-7 w-7 text-slate-600" />}
+                      {clinicData?.plano === 'corporate' ? <Building2 className="h-7 w-7 text-blue-600" /> :
+                        clinicData?.plano === 'clinica_pro' ? <Bot className="h-7 w-7 text-cyan-600" /> : <Users className="h-7 w-7 text-slate-600" />}
                     </div>
                     <div>
+                      <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">
+                        Plano Atual
+                      </p>
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-bold text-xl text-slate-900 capitalize">
-                          {clinicData?.plano === 'enterprise' ? 'Plano Enterprise' :
-                            clinicData?.plano === 'premium' ? 'Plano Clinic Pro' :
-                              clinicData?.plano === 'basic' ? 'Plano Basic' : clinicData?.plano}
+                          {clinicData?.plano === 'corporate' ? 'Plano Corporate' :
+                            clinicData?.plano === 'clinica_pro' ? 'Plano Clínica Pro' :
+                              clinicData?.plano === 'consultorio' ? 'Plano Consultório' :
+                                clinicData?.plano === 'trial' ? 'Plano Trial' : clinicData?.plano}
                         </h3>
                         {clinicData?.subscription_status === 'active' && (
                           <Badge className="rounded-md px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200">
-                            Ativa
+                            Ativo
                           </Badge>
                         )}
                         {clinicData?.subscription_status === 'canceled' && (
                           <Badge className="rounded-md px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 border-red-200">
-                            Cancelada
+                            Cancelado
                           </Badge>
                         )}
                       </div>
@@ -717,7 +740,10 @@ export default function SettingsPage() {
                     {clinicData?.subscription_end_date ? (
                       <div>
                         <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">
-                          {clinicData.subscription_status === 'active' ? (clinicData.subscription_interval === 'yearly' ? 'Vencimento em' : 'Renovação automática em') : 'Acesso atual expira em'}
+                          {clinicData.subscription_status === 'active' ? (
+                            clinicData.plano === 'trial' || clinicData.plan_id === 'trial' ? 'Período de testes encerra em' :
+                              (clinicData.subscription_interval === 'yearly' ? 'Vencimento em' : 'Renovação automática em')
+                          ) : 'Acesso atual expira em'}
                         </p>
                         <div className="flex items-center gap-2 text-slate-900 font-medium">
                           <Calendar className="h-4 w-4 text-cyan-600" />
@@ -743,7 +769,15 @@ export default function SettingsPage() {
             <Label className="text-lg font-bold text-slate-900"></Label>
             {clinicData?.subscription_status === 'active' && (
               <>
-                {clinicData?.subscription_interval === 'yearly' ? (
+                {(clinicData?.plano === 'trial' || clinicData?.plan_id === 'trial') ? (
+                  <Button
+                      size="sm"
+                      onClick={() => router.push('/dashboard/planos')}
+                      className="h-8 px-3 py-1 text-xs border border-cyan-200 bg-white text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 shadow-none font-normal rounded-md"
+                    >
+                      Assinar Agora
+                    </Button>
+                ) : clinicData?.subscription_interval === 'yearly' ? (
                   <Dialog open={isRenewSubscriptionOpen} onOpenChange={setIsRenewSubscriptionOpen}>
                     <DialogTrigger asChild>
                       <Button
@@ -785,33 +819,42 @@ export default function SettingsPage() {
                     </DialogContent>
                   </Dialog>
                 ) : (
-                  <Dialog open={isCancelSubscriptionOpen} onOpenChange={setIsCancelSubscriptionOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        size="sm"
-                        className="h-8 px-3 py-1 text-xs border border-slate-200 bg-white text-red-400 hover:text-red-500 hover:bg-slate-100 shadow-none font-normal rounded-md"
-                      >
-                        Cancelar Assinatura
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-md rounded-2xl">
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-red-600">
-                          <AlertTriangle className="h-5 w-5" />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => router.push('/dashboard/planos')}
+                      className="h-8 px-3 py-1 text-xs border border-cyan-200 bg-white text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 shadow-none font-normal rounded-md"
+                    >
+                      Mudar de Plano
+                    </Button>
+                    <Dialog open={isCancelSubscriptionOpen} onOpenChange={setIsCancelSubscriptionOpen}>
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="h-8 px-3 py-1 text-xs border border-slate-200 bg-white text-red-400 hover:text-red-500 hover:bg-slate-100 shadow-none font-normal rounded-md"
+                        >
                           Cancelar Assinatura
-                        </DialogTitle>
-                        <DialogDescription className="pt-2 text-slate-600">
-                          Ao cancelar, você perderá acesso aos recursos premium em <strong>{clinicData.subscription_end_date ? new Date(clinicData.subscription_end_date).toLocaleDateString('pt-BR') : 'breve'}</strong>. Tem certeza?
-                        </DialogDescription>
-                      </DialogHeader>
-                      <DialogFooter className="gap-2 sm:gap-0">
-                        <Button variant="outline" className="rounded-xl border-slate-200 hover:text-green-900" onClick={() => setIsCancelSubscriptionOpen(false)}>Manter Plano</Button>
-                        <Button onClick={handleCancelSubscription} disabled={saving} className="mx-4 rounded-xl bg-red-600 hover:bg-red-700">
-                          {saving ? 'Cancelando...' : 'Sim, cancelar'}
                         </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md rounded-2xl">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2 text-red-600">
+                            <AlertTriangle className="h-5 w-5" />
+                            Cancelar Assinatura
+                          </DialogTitle>
+                          <DialogDescription className="pt-2 text-slate-600">
+                            Ao cancelar, você perderá acesso aos recursos premium em <strong>{clinicData.subscription_end_date ? new Date(clinicData.subscription_end_date).toLocaleDateString('pt-BR') : 'breve'}</strong>. Tem certeza?
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="gap-2 sm:gap-0">
+                          <Button variant="outline" className="rounded-xl border-slate-200 hover:text-green-900" onClick={() => setIsCancelSubscriptionOpen(false)}>Manter Plano</Button>
+                          <Button onClick={handleCancelSubscription} disabled={saving} className="mx-4 rounded-xl bg-red-600 hover:bg-red-700">
+                            {saving ? 'Cancelando...' : 'Sim, cancelar'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 )}
               </>
             )}
@@ -904,14 +947,25 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="prof-calendar">ID do Calendário</Label>
-                    <Input
-                      id="prof-calendar"
+                    <Label htmlFor="prof-calendar">Calendário</Label>
+                    <Select
                       value={profissionalForm.external_calendar_id}
-                      onChange={(e) => setProfissionalForm({ ...profissionalForm, external_calendar_id: e.target.value })}
-                      placeholder="primary"
-                      className="rounded-xl border-slate-200"
-                    />
+                      onValueChange={(value) => setProfissionalForm({ ...profissionalForm, external_calendar_id: value })}
+                    >
+                      <SelectTrigger id="prof-calendar" className="rounded-xl border-slate-200 cursor-pointer">
+                        <SelectValue placeholder="Selecione um calendário" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="primary" className="cursor-pointer">Principal (clínica)</SelectItem>
+                        {calendars
+                          .filter(c => c.id !== 'primary')
+                          .map((calendar) => (
+                            <SelectItem key={calendar.id} value={calendar.id} className="cursor-pointer">
+                              {calendar.summary}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -919,7 +973,7 @@ export default function SettingsPage() {
                   <Button onClick={() => setIsAddProfissionalOpen(false)} disabled={saving} className="rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-500 transition-colors">
                     Cancelar
                   </Button>
-                  <Button 
+                  <Button
                     onClick={handleAddProfissional}
                     disabled={
                       saving ||
@@ -973,7 +1027,7 @@ export default function SettingsPage() {
                           <span className="truncate">{profissional.especialidade}</span>
                         )}
                         {profissional.especialidade && <span className="text-slate-300">•</span>}
-                        <span className="truncate text-xs bg-slate-100 px-2 py-0.5 rounded-md">Cal: {profissional.external_calendar_id}</span>
+                        {/* <span className="truncate text-xs bg-slate-100 px-2 py-0.5 rounded-md">Cal: {profissional.external_calendar_id}</span> */}
                       </div>
                     </div>
                   </div>
@@ -1049,13 +1103,25 @@ export default function SettingsPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="edit-prof-calendar">ID do Calendário</Label>
-                <Input
-                  id="edit-prof-calendar"
+                <Label htmlFor="edit-prof-calendar">Calendário</Label>
+                <Select
                   value={profissionalForm.external_calendar_id}
-                  onChange={(e) => setProfissionalForm({ ...profissionalForm, external_calendar_id: e.target.value })}
-                  className="rounded-xl border-slate-200"
-                />
+                  onValueChange={(value) => setProfissionalForm({ ...profissionalForm, external_calendar_id: value })}
+                >
+                  <SelectTrigger id="edit-prof-calendar" className="rounded-xl border-slate-200 cursor-pointer">
+                    <SelectValue placeholder="Selecione um calendário" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="primary" className="cursor-pointer">Principal (clínica)</SelectItem>
+                    {calendars
+                      .filter(c => c.id !== 'primary')
+                      .map((calendar) => (
+                        <SelectItem key={calendar.id} value={calendar.id} className="cursor-pointer">
+                          {calendar.summary}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

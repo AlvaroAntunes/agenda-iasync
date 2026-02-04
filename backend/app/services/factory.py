@@ -5,6 +5,7 @@
 import os
 from app.services.interfaces import CalendarService
 from app.services.google_calendar_service import GoogleCalendarService
+from app.services.outlook_calendar_service import OutlookCalendarService
 from dotenv import load_dotenv  
 from app.core.database import get_supabase
 
@@ -40,8 +41,7 @@ def get_calendar_service(clinic_id: str) -> CalendarService:
         return GoogleCalendarService(clinic_id)
     
     elif provider == 'outlook':
-        # return OutlookCalendarService(clinic_id) # Futuro
-        raise NotImplementedError("Outlook ainda não implementado")
+        return OutlookCalendarService(clinic_id)
         
     else:
         raise ValueError(f"Provedor de calendário desconhecido: {provider}")
