@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "IASync",
+  title: "Agenda IASync",
   icons: {
     icon: "/favicon.ico",
   },
