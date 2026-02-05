@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Building2, Users, Bot, ArrowLeft, Plus, Trash2, CheckCircle2, Edit } from "lucide-react"
+import { Building2, Users, Bot, ArrowLeft, Plus, Trash2, CheckCircle2, Edit, Maximize2, Minimize2 } from "lucide-react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { ClinicLoading } from "@/components/ClinicLoading"
@@ -97,6 +97,7 @@ export default function SettingsPage() {
   const [calendars, setCalendars] = useState<{ id: string, summary: string }[]>([])
   const [pendingSwitchDate, setPendingSwitchDate] = useState<string | null>(null)
   const [pendingPlanName, setPendingPlanName] = useState<string | null>(null)
+  const [isPromptExpanded, setIsPromptExpanded] = useState(false)
 
   useEffect(() => {
     checkAuthAndLoadClinic()
@@ -547,7 +548,7 @@ export default function SettingsPage() {
   }
 
   type PlanType = 'consultorio' | 'clinica_pro' | 'corporate'
-  
+
   const getPlanLabel = (plan?: string) => {
     const labels: Record<PlanType, string> = {
       consultorio: 'Consultório',
@@ -712,20 +713,48 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="tipo_calendario" className="text-slate-700 font-medium">Tipo de Calendário</Label>
-              <Select
-                value={formData.tipo_calendario || 'google'}
-                onValueChange={(value: any) => setFormData({ ...formData, tipo_calendario: value })}
-              >
-                <SelectTrigger className="h-12 rounded-xl border-cyan-200 focus:ring-cyan-400/20 cursor-pointer">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem className="cursor-pointer" value="google">Google Calendar</SelectItem>
-                  <SelectItem className="cursor-pointer" value="outlook">Outlook Calendar</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Seção de Prompt do Agente */}
+            <div className="space-y-6 pt-6 border-t border-slate-100">
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <Label htmlFor="prompt_ia" className="text-base font-semibold text-slate-900">Instruções do Agente IA</Label>
+                  <p className="text-sm text-slate-500">Defina a personalidade e as regras de negócio do seu agente.</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsPromptExpanded(!isPromptExpanded)}
+                  className="text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50"
+                >
+                  {isPromptExpanded ? <Minimize2 className="h-4 w-4 mr-2" /> : <Maximize2 className="h-4 w-4 mr-2" />}
+                  {isPromptExpanded ? 'Reduzir' : 'Expandir'}
+                </Button>
+              </div>
+
+              <div className={`transition-all duration-300 ease-in-out ${isPromptExpanded ? 'fixed inset-4 z-50 bg-white shadow-2xl rounded-2xl p-6 ring-2 ring-cyan-100 flex flex-col' : ''}`}>
+                {isPromptExpanded && (
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-slate-800">Editor de Prompt Fullscreen</h3>
+                    <Button variant="ghost" size="sm" onClick={() => setIsPromptExpanded(false)}>
+                      <Minimize2 className="h-4 w-4 mr-2" /> Reduzir
+                    </Button>
+                  </div>
+                )}
+                <Textarea
+                  id="prompt_ia"
+                  value={formData.prompt_ia || ''}
+                  onChange={(e) => setFormData({ ...formData, prompt_ia: e.target.value })}
+                  placeholder="Você é uma assistente virtual especializada..."
+                  className={`rounded-xl border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 font-mono text-sm leading-relaxed ${isPromptExpanded ? 'flex-1 resize-none' : 'h-52 resize-y'}`}
+                />
+                {isPromptExpanded && (
+                  <div className="mt-4 flex justify-end">
+                    <Button onClick={() => setIsPromptExpanded(false)} className="bg-cyan-600 text-white hover:bg-cyan-700">
+                      Concluir Edição
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Seção de Plano Refatorada */}

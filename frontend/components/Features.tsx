@@ -17,7 +17,7 @@ const Features = () => {
     {
       icon: Calendar,
       title: "Integração Premium",
-      description: "Sincroniza automaticamente com Google Calendar ou Outlook Calendar, além da possibilidade de integrar com seu sistema de gestão atual.",
+      description: "Sincroniza automaticamente com Google Calendar, além da possibilidade de integrar com seu sistema de gestão atual.",
       size: "large",
       gradient: "from-blue-50 to-slate-50",
     },
@@ -137,7 +137,7 @@ const Features = () => {
         >
           <p className="text-sm text-slate-400 mb-6">Integra-se com as ferramentas que você já utiliza</p>
           <div className="flex flex-wrap items-center justify-center gap-8">
-            {["Google Calendar", "Outlook Calendar"].map((name) => (
+            {["Google Calendar"].map((name) => (
               <div 
                 key={name}
                 className="text-slate-300 font-semibold text-sm tracking-wide 
