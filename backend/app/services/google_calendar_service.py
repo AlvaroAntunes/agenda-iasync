@@ -15,7 +15,10 @@ from app.core.database import get_supabase, TIMEZONE_BR, TIMEZONE_STR
 load_dotenv()  # Carrega variáveis do .env
 
 class GoogleCalendarService(CalendarService):
-    SCOPES = ['https://www.googleapis.com/auth/calendar.events']
+    SCOPES = [
+        'https://www.googleapis.com/auth/calendar.events', 
+        'https://www.googleapis.com/auth/calendar.readonly'
+    ]
 
     def __init__(self, clinic_id: str):
         """
