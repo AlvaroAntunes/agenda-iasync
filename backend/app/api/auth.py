@@ -15,7 +15,7 @@ from app.core.database import get_supabase
 
 load_dotenv()  # Carrega variáveis do .env
 
-SCOPES = ['https://www.googleapis.com/auth/calendar']
+SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI") 
 
 # Google config via .env
