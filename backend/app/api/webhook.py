@@ -330,18 +330,19 @@ async def send_uazapi_message(clinic_id: str, body: SendMessageBody):
     if not body.media_base64:
         raise HTTPException(status_code=400, detail="Arquivo não informado")
 
-    endpoint = "file" if msg_type == "file" else msg_type
-    url = f"{UAZAPI_URL}/send/{endpoint}"
+    media_type = "document" if msg_type == "file" else msg_type
+    url = f"{UAZAPI_URL}/send/media"
     payload = {
         "number": number,
-        "base64": body.media_base64,
-        "fileName": body.file_name,
+        "type": media_type,
+        "file": body.media_base64,
+        "text": body.caption,
+        "docName": body.file_name if media_type == "document" else None,
         "mimetype": body.mime_type,
-        "caption": body.caption,
         "readmessages": True,
         "delay": 1500,
-        "presence": "composing",
     }
+    payload = {k: v for k, v in payload.items() if v is not None}
     response = requests.post(url, json=payload, headers=get_uazapi_headers(token))
     if response.status_code not in [200, 201]:
         raise HTTPException(status_code=500, detail=response.text)
@@ -382,17 +383,54 @@ def status_uazapi_instance(clinic_id: str):
     url = f"{UAZAPI_URL}/instance/status"
     response = requests.get(url, headers=get_uazapi_headers(token))
     if response.status_code in [401, 404]:
-        supabase.table('clinicas')\
-            .update({'uazapi_token': None})\
-            .eq('id', clinic_id)\
-            .execute()
-        return {"status": "not_configured"}
+        # Evita limpar o token em falhas transitórias e mantém a instância no painel.
+        return {"status": "disconnected"}
     if response.status_code not in [200, 201]:
         raise HTTPException(status_code=500, detail=response.text)
 
     data = response.json()
     print("📦 Resposta Uazapi status:", json.dumps(data, indent=2))
     return data
+
+@router.get("/uazapi/message/download/{clinic_id}")
+def download_uazapi_message(clinic_id: str, message_id: str):
+    if not UAZAPI_URL:
+        raise HTTPException(status_code=500, detail="UAZAPI_URL não configurado")
+
+    token = get_clinic_uazapi_token(clinic_id)
+    if not token:
+        raise HTTPException(status_code=400, detail="Instância Uazapi não configurada")
+
+    if not message_id:
+        raise HTTPException(status_code=400, detail="message_id é obrigatório")
+
+    url = f"{UAZAPI_URL}/message/download"
+    headers = {
+        "Content-Type": "application/json",
+        "token": token,
+    }
+    payload = {
+        "id": message_id,
+        "return_base64": True,
+        "generate_mp3": False,
+    }
+    response = requests.post(url, json=payload, headers=headers, timeout=15)
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    data = response.json()
+    base64_data = data.get("base64Data") or data.get("data")
+    mime_type = data.get("mimetype") or data.get("mimeType") or data.get("contentType")
+    file_name = data.get("fileName") or data.get("filename") or data.get("name")
+
+    if not base64_data:
+        raise HTTPException(status_code=500, detail="Base64 não retornado pela Uazapi")
+
+    return {
+        "base64": base64_data,
+        "mimetype": mime_type,
+        "file_name": file_name,
+    }
 
 @router.delete("/uazapi/instance/{clinic_id}")
 def delete_uazapi_instance(clinic_id: str):

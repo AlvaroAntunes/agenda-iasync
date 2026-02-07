@@ -159,7 +159,6 @@ export default function LeadsPage() {
                   <TableRow>
                     <TableHead>Nome</TableHead>
                     <TableHead>Telefone</TableHead>
-                    <TableHead>LID</TableHead>
                     <TableHead>Data de criação</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -176,7 +175,6 @@ export default function LeadsPage() {
                       <TableRow key={lead.id}>
                         <TableCell className="font-medium">{lead.nome || "Sem nome"}</TableCell>
                         <TableCell>{lead.telefone || "-"}</TableCell>
-                        <TableCell>{lead.lid || "-"}</TableCell>
                         <TableCell>
                           {lead.created_at
                             ? format(new Date(lead.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })

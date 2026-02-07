@@ -12,6 +12,7 @@ export type ClinicData = {
   cidade: string
   prompt_ia: string
   ia_ativa: boolean
+  uazapi_token?: string | null
   plano: 'basic' | 'premium' | 'enterprise'
   tipo_calendario: 'google' | 'outlook'
   calendar_refresh_token: string | null

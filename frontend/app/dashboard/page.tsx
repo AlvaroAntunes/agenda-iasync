@@ -16,6 +16,7 @@ import {
   ChevronRight,
   CheckCircle2,
   QrCode,
+  RefreshCw,
   Trash2,
   Link2
 } from "lucide-react"
@@ -60,6 +61,7 @@ export default function ClinicDashboard() {
   const [uazapiQrCode, setUazapiQrCode] = useState<string | null>(null)
   const [uazapiPairingCode, setUazapiPairingCode] = useState<string | null>(null)
   const [uazapiLoading, setUazapiLoading] = useState(false)
+  const hasInstanceToken = Boolean(clinicData?.uazapi_token)
 
   useEffect(() => {
     checkAuthAndLoadClinic()
@@ -190,8 +192,9 @@ export default function ClinicDashboard() {
   const apiBaseUrl =
     process.env.NEXT_PUBLIC_BACKEND_URL ||
     process.env.NEXT_PUBLIC_BACKEND ||
-    process.env.BACKEND_URL ||
     ""
+
+  const apiUrl = (path: string) => (apiBaseUrl ? `${apiBaseUrl}${path}` : path)
 
   const normalizeQrCode = (value?: string | null) => {
     if (!value) return null
@@ -238,15 +241,17 @@ export default function ClinicDashboard() {
   }
 
   const fetchUazapiStatus = async (clinicId: string) => {
-    if (!apiBaseUrl) return
     try {
-      const response = await fetch(`${apiBaseUrl}/uazapi/instance/status/${clinicId}`)
+      const response = await fetch(apiUrl(`/uazapi/instance/status/${clinicId}`))
       const raw = await response.text()
       const data = raw ? JSON.parse(raw) : {}
       if (!response.ok) {
         throw new Error((data as any)?.detail || raw || "Erro ao consultar status")
       }
-      const status = resolveUazapiStatus(data)
+      let status = resolveUazapiStatus(data)
+      if (status === "not_configured" && hasInstanceToken) {
+        status = "disconnected"
+      }
       setUazapiStatus(status)
       setUazapiQrCode(normalizeQrCode(resolveUazapiQr(data)))
       setUazapiPairingCode(resolveUazapiPairingCode(data))
@@ -257,7 +262,11 @@ export default function ClinicDashboard() {
   }
 
   const handleCreateUazapiInstance = async () => {
-    if (!clinicData?.id || !apiBaseUrl) return
+    if (!clinicData?.id) return
+    if (hasInstanceToken) {
+      toast.info("Você já possui uma instância ativa.")
+      return
+    }
     if (uazapiStatus !== "not_configured" && uazapiStatus !== "error") {
       toast.info("Você já possui uma instância ativa.")
       return
@@ -265,7 +274,7 @@ export default function ClinicDashboard() {
     setUazapiLoading(true)
     setUazapiStatus("connecting")
     try {
-      const response = await fetch(`${apiBaseUrl}/uazapi/instance/create/${clinicData.id}`, {
+      const response = await fetch(apiUrl(`/uazapi/instance/create/${clinicData.id}`), {
         method: "POST",
       })
       const raw = await response.text()
@@ -284,14 +293,14 @@ export default function ClinicDashboard() {
   }
 
   const handleConnectUazapi = async () => {
-    if (!clinicData?.id || !apiBaseUrl) return
+    if (!clinicData?.id) return
     if (uazapiStatus === "not_configured") {
       toast.info("Crie a instância antes de gerar o QR Code.")
       return
     }
     setUazapiLoading(true)
     try {
-      const response = await fetch(`${apiBaseUrl}/uazapi/instance/connect/${clinicData.id}`, {
+      const response = await fetch(apiUrl(`/uazapi/instance/connect/${clinicData.id}`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -314,15 +323,25 @@ export default function ClinicDashboard() {
     }
   }
 
+  const handleRefreshUazapiStatus = async () => {
+    if (!clinicData?.id) return
+    setUazapiLoading(true)
+    try {
+      await fetchUazapiStatus(clinicData.id)
+    } finally {
+      setUazapiLoading(false)
+    }
+  }
+
   const handleDeleteUazapiInstance = async () => {
-    if (!clinicData?.id || !apiBaseUrl) return
+    if (!clinicData?.id) return
     if (uazapiStatus === "not_configured") {
       toast.info("Nenhuma instância para excluir.")
       return
     }
     setUazapiLoading(true)
     try {
-      const response = await fetch(`${apiBaseUrl}/uazapi/instance/${clinicData.id}`, {
+      const response = await fetch(apiUrl(`/uazapi/instance/${clinicData.id}`), {
         method: "DELETE",
       })
       const raw = await response.text()
@@ -599,21 +618,32 @@ export default function ClinicDashboard() {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Status</span>
+                  <div className="flex items-center gap-2">
                   <Badge
-                    variant={uazapiStatus === "connected" ? "default" : "secondary"}
+                    variant={(uazapiStatus === "connected") ? "default" : "secondary"}
                   >
-                    {uazapiStatus === "connected"
-                      ? "Conectado"
-                      : uazapiStatus === "disconnected"
-                        ? "Criado"
-                      : uazapiStatus === "connecting"
-                        ? "Conectando"
-                          : uazapiStatus === "not_configured"
-                            ? "Sem instância"
-                            : uazapiStatus === "error"
-                              ? "Erro"
-                              : "Desconhecido"}
-                  </Badge>
+                      {uazapiStatus === "connected"
+                        ? "Conectado"
+                        : uazapiStatus === "disconnected"
+                          ? "Criado"
+                        : uazapiStatus === "connecting"
+                          ? "Conectando"
+                            : uazapiStatus === "not_configured"
+                              ? (hasInstanceToken ? "Criado" : "Sem instância")
+                              : uazapiStatus === "error"
+                                ? "Erro"
+                                : "Desconhecido"}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleRefreshUazapiStatus}
+                      disabled={uazapiLoading}
+                      aria-label="Atualizar status da instância"
+                    >
+                      <RefreshCw className={uazapiLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+                    </Button>
+                  </div>
                 </div>
 
                 {uazapiQrCode ? (
@@ -641,6 +671,7 @@ export default function ClinicDashboard() {
                         onClick={handleCreateUazapiInstance}
                         disabled={
                           uazapiLoading ||
+                          hasInstanceToken ||
                           (uazapiStatus !== "not_configured" && uazapiStatus !== "error")
                         }
                       >
