@@ -6,6 +6,7 @@
 mensagens_contexto = 15  # Número de mensagens recentes a buscar para contexto
 
 import os
+import json
 from typing import List
 from langchain_core.messages import HumanMessage, AIMessage
 from dotenv import load_dotenv
@@ -43,10 +44,21 @@ class HistoryService:
             historico = []
             
             for msg in mensagens_db:
+                content = msg.get('conteudo')
+                if isinstance(content, str):
+                    try:
+                        parsed = json.loads(content)
+                        if isinstance(parsed, dict) and parsed.get('type'):
+                            if parsed.get('type') == 'audio':
+                                content = parsed.get('transcript') or '[áudio]'
+                            else:
+                                content = parsed.get('caption') or f"[{parsed.get('type')}]"
+                    except Exception:
+                        pass
                 if msg['quem_enviou'] == 'user':
-                    historico.append(HumanMessage(content=msg['conteudo']))
+                    historico.append(HumanMessage(content=content))
                 elif msg['quem_enviou'] == 'ai':
-                    historico.append(AIMessage(content=msg['conteudo']))
+                    historico.append(AIMessage(content=content))
             
             return historico
 

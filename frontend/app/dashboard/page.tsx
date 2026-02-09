@@ -61,6 +61,9 @@ export default function ClinicDashboard() {
   const [uazapiQrCode, setUazapiQrCode] = useState<string | null>(null)
   const [uazapiPairingCode, setUazapiPairingCode] = useState<string | null>(null)
   const [uazapiLoading, setUazapiLoading] = useState(false)
+  const [newConversationsCount, setNewConversationsCount] = useState(0)
+  const [newConversationsLoading, setNewConversationsLoading] = useState(false)
+  const [weeklyConversations, setWeeklyConversations] = useState<{ label: string; count: number }[]>([])
   const hasInstanceToken = Boolean(clinicData?.uazapi_token)
 
   useEffect(() => {
@@ -100,6 +103,8 @@ export default function ClinicDashboard() {
       if (clinicError) throw clinicError
 
       setClinicData(clinic)
+
+      await loadNewConversations(profile.clinic_id)
 
       // Carregar consultas da clínica
       await loadAppointments(profile.clinic_id)
@@ -157,6 +162,65 @@ export default function ClinicDashboard() {
       setUpcomingAppointments(upcomingAppts)
     } catch (error) {
       logger.error('Erro ao carregar consultas:', error)
+    }
+  }
+
+  const loadNewConversations = async (clinicId: string) => {
+    try {
+      setNewConversationsLoading(true)
+      const formatKey = (date: Date) => {
+        const y = date.getFullYear()
+        const m = String(date.getMonth() + 1).padStart(2, "0")
+        const d = String(date.getDate()).padStart(2, "0")
+        return `${y}-${m}-${d}`
+      }
+      const startOfToday = new Date()
+      startOfToday.setHours(0, 0, 0, 0)
+      const startOfWeek = new Date(startOfToday)
+      startOfWeek.setDate(startOfWeek.getDate() - 6)
+      const startIso = startOfWeek.toISOString()
+
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .select("session_id, created_at")
+        .eq("clinic_id", clinicId)
+        .gte("created_at", startIso)
+        .order("created_at", { ascending: false })
+        .limit(5000)
+
+      if (error) throw error
+
+      const buckets = new Map<string, Set<string>>()
+      for (let i = 0; i < 7; i += 1) {
+        const day = new Date(startOfWeek)
+        day.setDate(startOfWeek.getDate() + i)
+        buckets.set(formatKey(day), new Set())
+      }
+
+      for (const row of data || []) {
+        if (!row?.session_id || !row?.created_at) continue
+        const key = formatKey(new Date(row.created_at))
+        const bucket = buckets.get(key)
+        if (bucket) bucket.add(row.session_id)
+      }
+
+      const series: { label: string; count: number }[] = []
+      for (let i = 0; i < 7; i += 1) {
+        const day = new Date(startOfWeek)
+        day.setDate(startOfWeek.getDate() + i)
+        const key = formatKey(day)
+        const label = day.toLocaleDateString("pt-BR", { weekday: "short" })
+        series.push({ label, count: buckets.get(key)?.size || 0 })
+      }
+
+      setWeeklyConversations(series)
+      setNewConversationsCount(series[6]?.count ?? 0)
+    } catch (err) {
+      logger.error("Erro ao carregar novas conversas:", err)
+      setNewConversationsCount(0)
+      setWeeklyConversations([])
+    } finally {
+      setNewConversationsLoading(false)
     }
   }
 
@@ -374,6 +438,25 @@ export default function ClinicDashboard() {
 
   const confirmedCount = todayAppointments.filter((a) => a.status === "confirmed").length
   const pendingCount = todayAppointments.filter((a) => a.status === "pending").length
+  const maxWeekly = weeklyConversations.reduce((max, item) => Math.max(max, item.count), 1)
+  const weeklyTotal = weeklyConversations.reduce((sum, item) => sum + item.count, 0)
+  const weeklyAvg = weeklyConversations.length ? Math.round(weeklyTotal / weeklyConversations.length) : 0
+  const bestDay = weeklyConversations.reduce(
+    (best, item) => (item.count > best.count ? item : best),
+    { label: "-", count: 0 }
+  )
+  const chartHeight = 40
+  const chartPadding = 4
+  const chartMaxY = chartHeight - chartPadding
+  const chartMinY = chartPadding
+  const chartRange = chartMaxY - chartMinY
+  const chartPoints = weeklyConversations
+    .map((item, index) => {
+      const x = weeklyConversations.length <= 1 ? 50 : (index / (weeklyConversations.length - 1)) * 100
+      const y = chartMaxY - (item.count / maxWeekly) * chartRange
+      return `${x},${y}`
+    })
+    .join(" ")
 
   const getStatusBadge = (status: string) => {
     if (status === "confirmed") {
@@ -389,282 +472,203 @@ export default function ClinicDashboard() {
     <div className="min-h-screen bg-background">
       <ClinicHeader clinicName={clinicData?.nome} onSignOut={handleSignOut} />
 
-      <main className="container mx-auto px-6 py-8">
-        {/* Trial Banner */}
+      <main className="relative container mx-auto px-6 py-8">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-[-140px] -z-10 h-[260px] bg-gradient-to-br from-emerald-50 via-white to-sky-50"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute right-[-120px] top-[120px] -z-10 h-[240px] w-[240px] rounded-full bg-emerald-100/60 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute left-[-140px] top-[420px] -z-10 h-[280px] w-[280px] rounded-full bg-sky-100/70 blur-3xl"
+        />
+
         {clinicData && (
           <TrialBanner clinicId={clinicData.id} blockAccess={false} />
         )}
 
-        {/* Success Alert */}
         {success && (
-          <Alert className="mb-6 border-green-200 bg-green-50">
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-600">{success}</AlertDescription>
+          <Alert className="mb-6 border-emerald-200 bg-emerald-50">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <AlertDescription className="text-emerald-700">{success}</AlertDescription>
           </Alert>
         )}
 
-        {/* Quick Stats */}
-        <div className="mb-8 grid gap-6 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Consultas Hoje</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+        <div className="mb-8 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+          <Card className="relative overflow-hidden border-border/60 bg-white/90">
+            <CardHeader className="space-y-2">
+              <CardTitle className="text-2xl tracking-tight">
+                Bem-vindo, {clinicData?.nome || "Clínica"}
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Visão geral do dia, atendimentos e desempenho do WhatsApp.
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{todayAppointments.length}</div>
-              <p className="text-xs text-muted-foreground mt-1">{confirmedCount} confirmadas</p>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="rounded-xl border border-border/60 bg-emerald-50/60 px-4 py-3">
+                  <p className="text-xs text-emerald-700">Consultas hoje</p>
+                  <p className="mt-1 text-2xl font-semibold text-emerald-900">
+                    {todayAppointments.length}
+                  </p>
+                  <p className="text-xs text-emerald-700/70">{confirmedCount} confirmadas</p>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-sky-50/70 px-4 py-3">
+                  <p className="text-xs text-sky-700">Pendentes</p>
+                  <p className="mt-1 text-2xl font-semibold text-sky-900">{pendingCount}</p>
+                  <p className="text-xs text-sky-700/70">Aguardando confirmação</p>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-amber-50/70 px-4 py-3">
+                  <p className="text-xs text-amber-700">Próximas</p>
+                  <p className="mt-1 text-2xl font-semibold text-amber-900">
+                    {upcomingAppointments.length}
+                  </p>
+                  <p className="text-xs text-amber-700/70">Agendamentos futuros</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button onClick={() => router.push("/dashboard/conversas")} className="gap-2">
+                  Ir para conversas
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                {clinicData?.calendar_refresh_token ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const calendarUrl = clinicData?.tipo_calendario === 'google'
+                        ? 'https://calendar.google.com'
+                        : 'https://outlook.live.com/calendar'
+                      window.open(calendarUrl, '_blank')
+                    }}
+                  >
+                    Ver calendário
+                  </Button>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      if (clinicData?.id) {
+                        window.location.href = `${process.env.NEXT_PUBLIC_URL_SITE!}/auth/login?clinic_id=${clinicData.id}`
+                      }
+                    }}
+                  >
+                    Conectar calendário
+                  </Button>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted-foreground">Atividade semanal</p>
+                  <span className="text-[11px] text-muted-foreground">últimos 7 dias</span>
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">Conversas</p>
+                    <p className="text-lg font-semibold text-foreground">{weeklyTotal}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">Média / dia</p>
+                    <p className="text-lg font-semibold text-foreground">{weeklyAvg}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">Melhor dia</p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {bestDay.label !== "-" ? bestDay.label : "—"}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">{bestDay.count} conversas</p>
+                  </div>
+                </div>
+              </div>
             </CardContent>
+            <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-emerald-100/60 blur-2xl" />
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Pendentes</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+          <Card className="border-border/60 bg-white/90">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Status do Bot</CardTitle>
+                <CardDescription className="text-xs">Automação e WhatsApp</CardDescription>
+              </div>
+              <Bot className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{pendingCount}</div>
-              <p className="text-xs text-muted-foreground mt-1">Aguardando confirmação</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Próximas</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{upcomingAppointments.length}</div>
-              <p className="text-xs text-muted-foreground mt-1">Nos próximos dias</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Bot WhatsApp</CardTitle>
-              <Bot className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className={`h-3 w-3 rounded-full ${clinicData?.ia_ativa ? 'bg-green-500' : 'bg-red-400'}`} />
-                  <span className="text-sm font-medium text-foreground">
-                    {clinicData?.ia_ativa ? 'IA Ativa' : 'IA Inativa'}
-                  </span>
+            <CardContent className="space-y-5">
+              <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/40 px-3 py-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">IA</p>
+                  <p className="text-sm font-medium">
+                    {clinicData?.ia_ativa ? "Ativa" : "Inativa"}
+                  </p>
                 </div>
                 <Switch
                   checked={clinicData?.ia_ativa ?? false}
                   onCheckedChange={handleToggleIA}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                {clinicData?.ia_ativa
-                  ? 'Bot respondendo automaticamente'
-                  : 'Bot em modo manual'}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Today's Appointments */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
+              <div className="rounded-lg border border-border/60 px-3 py-3">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Consultas de Hoje</CardTitle>
-                    <CardDescription>
-                      {new Date(selectedDate + 'T12:00:00').toLocaleDateString("pt-BR", {
-                        weekday: "long",
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                        timeZone: "America/Sao_Paulo"
-                      })}
-                    </CardDescription>
-                  </div>
-                  {clinicData?.calendar_refresh_token ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const calendarUrl = clinicData?.tipo_calendario === 'google'
-                          ? 'https://calendar.google.com'
-                          : 'https://outlook.live.com/calendar'
-                        window.open(calendarUrl, '_blank')
-                      }}
-                    >
-                      Ver Calendário
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => {
-                        if (clinicData?.id) {
-                          window.location.href = `${process.env.NEXT_PUBLIC_URL_SITE!}/auth/login?clinic_id=${clinicData.id}`
-                        }
-                      }}
-                    >
-                      Conectar Calendário
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {todayAppointments.length === 0 ? (
-                    <div className="py-12 text-center">
-                      <Calendar className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">Nenhuma consulta agendada para hoje</p>
-                    </div>
-                  ) : (
-                    todayAppointments.map((appointment) => (
-                      <div
-                        key={appointment.id}
-                        className="flex items-center justify-between rounded-lg border p-4 hover:bg-accent/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                            <User className="h-6 w-6 text-primary" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-semibold text-foreground">{appointment.paciente?.nome || 'Paciente não identificado'}</h3>
-                              {getStatusBadge(appointment.status)}
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {new Date(appointment.horario_consulta).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                              {appointment.profissional && (
-                                <span className="flex items-center gap-1">
-                                  <User className="h-3 w-3" />
-                                  {appointment.profissional.nome}
-                                </span>
-                              )}
-                              <span className="flex items-center gap-1">
-                                <Phone className="h-3 w-3" />
-                                {appointment.paciente?.telefone || 'Sem telefone'}
-                              </span>
-                            </div>
-                            {appointment.profissional?.especialidade && (
-                              <div className="mt-1">
-                                <Badge variant="outline" className="text-xs">
-                                  {appointment.profissional.especialidade}
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <Button variant="ghost" size="icon">
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Upcoming Appointments */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Próximas Consultas</CardTitle>
-                <CardDescription>Agendamentos futuros</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {upcomingAppointments.slice(0, 5).map((appointment) => (
-                    <div key={appointment.id} className="flex items-start gap-3 pb-4 border-b last:border-0 last:pb-0">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
-                        <Calendar className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-foreground">{appointment.paciente?.nome || 'Paciente não identificado'}</p>
-                        {appointment.profissional && (
-                          <p className="text-xs text-muted-foreground mt-0.5">{appointment.profissional.nome}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(appointment.horario_consulta).toLocaleDateString("pt-BR")}
-                          </span>
-                          <span className="text-xs text-muted-foreground">•</span>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(appointment.horario_consulta).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <Button variant="outline" className="w-full mt-4 bg-transparent">
-                  Ver Todas
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="mt-6">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Instância WhatsApp</CardTitle>
-                  <CardDescription>Uazapi</CardDescription>
-                </div>
-                <QrCode className="h-5 w-5 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Status</span>
-                  <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">WhatsApp</p>
                   <Badge
                     variant={(uazapiStatus === "connected") ? "default" : "secondary"}
                   >
-                      {uazapiStatus === "connected"
-                        ? "Conectado"
-                        : uazapiStatus === "disconnected"
-                          ? "Criado"
+                    {uazapiStatus === "connected"
+                      ? "Conectado"
+                      : uazapiStatus === "disconnected"
+                        ? "Criado"
                         : uazapiStatus === "connecting"
                           ? "Conectando"
-                            : uazapiStatus === "not_configured"
-                              ? (hasInstanceToken ? "Criado" : "Sem instância")
-                              : uazapiStatus === "error"
-                                ? "Erro"
-                                : "Desconhecido"}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleRefreshUazapiStatus}
-                      disabled={uazapiLoading}
-                      aria-label="Atualizar status da instância"
-                    >
-                      <RefreshCw className={uazapiLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-                    </Button>
-                  </div>
+                          : uazapiStatus === "not_configured"
+                            ? (hasInstanceToken ? "Criado" : "Sem instância")
+                            : uazapiStatus === "error"
+                              ? "Erro"
+                              : "Desconhecido"}
+                  </Badge>
                 </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {clinicData?.ia_ativa
+                    ? "Bot respondendo automaticamente."
+                    : "Bot em modo manual."}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={handleRefreshUazapiStatus}
+                disabled={uazapiLoading}
+                className="w-full justify-center gap-2"
+              >
+                <RefreshCw className={uazapiLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+                Atualizar status
+              </Button>
 
+              <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-3">
+                <p className="text-xs text-muted-foreground">Conexão da instância</p>
                 {uazapiQrCode ? (
-                  <div className="rounded-lg border border-dashed border-border p-4 text-center">
-                    <img src={uazapiQrCode} alt="QR Code da instância" className="mx-auto h-48 w-48" />
+                  <div className="mt-3 rounded-lg border border-dashed border-border p-4 text-center">
+                    <img src={uazapiQrCode} alt="QR Code da instância" className="mx-auto h-36 w-36" />
                     <p className="text-xs text-muted-foreground mt-2">
                       Escaneie o QR Code no WhatsApp da clínica.
                     </p>
                   </div>
                 ) : uazapiPairingCode ? (
-                  <div className="rounded-lg border border-dashed border-border p-4 text-center">
+                  <div className="mt-3 rounded-lg border border-dashed border-border p-4 text-center">
                     <p className="text-xs text-muted-foreground">Código de pareamento</p>
                     <p className="text-lg font-semibold mt-2">{uazapiPairingCode}</p>
                   </div>
-                ) : uazapiStatus === "connected" ? null : (
-                  <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                ) : uazapiStatus === "connected" ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Instância conectada e ativa.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
                     Gere um QR Code ou código de pareamento para conectar.
-                  </div>
+                  </p>
                 )}
 
-                <div className="grid gap-2">
+                <div className="mt-3 grid gap-2">
                   {uazapiStatus === "connected" ? null : (
                     <>
                       <Button
@@ -697,9 +701,76 @@ export default function ClinicDashboard() {
                     Excluir instância
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="mb-8 grid gap-6 lg:grid-cols-[1.1fr_1fr]">
+          <Card className="border-border/60 bg-white/90">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Conversas</CardTitle>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="w-full md:w-1/3">
+                <div className="text-3xl font-semibold text-foreground">
+                  {newConversationsLoading ? "..." : newConversationsCount}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Novas conversas iniciadas hoje</p>
+                <Button className="mt-3" onClick={() => router.push("/dashboard/conversas")}>
+                  Ir para conversas
+                </Button>
+              </div>
+              <div className="h-24 w-full md:w-2/3 md:pl-4 overflow-visible">
+                <svg viewBox="0 0 100 40" className="h-full w-full overflow-visible">
+                  <polyline
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="text-foreground/80"
+                    points={chartPoints}
+                  />
+                  {weeklyConversations.map((item, index) => {
+                    const x = weeklyConversations.length <= 1 ? 50 : (index / (weeklyConversations.length - 1)) * 100
+                    const y = chartMaxY - (item.count / maxWeekly) * chartRange
+                    return (
+                      <circle
+                        key={item.label}
+                        cx={x}
+                        cy={y}
+                        r="2"
+                        className="fill-emerald-500"
+                      />
+                    )
+                  })}
+                </svg>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60 bg-white/90">
+            <CardHeader>
+              <CardTitle className="text-base">Atividade semanal</CardTitle>
+              <CardDescription className="text-xs">Conversas por dia</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {weeklyConversations.map((item, index) => (
+                <div key={`${item.label}-${index}`} className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{item.label}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-24 rounded-full bg-muted">
+                      <div
+                        className="h-1.5 rounded-full bg-emerald-500"
+                        style={{ width: `${Math.min(100, (item.count / maxWeekly) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-medium text-foreground">{item.count}</span>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>

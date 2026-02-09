@@ -10,6 +10,7 @@ export type Lead = {
   telefone: string
   lid: string
   created_at: string
+  status_ia: boolean
 }
 
 export function useLeads(clinicId?: string | null) {
@@ -31,7 +32,7 @@ export function useLeads(clinicId?: string | null) {
     try {
       const { data, error } = await supabase
         .from("leads")
-        .select("id, nome, telefone, lid, created_at")
+        .select("id, nome, telefone, lid, created_at, status_ia")
         .eq("clinic_id", clinicId)
         .order("created_at", { ascending: false })
 
@@ -52,5 +53,5 @@ export function useLeads(clinicId?: string | null) {
     fetchLeads()
   }, [fetchLeads])
 
-  return { leads, loading, error, refresh: fetchLeads }
+  return { leads, loading, error, refresh: fetchLeads, setLeads }
 }

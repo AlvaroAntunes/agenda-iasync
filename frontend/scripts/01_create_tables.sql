@@ -71,6 +71,7 @@ CREATE TABLE public.leads (
     lid text NOT NULL,
     nome text NOT NULL,
     telefone text NOT NULL,
+    status_ia boolean NOT NULL DEFAULT true,
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -83,6 +84,38 @@ CREATE INDEX idx_leads_clinic_id ON public.leads(clinic_id);
 
 -- 2. Para o IA encontrar "este paciente pelo telefone DENTRO desta clínica"
 CREATE UNIQUE INDEX idx_leads_clinic_telefone ON public.leads(clinic_id, telefone);
+
+-- 3.1. TABELA "tags"
+-- Tags personalizadas por clínica para organizar leads
+CREATE TABLE public.tags (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    clinic_id uuid NOT NULL REFERENCES public.clinicas(id) ON DELETE CASCADE,
+    name text NOT NULL,
+    color text NOT NULL,
+    is_system boolean NOT NULL DEFAULT false,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.tags ENABLE ROW LEVEL SECURITY;
+
+CREATE UNIQUE INDEX idx_tags_clinic_name ON public.tags(clinic_id, name);
+CREATE INDEX idx_tags_clinic_id ON public.tags(clinic_id);
+
+-- 3.2. TABELA "lead_tags"
+-- Associação N:N entre leads e tags
+CREATE TABLE public.lead_tags (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    clinic_id uuid NOT NULL REFERENCES public.clinicas(id) ON DELETE CASCADE,
+    lead_id uuid NOT NULL REFERENCES public.leads(id) ON DELETE CASCADE,
+    tag_id uuid NOT NULL REFERENCES public.tags(id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (lead_id, tag_id)
+);
+
+ALTER TABLE public.lead_tags ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX idx_lead_tags_clinic_id ON public.lead_tags(clinic_id);
+CREATE INDEX idx_lead_tags_lead_id ON public.lead_tags(lead_id);
 
 -- 4. TABELA "consultas"
 -- O coração do sistema. Armazena os eventos de agendamento.
