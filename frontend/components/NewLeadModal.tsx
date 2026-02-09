@@ -26,8 +26,10 @@ export type NewLeadFormData = {
 type NewLeadModalProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  mode?: "create"
-  onCreateLead: (data: NewLeadFormData) => Promise<void> | void
+  mode?: "create" | "edit"
+  initialData?: Partial<NewLeadFormData>
+  onCreateLead?: (data: NewLeadFormData) => Promise<void> | void
+  onUpdateLead?: (data: NewLeadFormData) => Promise<void> | void
 }
 
 const COUNTRY_CODES = [
@@ -36,7 +38,14 @@ const COUNTRY_CODES = [
   { label: "Estados Unidos (+1)", value: "US +1" },
 ]
 
-export function NewLeadModal({ open, onOpenChange, onCreateLead }: NewLeadModalProps) {
+export function NewLeadModal({
+  open,
+  onOpenChange,
+  mode = "create",
+  initialData,
+  onCreateLead,
+  onUpdateLead,
+}: NewLeadModalProps) {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [phone, setPhone] = useState("")
@@ -50,8 +59,20 @@ export function NewLeadModal({ open, onOpenChange, onCreateLead }: NewLeadModalP
       setPhone("")
       setCountryCode(COUNTRY_CODES[0].value)
       setSubmitting(false)
+      return
     }
-  }, [open])
+    if (mode === "edit" && initialData) {
+      setFirstName(initialData.firstName || "")
+      setLastName(initialData.lastName || "")
+      setPhone(initialData.phone || "")
+      setCountryCode(initialData.countryCode || COUNTRY_CODES[0].value)
+    } else if (mode === "create") {
+      setFirstName("")
+      setLastName("")
+      setPhone("")
+      setCountryCode(COUNTRY_CODES[0].value)
+    }
+  }, [open, mode, initialData])
 
   const handleSubmit = async () => {
     if (!firstName.trim() || !phone.trim()) {
@@ -62,17 +83,24 @@ export function NewLeadModal({ open, onOpenChange, onCreateLead }: NewLeadModalP
     setSubmitting(true)
 
     try {
-      await onCreateLead({
+      const payload = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         phone: phone.trim(),
         countryCode,
-      })
-
+      }
+      if (mode === "edit") {
+        if (!onUpdateLead) throw new Error("onUpdateLead não informado")
+        await onUpdateLead(payload)
+        toast.success("Lead atualizado com sucesso!")
+      } else {
+        if (!onCreateLead) throw new Error("onCreateLead não informado")
+        await onCreateLead(payload)
+        toast.success("Lead criado com sucesso!")
+      }
       onOpenChange(false)
-      toast.success("Lead criado com sucesso!")
     } catch {
-      toast.error("Não foi possível criar o lead.")
+      toast.error(mode === "edit" ? "Não foi possível atualizar o lead." : "Não foi possível criar o lead.")
     } finally {
       setSubmitting(false)
     }
@@ -86,9 +114,9 @@ export function NewLeadModal({ open, onOpenChange, onCreateLead }: NewLeadModalP
       {/* Conteúdo (modal) */}
       <DialogContent className="sm:max-w-md bg-white text-black">
         <DialogHeader>
-          <DialogTitle>Novo lead</DialogTitle>
+          <DialogTitle>{mode === "edit" ? "Editar lead" : "Novo lead"}</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Adicione um novo paciente na sua base.
+            {mode === "edit" ? "Atualize os dados do paciente." : "Adicione um novo paciente na sua base."}
           </DialogDescription>
         </DialogHeader>
 
@@ -145,7 +173,7 @@ export function NewLeadModal({ open, onOpenChange, onCreateLead }: NewLeadModalP
             Cancelar
           </Button>
           <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "Salvando..." : "Criar lead"}
+            {submitting ? "Salvando..." : mode === "edit" ? "Salvar" : "Criar lead"}
           </Button>
         </DialogFooter>
       </DialogContent>
