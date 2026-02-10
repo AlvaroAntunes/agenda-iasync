@@ -133,7 +133,8 @@ class AgenteClinica:
         self.profissionais_por_id = {p['id']: p for p in self.profissionais} # Cache de profissionais por ID para busca O(1)
         self.dados_paciente = self._identificar_paciente()
         self.dia_hoje = self._formatar_data_extenso(dt.datetime.now(TIMEZONE_BR))
-        
+        self.clinica_fechada = self._verificar_clinica_fechada()
+
     def _carregar_dados_clinica(self):
         response = supabase.table('clinicas').select('*').eq('id', self.clinic_id).single().execute()
         return response.data
@@ -142,6 +143,75 @@ class AgenteClinica:
         # Trazemos os profissionais para injetar no prompt do sistema
         response = supabase.table('profissionais').select('id, nome, especialidade, external_calendar_id').eq('clinic_id', self.clinic_id).execute()
         return response.data
+    
+    def _verificar_clinica_fechada(self):
+        """
+        Retorna a lista dos dias que a clínica está fechada.
+        O campo clinica_fechada é um JSONB que pode conter:
+        - Nova estrutura: [{"date": "2024-12-25", "description": "Feriado de Natal"}]
+        - Estrutura antiga: ["2024-12-25", "2024-01-01"] (retrocompatível)
+        """
+        dias_fechados_raw = self.dados_clinica.get('clinica_fechada')
+        
+        if not dias_fechados_raw:
+            return []
+        
+        dias_fechados = []
+        try:
+            if isinstance(dias_fechados_raw, list):
+                for item in dias_fechados_raw:
+                    # Nova estrutura: objeto com date e description
+                    if isinstance(item, dict):
+                        date_str = item.get('date')
+                        description = item.get('description', '')
+                        
+                        if not date_str:
+                            continue
+                        
+                        try:
+                            # Tenta parsear no formato ISO (YYYY-MM-DD)
+                            data_obj = dt.datetime.strptime(date_str, "%Y-%m-%d").date()
+                            dias_fechados.append({
+                                'date': data_obj,
+                                'description': description
+                            })
+                        except ValueError:
+                            try:
+                                # Tenta parsear no formato brasileiro (DD/MM/YYYY)
+                                data_obj = dt.datetime.strptime(date_str, "%d/%m/%Y").date()
+                                dias_fechados.append({
+                                    'date': data_obj,
+                                    'description': description
+                                })
+                            except ValueError:
+                                print(f"⚠️ Data inválida em clinica_fechada: {date_str}")
+                                continue
+                    
+                    # Estrutura antiga: apenas string (retrocompatibilidade)
+                    elif isinstance(item, str):
+                        try:
+                            # Tenta parsear no formato ISO (YYYY-MM-DD)
+                            data_obj = dt.datetime.strptime(item, "%Y-%m-%d").date()
+                            dias_fechados.append({
+                                'date': data_obj,
+                                'description': ''
+                            })
+                        except ValueError:
+                            try:
+                                # Tenta parsear no formato brasileiro (DD/MM/YYYY)
+                                data_obj = dt.datetime.strptime(item, "%d/%m/%Y").date()
+                                dias_fechados.append({
+                                    'date': data_obj,
+                                    'description': ''
+                                })
+                            except ValueError:
+                                print(f"⚠️ Data inválida em clinica_fechada: {item}")
+                                continue
+        except Exception as e:
+            print(f"❌ Erro ao processar clinica_fechada: {e}")
+            return []
+        
+        return dias_fechados
     
     def _identificar_paciente(self):
         """
@@ -262,8 +332,46 @@ class AgenteClinica:
         Considera horário comercial 08:00 às 18:00.
         """
         # Configuração da Clínica 
-        hora_abertura = int(self.dados_clinica.get('hora_abertura') or 8)
-        hora_fechamento = int(self.dados_clinica.get('hora_fechamento') or 18)
+        # Mapeamento de dias da semana (0=Segunda, 6=Domingo) para os nomes no JSON
+        dias_semana_map = {
+            0: "Segunda-feira",
+            1: "Terça-feira",
+            2: "Quarta-feira",
+            3: "Quinta-feira",
+            4: "Sexta-feira",
+            5: "Sábado",
+            6: "Domingo"
+        }
+        
+        dia_atual_nome = dias_semana_map.get(data_base.weekday())
+        horario_funcionamento = self.dados_clinica.get('horario_funcionamento') or []
+        
+        # Valores padrão
+        hora_abertura = 8
+        minuto_abertura = 0
+        hora_fechamento = 18
+        minuto_fechamento = 0
+        dia_ativo = True
+
+        # Busca configuração do dia
+        config_dia = next((h for h in horario_funcionamento if h.get('dia') == dia_atual_nome), None)
+        
+        if config_dia:
+            if not config_dia.get('ativo', True):
+                dia_ativo = False
+            else:
+                abertura_str = config_dia.get('abertura', '08:00')
+                fechamento_str = config_dia.get('fechamento', '18:00')
+                
+                try:
+                    hora_abertura, minuto_abertura = map(int, abertura_str.split(':'))
+                    hora_fechamento, minuto_fechamento = map(int, fechamento_str.split(':'))
+                except ValueError:
+                    pass # Mantém padrão se der erro no parse
+
+        # Se o dia não for ativo, não há slots livres
+        if not dia_ativo:
+            return []
 
         # DEFINIÇÕES DE TEMPO
         duracao_consulta = dt.timedelta(hours=1)      # Duração do bloco ocupado
@@ -273,8 +381,8 @@ class AgenteClinica:
         tz_br = TIMEZONE_BR
         
         # Define marcos de início e fim do dia
-        inicio_expediente = dt.datetime.combine(data_base, dt.time(hour=hora_abertura, minute=0), tzinfo=tz_br)
-        fim_expediente = dt.datetime.combine(data_base, dt.time(hour=hora_fechamento, minute=0), tzinfo=tz_br)
+        inicio_expediente = dt.datetime.combine(data_base, dt.time(hour=hora_abertura, minute=minuto_abertura), tzinfo=tz_br)
+        fim_expediente = dt.datetime.combine(data_base, dt.time(hour=hora_fechamento, minute=minuto_fechamento), tzinfo=tz_br)
         
         # Cursor que vai percorrer o dia
         cursor_tempo = inicio_expediente
@@ -407,8 +515,16 @@ class AgenteClinica:
         if holidays:
             estado_uf = self.dados_clinica.get('uf', 'MG') 
             feriados = holidays.BR(state=estado_uf, years=[dt_inicio.year])
+
             if dt_inicio.date() in feriados:
                 return f"NEGADO: {data} é feriado ({feriados.get(dt_inicio.date())})."
+        
+        # 3. Validação de Dias Fechados da Clínica
+        if self.clinica_fechada:
+            for closed_day in self.clinica_fechada:
+                if dt_inicio.date() == closed_day['date']:
+                    motivo = f" ({closed_day['description']})" if closed_day['description'] else ""
+                    return f"NEGADO: A clínica estará fechada no dia {data}{motivo}."
 
         # 3. Definição dos Calendários
         calendarios_alvo = [] 

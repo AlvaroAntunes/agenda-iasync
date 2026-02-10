@@ -3,13 +3,25 @@
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Building2, Settings, Users, MessageSquare, CalendarDays, CreditCard, Menu } from "lucide-react"
+import { Building2, Settings, Users, MessageSquare, CalendarDays, CreditCard, Menu, LogOut, LayoutDashboard, ClipboardList } from "lucide-react"
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
   SheetTitle,
 } from "@/components/ui/sheet"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { useState } from "react"
 
 type Props = {
   clinicName?: string | null
@@ -19,6 +31,7 @@ type Props = {
 export function ClinicHeader({ clinicName, onSignOut }: Props) {
   const router = useRouter()
   const pathname = usePathname()
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
 
   const isActive = (path: string) => pathname === path || pathname?.startsWith(`${path}/`)
 
@@ -48,7 +61,7 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
                   variant={pathname === '/dashboard' ? "secondary" : "ghost"}
                   className={`gap-2 ${pathname === '/dashboard' ? 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100' : 'text-slate-600'}`}
                 >
-                  <Users className="h-4 w-4" />
+                  <LayoutDashboard className="h-4 w-4" />
                   Dashboard
                 </Button>
               </Link>
@@ -73,10 +86,23 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
                 </Button>
               </Link>
 
-              <Link href="/dashboard/calendario">
-                <Button variant="ghost" className="gap-2 text-slate-600">
+              <Link href="/dashboard/agenda">
+                <Button
+                  variant={isActive('/dashboard/agenda') ? "secondary" : "ghost"}
+                  className={`gap-2 ${isActive('/dashboard/agenda') ? 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100' : 'text-slate-600'}`}
+                >
                   <CalendarDays className="h-4 w-4" />
-                  Calendário
+                  Agenda
+                </Button>
+              </Link>
+
+              <Link href="/dashboard/consultas">
+                <Button
+                  variant={isActive('/dashboard/consultas') ? "secondary" : "ghost"}
+                  className={`gap-2 ${isActive('/dashboard/consultas') ? 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100' : 'text-slate-600'}`}
+                >
+                  <ClipboardList className="h-4 w-4" />
+                  Consultas
                 </Button>
               </Link>
 
@@ -94,27 +120,51 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-3">
-            <Link href="/dashboard/settings">
-              <Button
-                variant={isActive('/dashboard/settings') ? "secondary" : "ghost"}
-                size="icon"
-                aria-label="Configurações"
-                className={isActive('/dashboard/settings') ? 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100' : 'text-slate-600'}
-              >
-                <Settings className="h-5 w-5" />
-              </Button>
-            </Link>
+            {/* Desktop Actions */}
+            <div className="hidden md:flex items-center gap-3">
+              <Link href="/dashboard/settings">
+                <Button
+                  variant={isActive('/dashboard/settings') ? "secondary" : "ghost"}
+                  size="icon"
+                  aria-label="Configurações"
+                  className={isActive('/dashboard/settings') ? 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100' : 'text-slate-600'}
+                >
+                  <Settings className="h-5 w-5" />
+                </Button>
+              </Link>
 
-            <Button
-              variant="ghost"
-              className="text-slate-600 hover:text-red-600 hover:bg-red-50 hover:border-red-100"
-              onClick={async () => {
-                await onSignOut()
-                router.push("/")
-              }}
-            >
-              Sair
-            </Button>
+              <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="text-slate-600 hover:text-red-600 hover:bg-red-50 hover:border-red-100 gap-2"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sair
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Deseja realmente sair?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Você será desconectado da sua conta e precisará fazer login novamente para acessar o painel.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="hover:text-black">Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                      onClick={async () => {
+                        await onSignOut()
+                        router.push("/")
+                      }}
+                    >
+                      Sim, quero sair
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
 
             {/* Mobile Menu */}
             <div className="md:hidden">
@@ -128,17 +178,27 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
                 <SheetContent side="right">
                   <SheetTitle className="hidden">Menu de Navegação</SheetTitle>
                   <div className="flex flex-col gap-4 mt-6">
-                    <Link href="/dashboard" className="flex items-center gap-2 mb-4">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                        <Building2 className="h-5 w-5 text-primary-foreground" />
+                    <Link href="/dashboard" className="flex items-center gap-3 mb-8 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-600 to-blue-600 shadow-lg shadow-cyan-500/20 text-white">
+                        <Building2 className="h-6 w-6" />
                       </div>
-                      <span className="font-semibold text-lg">{clinicName || "Carregando..."}</span>
+                      <span className="font-bold text-slate-900 text-lg leading-tight">{clinicName || "Carregando..."}</span>
+                    </Link>
+
+                    <Link href="/dashboard">
+                      <Button
+                        variant={pathname === '/dashboard' ? "secondary" : "ghost"}
+                        className={`w-full justify-start gap-2 h-12 ${pathname === '/dashboard' ? 'bg-cyan-50 text-cyan-700' : ''}`}
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                        Dashboard
+                      </Button>
                     </Link>
 
                     <Link href="/dashboard/leads">
                       <Button
                         variant={isActive('/dashboard/leads') ? "secondary" : "ghost"}
-                        className={`w-full justify-start gap-2 ${isActive('/dashboard/leads') ? 'bg-cyan-50 text-cyan-700' : ''}`}
+                        className={`w-full justify-start gap-2 h-12 ${isActive('/dashboard/leads') ? 'bg-cyan-50 text-cyan-700' : ''}`}
                       >
                         <Users className="h-4 w-4" />
                         Leads
@@ -148,24 +208,37 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
                     <Link href="/dashboard/conversas">
                       <Button
                         variant={isActive('/dashboard/conversas') ? "secondary" : "ghost"}
-                        className={`w-full justify-start gap-2 ${isActive('/dashboard/conversas') ? 'bg-cyan-50 text-cyan-700' : ''}`}
+                        className={`w-full justify-start gap-2 h-12 ${isActive('/dashboard/conversas') ? 'bg-cyan-50 text-cyan-700' : ''}`}
                       >
                         <MessageSquare className="h-4 w-4" />
                         Conversas
                       </Button>
                     </Link>
 
-                    <Link href="#">
-                      <Button variant="ghost" className="w-full justify-start gap-2">
+                    <Link href="/dashboard/agenda">
+                      <Button
+                        variant={isActive('/dashboard/agenda') ? "secondary" : "ghost"}
+                        className={`w-full justify-start gap-2 h-12 ${isActive('/dashboard/agenda') ? 'bg-cyan-50 text-cyan-700' : ''}`}
+                      >
                         <CalendarDays className="h-4 w-4" />
-                        Calendário
+                        Agenda
+                      </Button>
+                    </Link>
+
+                    <Link href="/dashboard/consultas">
+                      <Button
+                        variant={isActive('/dashboard/consultas') ? "secondary" : "ghost"}
+                        className={`w-full justify-start gap-2 h-12 ${isActive('/dashboard/consultas') ? 'bg-cyan-50 text-cyan-700' : ''}`}
+                      >
+                        <ClipboardList className="h-4 w-4" />
+                        Consultas
                       </Button>
                     </Link>
 
                     <Link href="/dashboard/planos">
                       <Button
                         variant={isActive('/dashboard/planos') ? "secondary" : "ghost"}
-                        className={`w-full justify-start gap-2 ${isActive('/dashboard/planos') ? 'bg-cyan-50 text-cyan-700' : ''}`}
+                        className={`w-full justify-start gap-2 h-12 ${isActive('/dashboard/planos') ? 'bg-cyan-50 text-cyan-700' : ''}`}
                       >
                         <CreditCard className="h-4 w-4" />
                         Planos
@@ -177,12 +250,21 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
                     <Link href="/dashboard/settings">
                       <Button
                         variant={isActive('/dashboard/settings') ? "secondary" : "ghost"}
-                        className={`w-full justify-start gap-2 ${isActive('/dashboard/settings') ? 'bg-cyan-50 text-cyan-700' : ''}`}
+                        className={`w-full justify-start gap-2 h-12 ${isActive('/dashboard/settings') ? 'bg-cyan-50 text-cyan-700' : ''}`}
                       >
                         <Settings className="h-4 w-4" />
                         Configurações
                       </Button>
                     </Link>
+
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start gap-2 h-12 text-slate-600 hover:text-red-600 hover:bg-red-50"
+                      onClick={() => setShowLogoutDialog(true)}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Sair
+                    </Button>
                   </div>
                 </SheetContent>
               </Sheet>

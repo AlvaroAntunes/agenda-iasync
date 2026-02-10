@@ -48,6 +48,7 @@ type ClinicData = {
   subscription_interval?: 'monthly' | 'yearly'
   subscription_end_date?: string
   plan_id?: string
+  clinica_fechada?: Array<{ date: string, description: string }> | string[] | null
 }
 
 const UFS = [
@@ -98,6 +99,16 @@ export default function SettingsPage() {
   const [pendingSwitchDate, setPendingSwitchDate] = useState<string | null>(null)
   const [pendingPlanName, setPendingPlanName] = useState<string | null>(null)
   const [isPromptExpanded, setIsPromptExpanded] = useState(false)
+  const [closedDays, setClosedDays] = useState<Array<{ date: string, description: string }>>([])
+  const [newClosedDay, setNewClosedDay] = useState('')
+  const [newClosedDayDescription, setNewClosedDayDescription] = useState('')
+  const [savingClosedDay, setSavingClosedDay] = useState(false)
+  const [isDeleteClosedDayOpen, setIsDeleteClosedDayOpen] = useState(false)
+  const [deletingClosedDay, setDeletingClosedDay] = useState<{ date: string, description: string } | null>(null)
+  const [isEditClosedDayOpen, setIsEditClosedDayOpen] = useState(false)
+  const [editingClosedDay, setEditingClosedDay] = useState<{ date: string, description: string } | null>(null)
+  const [editClosedDayDate, setEditClosedDayDate] = useState('')
+  const [editClosedDayDescription, setEditClosedDayDescription] = useState('')
 
   useEffect(() => {
     checkAuthAndLoadClinic()
@@ -186,6 +197,19 @@ export default function SettingsPage() {
 
       setClinicData(clinicDataClean)
       setFormData(clinicDataClean)
+
+      // Carregar dias fechados (normalizar para novo formato)
+      if (clinicDataClean.clinica_fechada) {
+        const normalized = clinicDataClean.clinica_fechada.map((item: string | { date: string, description: string }) => {
+          if (typeof item === 'string') {
+            // Formato antigo: apenas string
+            return { date: item, description: '' }
+          }
+          // Formato novo: objeto com date e description
+          return item
+        })
+        setClosedDays(normalized)
+      }
 
       // Carregar profissionais da clínica
       await loadProfissionais(profile.clinic_id)
@@ -439,6 +463,155 @@ export default function SettingsPage() {
       setError(error.message || 'Erro ao salvar alterações')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleAddClosedDay = async () => {
+    if (!newClosedDay || !clinicData) return
+
+    setSavingClosedDay(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      // Validate date format
+      const dateObj = new Date(newClosedDay)
+      if (isNaN(dateObj.getTime())) {
+        setError('Data inválida')
+        return
+      }
+
+      // Check if already exists
+      if (closedDays.some(item => item.date === newClosedDay)) {
+        setError('Esta data já está na lista')
+        return
+      }
+
+      // Create new entry
+      const newEntry = {
+        date: newClosedDay,
+        description: newClosedDayDescription
+      }
+
+      // Add to list and sort by date
+      const updatedDays = [...closedDays, newEntry].sort((a, b) =>
+        a.date.localeCompare(b.date)
+      )
+
+      // Update Supabase
+      const { error: updateError } = await supabase
+        .from('clinicas')
+        .update({ clinica_fechada: updatedDays })
+        .eq('id', clinicData.id)
+
+      if (updateError) throw updateError
+
+      setClosedDays(updatedDays)
+      setNewClosedDay('')
+      setNewClosedDayDescription('')
+      setSuccess('Dia fechado adicionado com sucesso')
+
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (error) {
+      logger.error('Erro ao adicionar dia fechado:', error)
+      setError('Erro ao adicionar dia fechado')
+    } finally {
+      setSavingClosedDay(false)
+    }
+  }
+
+  const handleRemoveClosedDay = (item: { date: string, description: string }) => {
+    setDeletingClosedDay(item)
+    setIsDeleteClosedDayOpen(true)
+  }
+
+  const confirmRemoveClosedDay = async () => {
+    if (!clinicData || !deletingClosedDay) return
+
+    setSavingClosedDay(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const updatedDays = closedDays.filter(item => item.date !== deletingClosedDay.date)
+
+      const { error: updateError } = await supabase
+        .from('clinicas')
+        .update({ clinica_fechada: updatedDays.length > 0 ? updatedDays : null })
+        .eq('id', clinicData.id)
+
+      if (updateError) throw updateError
+
+      setClosedDays(updatedDays)
+      setSuccess('Dia fechado removido com sucesso')
+      setIsDeleteClosedDayOpen(false)
+      setDeletingClosedDay(null)
+
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (error) {
+      logger.error('Erro ao remover dia fechado:', error)
+      setError('Erro ao remover dia fechado')
+    } finally {
+      setSavingClosedDay(false)
+    }
+  }
+
+  const handleEditClosedDay = (item: { date: string, description: string }) => {
+    setEditingClosedDay(item)
+    setEditClosedDayDate(item.date)
+    setEditClosedDayDescription(item.description)
+    setIsEditClosedDayOpen(true)
+  }
+
+  const confirmEditClosedDay = async () => {
+    if (!clinicData || !editingClosedDay) return
+
+    setSavingClosedDay(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      // Validate date format
+      const dateObj = new Date(editClosedDayDate)
+      if (isNaN(dateObj.getTime())) {
+        setError('Data inválida')
+        return
+      }
+
+      // Check if new date already exists (but not the same item being edited)
+      if (editClosedDayDate !== editingClosedDay.date &&
+        closedDays.some(item => item.date === editClosedDayDate)) {
+        setError('Esta data já está na lista')
+        return
+      }
+
+      // Update the item
+      const updatedDays = closedDays.map(item =>
+        item.date === editingClosedDay.date
+          ? { date: editClosedDayDate, description: editClosedDayDescription }
+          : item
+      ).sort((a, b) => a.date.localeCompare(b.date))
+
+      const { error: updateError } = await supabase
+        .from('clinicas')
+        .update({ clinica_fechada: updatedDays })
+        .eq('id', clinicData.id)
+
+      if (updateError) throw updateError
+
+      setClosedDays(updatedDays)
+      setSuccess('Dia fechado atualizado com sucesso')
+      setIsEditClosedDayOpen(false)
+      setEditingClosedDay(null)
+      setEditClosedDayDate('')
+      setEditClosedDayDescription('')
+
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (error) {
+      logger.error('Erro ao atualizar dia fechado:', error)
+      setError('Erro ao atualizar dia fechado')
+    } finally {
+      setSavingClosedDay(false)
     }
   }
 
@@ -992,6 +1165,227 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Closed Days Management Card */}
+        <div className="bg-white rounded-3xl p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-700">
+              <Calendar className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">Dias Fechados</h2>
+              <p className="text-slate-500 text-sm">Gerencie os dias em que a clínica não atenderá (não precisa adicionar feriados nacionais e estaduais, já vem cadastrado)</p>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            {/* Add New Closed Day */}
+            <div className="space-y-3">
+              <Label htmlFor="new-closed-day" className="text-sm font-medium text-slate-700">
+                Adicionar Dia Fechado
+              </Label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input
+                  id="new-closed-day"
+                  type="date"
+                  value={newClosedDay}
+                  onChange={(e) => setNewClosedDay(e.target.value)}
+                  disabled={savingClosedDay}
+                  className="flex-1 h-12 rounded-xl border-slate-200 focus:border-cyan-500 focus:ring-cyan-500"
+                />
+                <Input
+                  id="new-closed-day-description"
+                  type="text"
+                  placeholder="Motivo (ex: Reforma)"
+                  value={newClosedDayDescription}
+                  onChange={(e) => setNewClosedDayDescription(e.target.value)}
+                  disabled={savingClosedDay}
+                  className="flex-1 h-12 rounded-xl border-slate-200 focus:border-cyan-500 focus:ring-cyan-500"
+                />
+                <Button
+                  onClick={handleAddClosedDay}
+                  disabled={!newClosedDay || savingClosedDay}
+                  className="h-12 px-6 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all hover:scale-[1.02] whitespace-nowrap"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar
+                </Button>
+              </div>
+            </div>
+
+            {/* List of Closed Days */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-slate-700">
+                Dias Cadastrados ({closedDays.length})
+              </Label>
+              {closedDays.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 bg-slate-50 rounded-xl">
+                  Nenhum dia fechado cadastrado
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {closedDays.map((item) => (
+                    <div
+                      key={item.date}
+                      className="flex items-center justify-between p-4 border border-slate-200 rounded-xl transition-colors hover:border-cyan-200"
+                    >
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+                          <Calendar className="h-4 w-4 text-red-600" />
+                        </div>
+                        <div className="flex-1">
+                          <span className="font-medium text-slate-900 block">
+                            {new Date(item.date + 'T00:00:00').toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: 'long',
+                              year: 'numeric'
+                            })}
+                          </span>
+                          {item.description && (
+                            <span className="text-sm text-slate-500">
+                              {item.description}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditClosedDay(item)}
+                          disabled={savingClosedDay}
+                          className="h-9 w-9 p-0 hover:bg-blue-50 rounded-lg"
+                        >
+                          <Edit className="h-4 w-4 text-blue-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveClosedDay(item)}
+                          disabled={savingClosedDay}
+                          className="h-9 w-9 p-0 hover:bg-red-50 rounded-lg"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Delete Confirmation Dialog */}
+          <Dialog open={isDeleteClosedDayOpen} onOpenChange={setIsDeleteClosedDayOpen}>
+            <DialogContent className="sm:max-w-md rounded-2xl">
+              <DialogHeader>
+                <DialogTitle>Confirmar Exclusão</DialogTitle>
+                <DialogDescription>
+                  Tem certeza que deseja remover este dia fechado?
+                </DialogDescription>
+              </DialogHeader>
+              {deletingClosedDay && (
+                <div className="py-4">
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                    <Calendar className="h-5 w-5 text-red-600" />
+                    <div>
+                      <p className="font-medium text-slate-900">
+                        {new Date(deletingClosedDay.date + 'T00:00:00').toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: 'long',
+                          year: 'numeric'
+                        })}
+                      </p>
+                      {deletingClosedDay.description && (
+                        <p className="text-sm text-slate-500">{deletingClosedDay.description}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsDeleteClosedDayOpen(false)
+                    setDeletingClosedDay(null)
+                  }}
+                  disabled={savingClosedDay}
+                  className="rounded-xl mx-4 hover:text-black"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={confirmRemoveClosedDay}
+                  disabled={savingClosedDay}
+                  className="rounded-xl"
+                >
+                  {savingClosedDay ? 'Removendo...' : 'Remover'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Dialog */}
+          <Dialog open={isEditClosedDayOpen} onOpenChange={setIsEditClosedDayOpen}>
+            <DialogContent className="sm:max-w-md rounded-2xl">
+              <DialogHeader>
+                <DialogTitle>Editar Dia Fechado</DialogTitle>
+                <DialogDescription>
+                  Altere a data ou a descrição do dia fechado
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-closed-day-date">Data</Label>
+                  <Input
+                    id="edit-closed-day-date"
+                    type="date"
+                    value={editClosedDayDate}
+                    onChange={(e) => setEditClosedDayDate(e.target.value)}
+                    disabled={savingClosedDay}
+                    className="h-12 rounded-xl border-slate-200 focus:border-cyan-500 focus:ring-cyan-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-closed-day-description">Descrição</Label>
+                  <Input
+                    id="edit-closed-day-description"
+                    type="text"
+                    placeholder="Motivo (ex: Feriado de Natal, Reforma)"
+                    value={editClosedDayDescription}
+                    onChange={(e) => setEditClosedDayDescription(e.target.value)}
+                    disabled={savingClosedDay}
+                    className="h-12 rounded-xl border-slate-200 focus:border-cyan-500 focus:ring-cyan-500"
+                  />
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditClosedDayOpen(false)
+                    setEditingClosedDay(null)
+                    setEditClosedDayDate('')
+                    setEditClosedDayDescription('')
+                  }}
+                  disabled={savingClosedDay}
+                  className="rounded-xl mx-4 hover:text-black"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={confirmEditClosedDay}
+                  disabled={savingClosedDay || !editClosedDayDate}
+                  className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700"
+                >
+                  {savingClosedDay ? 'Salvando...' : 'Salvar'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+
         {/* Doctors Management Card */}
         <div className="bg-white rounded-3xl p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50">
           <div className="flex items-center justify-between mb-8">
@@ -1145,14 +1539,14 @@ export default function SettingsPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => openEditDialog(profissional)}
                       className="hover:bg-slate-100 rounded-lg text-slate-500 hover:text-cyan-700"
                     >
-                      <Edit className="h-4 w-4" />
+                      <Edit className="h-4 w-4 text-blue-600" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -1160,7 +1554,7 @@ export default function SettingsPage() {
                       className="hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-600"
                       onClick={() => openDeleteDialog(profissional.id)}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4 text-red-600" />
                     </Button>
                   </div>
                 </div>

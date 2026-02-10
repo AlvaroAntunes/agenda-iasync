@@ -18,10 +18,23 @@ export type ClinicData = {
   calendar_refresh_token: string | null
   saldo_tokens: number
   tokens_comprados: number
+  hora_abertura?: number
+  hora_fechamento?: number
   assinaturas?: {
     planos?: {
       max_tokens: number
     } | null
+  }[] | null
+  profissionais?: {
+    id: string
+    nome: string
+    especialidade: string
+  }[] | null
+  horario_funcionamento?: {
+    dia: string
+    ativo: boolean
+    abertura: string
+    fechamento: string
   }[] | null
 }
 

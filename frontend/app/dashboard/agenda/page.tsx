@@ -17,7 +17,9 @@ import {
   AlignLeft,
   RefreshCw,
   Loader2,
-  Plus
+  Plus,
+  AlertCircle,
+  TrendingUp
 } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -64,6 +66,14 @@ export default function CalendarPage() {
   const [isDayDialogOpen, setIsDayDialogOpen] = useState(false)
   const [selectedDateDetails, setSelectedDateDetails] = useState<Date | null>(null)
 
+  // Estado para estatísticas
+  const [todayEvents, setTodayEvents] = useState<CalendarEvent[]>([])
+  const [tomorrowEvents, setTomorrowEvents] = useState<CalendarEvent[]>([])
+  const [occupancyRate, setOccupancyRate] = useState(0)
+  const [nextAvailableSlot, setNextAvailableSlot] = useState<string | null>(null)
+  const [cancellationRate, setCancellationRate] = useState(0)
+  const [avgAppointmentsPerDay, setAvgAppointmentsPerDay] = useState(0)
+
   // Estado para edição (movido para o topo para evitar erro de hook)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
 
@@ -87,6 +97,7 @@ export default function CalendarPage() {
   useEffect(() => {
     if (clinicData?.id) {
       fetchEvents()
+      fetchAppointmentsStats()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentDate, clinicData?.id])
@@ -127,6 +138,150 @@ export default function CalendarPage() {
     }
   }
 
+  const calculateStats = (allEvents: CalendarEvent[]) => {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const dayAfterTomorrow = new Date(tomorrow)
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1)
+    const next7Days = new Date(today)
+    next7Days.setDate(next7Days.getDate() + 7)
+
+    // Filter events for today
+    const todayEvts = allEvents.filter(e => {
+      const d = new Date(e.start.dateTime)
+      return d >= today && d < tomorrow
+    })
+
+    // Filter events for tomorrow
+    const tomorrowEvts = allEvents.filter(e => {
+      const d = new Date(e.start.dateTime)
+      return d >= tomorrow && d < dayAfterTomorrow
+    })
+
+    // Filter events for next 7 days
+    const next7DaysEvts = allEvents.filter(e => {
+      const d = new Date(e.start.dateTime)
+      return d >= today && d < next7Days
+    })
+
+    // Calculate occupancy rate (assuming 8-hour workday, 30min slots = 16 slots/day * 7 days)
+    const totalSlots = 16 * 7
+    const occupiedSlots = next7DaysEvts.length
+    const rate = Math.min(100, Math.round((occupiedSlots / totalSlots) * 100))
+
+    // Calculate next available slot
+    // Working hours from clinic settings
+    const findNextAvailableSlot = () => {
+      const workStart = clinicData?.hora_abertura || 8 // Default 8:00 if not set
+      const workEnd = clinicData?.hora_fechamento || 18 // Default 18:00 if not set
+      const slotDuration = 5 // minutes
+
+      // Start from current time, rounded up to next 5-min slot
+      let checkTime = new Date()
+      const minutes = checkTime.getMinutes()
+      const roundedMinutes = Math.ceil(minutes / 5) * 5
+      checkTime.setMinutes(roundedMinutes, 0, 0)
+
+      if (roundedMinutes >= 60) {
+        checkTime.setHours(checkTime.getHours() + 1, 0, 0, 0)
+      }
+
+      // Check next 7 days
+      for (let day = 0; day < 7; day++) {
+        const currentDay = new Date(checkTime)
+        currentDay.setDate(currentDay.getDate() + day)
+
+        // Reset to work start if checking future days
+        if (day > 0) {
+          currentDay.setHours(workStart, 0, 0, 0)
+        }
+
+        // Check all slots in this day
+        for (let hour = currentDay.getHours(); hour < workEnd; hour++) {
+          for (let minute of [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]) {
+            // Skip if before current time on first day
+            if (day === 0 && (hour < checkTime.getHours() || (hour === checkTime.getHours() && minute < checkTime.getMinutes()))) {
+              continue
+            }
+
+            const slotStart = new Date(currentDay)
+            slotStart.setHours(hour, minute, 0, 0)
+
+            const slotEnd = new Date(slotStart)
+            slotEnd.setMinutes(slotEnd.getMinutes() + slotDuration)
+
+            // Check if this slot conflicts with any event
+            const hasConflict = allEvents.some(event => {
+              const eventStart = new Date(event.start.dateTime)
+              const eventEnd = new Date(event.end.dateTime)
+
+              return (slotStart < eventEnd && slotEnd > eventStart)
+            })
+
+            if (!hasConflict) {
+              // Found available slot!
+              const isToday = slotStart.toDateString() === new Date().toDateString()
+              const isTomorrow = slotStart.toDateString() === new Date(Date.now() + 86400000).toDateString()
+
+              const timeStr = slotStart.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+
+              if (isToday) {
+                return `Hoje às ${timeStr}`
+              } else if (isTomorrow) {
+                return `Amanhã às ${timeStr}`
+              } else {
+                const dateStr = slotStart.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                return `${dateStr} às ${timeStr}`
+              }
+            }
+          }
+        }
+      }
+
+      return "Sem horários livres"
+    }
+
+    setTodayEvents(todayEvts)
+    setTomorrowEvents(tomorrowEvts)
+    setOccupancyRate(rate)
+    setNextAvailableSlot(findNextAvailableSlot())
+  }
+
+  const fetchAppointmentsStats = async () => {
+    if (!clinicData?.id) return
+
+    try {
+      // Get appointments from last 30 days
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+      const { data: appointments, error } = await supabase
+        .from('consultas')
+        .select('id, status, horario_consulta')
+        .eq('clinic_id', clinicData.id)
+        .gte('horario_consulta', thirtyDaysAgo.toISOString())
+
+      if (error) throw error
+
+      // Calculate cancellation rate
+      const total = appointments?.length || 0
+      const cancelled = appointments?.filter(
+        (a: { status: string }) => a.status === 'CANCELADO' || a.status === 'NO_SHOW'
+      ).length || 0
+      const cancelRate = total > 0 ? Math.round((cancelled / total) * 100) : 0
+
+      // Calculate average per day (last 30 days)
+      const avgPerDay = total > 0 ? (total / 30).toFixed(1) : '0.0'
+
+      setCancellationRate(cancelRate)
+      setAvgAppointmentsPerDay(parseFloat(avgPerDay))
+    } catch (error) {
+      console.error('Error fetching appointments stats:', error)
+    }
+  }
+
   const fetchEvents = async () => {
     if (!clinicData?.id) return
 
@@ -152,7 +307,11 @@ export default function CalendarPage() {
       }
 
       const data = await response.json()
-      setEvents(data.events || [])
+      const fetchedEvents = data.events || []
+      setEvents(fetchedEvents)
+
+      // Calculate statistics with all events (not just current month)
+      calculateStats(fetchedEvents)
 
     } catch (error) {
       console.error("Erro ao buscar eventos do calendário:", error)
@@ -201,7 +360,7 @@ export default function CalendarPage() {
 
     // Preenchimento vazio para dias antes do dia 1
     for (let i = 0; i < firstDayIndex; i++) {
-      days.push(<div key={`empty-${i}`} className="h-24 md:h-32 bg-gray-50/30 border border-gray-100/50"></div>)
+      days.push(<div key={`empty-${i}`} className="h-16 sm:h-24 md:h-32 bg-gray-50/30 border border-gray-100/50"></div>)
     }
 
     // Dias do mês
@@ -217,33 +376,33 @@ export default function CalendarPage() {
           key={day}
           onClick={() => handleDayClick(day)}
           className={`
-            h-24 md:h-32 border border-gray-100 p-2 relative group cursor-pointer transition-colors
+            h-16 sm:h-24 md:h-32 border border-gray-100 p-1 sm:p-2 relative group cursor-pointer transition-colors
             ${isToday ? 'bg-violet-50/50' : 'bg-white hover:bg-gray-50'}
           `}
         >
           <div className="flex justify-between items-start">
             <span className={`
-              text-sm font-medium h-7 w-7 flex items-center justify-center rounded-full
+              text-[10px] sm:text-sm font-medium h-5 w-5 sm:h-7 sm:w-7 flex items-center justify-center rounded-full
               ${isToday ? 'bg-violet-600 text-white' : 'text-gray-700 group-hover:bg-gray-200'}
             `}>
               {day}
             </span>
             {dayEvents.length > 0 && (
-              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-violet-100 text-violet-700 border-none">
+              <Badge variant="secondary" className="text-[8px] sm:text-[10px] h-4 sm:h-5 px-1 sm:px-1.5 bg-violet-100 text-violet-700 border-none">
                 {dayEvents.length}
               </Badge>
             )}
           </div>
 
-          <div className="mt-2 space-y-1 overflow-hidden max-h-[calc(100%-32px)]">
-            {dayEvents.slice(0, 3).map((event, idx) => (
-              <div key={idx} className="text-[10px] truncate px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 border-l-2 border-l-blue-500">
+          <div className="mt-1 sm:mt-2 space-y-0.5 sm:space-y-1 overflow-hidden max-h-[calc(100%-24px)] sm:max-h-[calc(100%-32px)]">
+            {dayEvents.slice(0, 2).map((event, idx) => (
+              <div key={idx} className="text-[8px] sm:text-[10px] truncate px-1 sm:px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 border-l-2 border-l-blue-500 hidden sm:block">
                 {new Date(event.start.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} {event.summary}
               </div>
             ))}
-            {dayEvents.length > 3 && (
-              <div className="text-[10px] text-gray-400 pl-1">
-                + {dayEvents.length - 3} mais
+            {dayEvents.length > 2 && (
+              <div className="text-[8px] sm:text-[10px] text-gray-400 pl-1 hidden sm:block">
+                + {dayEvents.length - 2} mais
               </div>
             )}
           </div>
@@ -365,17 +524,17 @@ export default function CalendarPage() {
     <div className="min-h-screen bg-background">
       <ClinicHeader clinicName={clinicData?.nome} onSignOut={handleSignOut} />
 
-      <main className="container mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-8">
+      <main className="container mx-auto px-2 sm:px-6 py-4 sm:py-8">
+        <div className="flex items-center justify-between mb-4 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Calendário</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Agenda</h1>
+            <p className="text-muted-foreground mt-1 text-sm hidden sm:block">
               Visualize seus agendamentos sincronizados com o Google Calendar.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1 sm:gap-2">
             <Button
-              className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all"
+              className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all text-xs sm:text-sm px-2 sm:px-4"
               onClick={() => {
                 const today = new Date()
                 const dateStr = today.toISOString().split('T')[0]
@@ -384,30 +543,123 @@ export default function CalendarPage() {
                 setIsCreateDialogOpen(true)
               }}
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Evento
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Novo Evento</span>
             </Button>
             <Button className="bg-gray-200 text-black border-1 border-gray-300 hover:bg-gray-300 hover:text-black" size="icon" onClick={fetchEvents} disabled={loadingEvents}>
-              <RefreshCw className={`h-4 w-4 ${loadingEvents ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${loadingEvents ? 'animate-spin' : ''}`} />
             </Button>
-            <Button className="bg-gray-200 text-black border-1 border-gray-300 hover:bg-gray-300 hover:text-black" onClick={() => setCurrentDate(new Date())}>
+            <Button className="bg-gray-200 text-black border-1 border-gray-300 hover:bg-gray-300 hover:text-black text-xs sm:text-sm px-2 sm:px-4" onClick={() => setCurrentDate(new Date())}>
               Hoje
             </Button>
           </div>
         </div>
 
+        {/* Quick Stats */}
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4" />
+                Taxa de Ocupação (7 dias)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">{occupancyRate}%</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Próximos 7 dias
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Consultas Hoje
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">{todayEvents.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {todayEvents.filter(e => new Date(e.start.dateTime) > new Date()).length} restantes
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="sm:col-span-2 lg:col-span-1">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4" />
+                Consultas Amanhã
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">{tomorrowEvents.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Agendadas
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="sm:col-span-2 lg:col-span-1">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Próximo Horário Livre
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-lg sm:text-xl font-bold text-foreground">{nextAvailableSlot || "Calculando..."}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Disponível para agendamento
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                Taxa de Cancelamento
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">{cancellationRate}%</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Últimos 30 dias
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Média de Consultas/Dia
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">{avgAppointmentsPerDay}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Últimos 30 dias
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
         <Card className="border-border/60 bg-white/90 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between py-4">
-            <div className="flex items-center gap-4">
-              <h2 className="text-2xl font-semibold text-gray-800 capitalize w-48">
+          <CardHeader className="flex flex-row items-center justify-between py-2 sm:py-4 px-2 sm:px-6">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <h2 className="text-base sm:text-2xl font-semibold text-gray-800 capitalize">
                 {MONTHS[currentDate.getMonth()]} <span className="text-gray-400">{currentDate.getFullYear()}</span>
               </h2>
-              <div className="flex items-center gap-1 bg-gray-100 rounded-md p-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={prevMonth}>
-                  <ChevronLeft className="h-4 w-4" />
+              <div className="flex items-center gap-0.5 sm:gap-1 bg-gray-100 rounded-md p-0.5 sm:p-1">
+                <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-8 sm:w-8" onClick={prevMonth}>
+                  <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={nextMonth}>
-                  <ChevronRight className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-8 sm:w-8" onClick={nextMonth}>
+                  <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
               </div>
             </div>
@@ -416,7 +668,7 @@ export default function CalendarPage() {
             {/* Cabeçalho dias da semana */}
             <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50/50">
               {DAYS_SHORT.map(day => (
-                <div key={day} className="py-2 text-center text-sm font-semibold text-gray-500">
+                <div key={day} className="py-1 sm:py-2 text-center text-[10px] sm:text-sm font-semibold text-gray-500">
                   {day}
                 </div>
               ))}
@@ -510,7 +762,7 @@ export default function CalendarPage() {
                     </div>
 
                     {/* Botões de Ação */}
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                       <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-500 hover:text-blue-600" onClick={() => setEditingEvent(evt)}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
                       </Button>

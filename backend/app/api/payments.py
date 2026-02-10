@@ -185,6 +185,33 @@ def check_subscription_status(clinic_id: str):
         
     except Exception as e:
         return {"status": "error"}
+
+@router.get("/checkout/tokens/status/{clinic_id}")
+def check_token_purchase_status(clinic_id: str):
+    """
+    Verifica o status da compra de tokens mais recente.
+    Usado pelo Frontend para polling durante espera de pagamento.
+    Retorna 'pago' se a última compra foi confirmada.
+    """
+    try:
+        # Busca a compra de tokens mais recente na tabela compra_tokens
+        result = supabase.table('compra_tokens')\
+            .select('status')\
+            .eq('clinic_id', clinic_id)\
+            .order('created_at', desc=True)\
+            .limit(1)\
+            .maybe_single()\
+            .execute()
+            
+        if result.data:
+            status = result.data['status']
+            return {"status": status}
+            
+        return {"status": "none"}
+        
+    except Exception as e:
+        print(f"❌ Erro ao verificar status de compra de tokens: {e}")
+        return {"status": "error"}
     
 @router.post("/cancel-subscription")
 async def cancel_subscription(data: CancelRequest):
