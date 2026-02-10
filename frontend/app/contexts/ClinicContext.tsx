@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState } from "react"
+import { createContext, useContext, useState, Dispatch, SetStateAction } from "react"
 
 export type ClinicData = {
   id: string
@@ -16,11 +16,18 @@ export type ClinicData = {
   plano: 'basic' | 'premium' | 'enterprise'
   tipo_calendario: 'google' | 'outlook'
   calendar_refresh_token: string | null
+  saldo_tokens: number
+  tokens_comprados: number
+  assinaturas?: {
+    planos?: {
+      max_tokens: number
+    } | null
+  }[] | null
 }
 
 type ClinicContextType = {
   clinicData: ClinicData | null
-  setClinicData: (data: ClinicData | null) => void
+  setClinicData: Dispatch<SetStateAction<ClinicData | null>>
 }
 
 const ClinicContext = createContext<ClinicContextType | null>(null)

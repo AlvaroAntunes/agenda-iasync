@@ -978,15 +978,21 @@ class AgenteClinica:
                 return
 
             # Busca saldo atual
-            resp = supabase.table('clinicas').select('saldo_tokens').eq('id', clinic_id).single().execute()
+            resp = supabase.table('clinicas').select('saldo_tokens, tokens_comprados').eq('id', clinic_id).single().execute()
             
             if resp.data:
                 saldo_atual = resp.data.get('saldo_tokens', 0) or 0
+                coluna_saldo = 'saldo_tokens'
+
+                if saldo_atual <= 0:
+                    saldo_atual = resp.data.get('tokens_comprados', 0) or 0
+                    coluna_saldo = 'tokens_comprados'
+
                 # Evita saldo negativo, mas permite chegar a 0
                 novo_saldo = max(0, saldo_atual - tokens_gastos)
                 
                 # Atualiza no banco
-                supabase.table('clinicas').update({'saldo_tokens': novo_saldo, 'custo_usd': custo_usd}).eq('id', clinic_id).execute()
+                supabase.table('clinicas').update({coluna_saldo: novo_saldo, 'custo_usd': custo_usd}).eq('id', clinic_id).execute()
                 print(f"📉 Tokens debitados: -{tokens_gastos} | Saldo restante: {novo_saldo}")
                 
         except Exception as e:

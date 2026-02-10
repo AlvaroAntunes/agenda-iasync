@@ -86,6 +86,7 @@ export async function POST(request: Request) {
         tipo_calendario: 'google',
         ia_ativa: true,
         prompt_ia: '',
+        saldo_tokens: 600000 // 600k tokens para o plano trial
       })
       .select()
       .single()

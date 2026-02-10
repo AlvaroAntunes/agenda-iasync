@@ -43,6 +43,16 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
 
             {/* Middle: Nav */}
             <nav className="hidden md:flex items-center gap-1 ml-4">
+              <Link href="/dashboard">
+                <Button
+                  variant={pathname === '/dashboard' ? "secondary" : "ghost"}
+                  className={`gap-2 ${pathname === '/dashboard' ? 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100' : 'text-slate-600'}`}
+                >
+                  <Users className="h-4 w-4" />
+                  Dashboard
+                </Button>
+              </Link>
+
               <Link href="/dashboard/leads">
                 <Button
                   variant={isActive('/dashboard/leads') ? "secondary" : "ghost"}
@@ -63,7 +73,7 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
                 </Button>
               </Link>
 
-              <Link href="#">
+              <Link href="/dashboard/calendario">
                 <Button variant="ghost" className="gap-2 text-slate-600">
                   <CalendarDays className="h-4 w-4" />
                   Calendário

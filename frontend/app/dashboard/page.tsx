@@ -4,8 +4,11 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Switch } from "@/components/ui/switch"
+import { Slider } from "@/components/ui/slider"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { TrialBanner } from "@/components/TrialBanner"
 import {
   Calendar,
@@ -27,7 +30,7 @@ import { useSubscriptionCheck } from "@/lib/use-subscription-check"
 import { logger } from '@/lib/logger'
 import { toast } from "sonner"
 import { ClinicHeader } from "@/components/Header"
-import { useClinic } from "@/app/contexts/ClinicContext"
+import { ClinicData, useClinic } from "@/app/contexts/ClinicContext"
 
 type Appointment = {
   id: string
@@ -51,6 +54,12 @@ export default function ClinicDashboard() {
 
   const { clinicData, setClinicData } = useClinic()
 
+  // Token Purchase State
+  const [buyTokensOpen, setBuyTokensOpen] = useState(false)
+  const [tokenAmount, setTokenAmount] = useState(1) // Em milhões
+  const [buyingTokens, setBuyingTokens] = useState(false)
+  const [isWaitingTokenPayment, setIsWaitingTokenPayment] = useState(false)
+
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(true)
   const [success, setSuccess] = useState("")
@@ -64,12 +73,95 @@ export default function ClinicDashboard() {
   const [newConversationsCount, setNewConversationsCount] = useState(0)
   const [newConversationsLoading, setNewConversationsLoading] = useState(false)
   const [weeklyConversations, setWeeklyConversations] = useState<{ label: string; count: number }[]>([])
+  const [hoveredPoint, setHoveredPoint] = useState<{ label: string; count: number; x: number; y: number } | null>(null)
   const hasInstanceToken = Boolean(clinicData?.uazapi_token)
 
   useEffect(() => {
     checkAuthAndLoadClinic()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Realtime subscription for Clinic Updates (Balance/Status)
+  useEffect(() => {
+    if (!clinicData?.id) return
+
+    const channel = supabase
+      .channel(`clinic-updates-${clinicData.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'clinicas',
+          filter: `id=eq.${clinicData.id}`
+        },
+        (payload: any) => {
+          const updated = payload.new
+          if (updated) {
+            setClinicData((prev: ClinicData | null) => {
+              if (!prev) return null
+
+              // Show toast only if balance increased
+              if (updated.saldo_tokens > prev.saldo_tokens) {
+                toast.success("Saldo de tokens atualizado!")
+                setIsWaitingTokenPayment(false)
+                setBuyTokensOpen(false)
+              }
+
+              return {
+                ...prev,
+                saldo_tokens: updated.saldo_tokens,
+                tokens_comprados: updated.tokens_comprados,
+                ia_ativa: updated.ia_ativa,
+              }
+            })
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [clinicData?.id])
+
+  const handleBuyTokens = async () => {
+    if (!clinicData?.id) return
+
+    setBuyingTokens(true)
+    try {
+      const amount_tokens = tokenAmount * 1000000
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/checkout/tokens`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          clinic_id: clinicData.id,
+          amount_tokens: amount_tokens
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || "Erro ao processar compra")
+      }
+
+      const data = await response.json()
+      if (data.url) {
+        window.open(data.url, '_blank')
+        // setBuyTokensOpen(false) // Keep it open or close? Better to close and show waiting modal
+        setBuyTokensOpen(false)
+        setIsWaitingTokenPayment(true)
+      }
+    } catch (error: any) {
+      console.error("Erro na compra de tokens:", error)
+      alert(error.message || "Erro ao iniciar compra de tokens")
+    } finally {
+      setBuyingTokens(false)
+    }
+  }
 
   const checkAuthAndLoadClinic = async () => {
     try {
@@ -94,7 +186,16 @@ export default function ClinicDashboard() {
       // Carregar dados da clínica
       const { data: clinic, error: clinicError } = await supabase
         .from('clinicas')
-        .select('*')
+        .select(`
+          *,
+          *,
+          tokens_comprados,
+          assinaturas (
+            planos (
+              max_tokens
+            )
+          )
+        `)
         .eq('id', profile.clinic_id)
         .single()
 
@@ -468,6 +569,52 @@ export default function ClinicDashboard() {
     return <Badge variant="secondary">{status}</Badge>
   }
 
+  const totalTokens = clinicData?.assinaturas?.[0]?.planos?.max_tokens || 1000000
+  const saldoTokens = clinicData?.saldo_tokens || 0
+  const tokensComprados = clinicData?.tokens_comprados || 0
+
+  // Lógica de visualização
+  const usingPurchasedTokens = saldoTokens <= 0 && tokensComprados > 0
+  const outOfTokens = saldoTokens <= 0 && tokensComprados <= 0
+
+  // Se estiver usando tokens comprados, não tem "porcentagem" do plano, é valor absoluto
+  // Se estiver usando plano, calcula porcentagem
+  const usedPlanTokens = Math.max(0, totalTokens - saldoTokens)
+  const tokenPercentage = (usedPlanTokens / totalTokens) * 100
+
+  // Modal de Espera de Pagamento (Token)
+  if (isWaitingTokenPayment) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-violet-100 via-white to-violet-200 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div className="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-md mx-4 border border-violet-100 relative">
+          <div className="flex flex-col items-center mb-4">
+            <div className="animate-spin w-14 h-14 border-4 border-violet-500 border-t-transparent rounded-full mb-2 shadow-lg"></div>
+            <span className="absolute top-6 right-6 text-violet-400 animate-pulse">
+              <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeWidth="2" d="M12 2v2m0 16v2m8-10h2M2 12H4m15.07 7.07l1.41 1.41M4.93 4.93L3.52 3.52m15.07-1.41l-1.41 1.41M4.93 19.07l-1.41 1.41" /></svg>
+            </span>
+          </div>
+          <h3 className="text-2xl font-extrabold text-violet-700 mb-2 tracking-tight">Aguardando Pagamento...</h3>
+          <p className="text-gray-600 mb-6 text-base">
+            A guia de pagamento foi aberta em uma nova aba.<br />
+            Assim que o pagamento for identificado, seu saldo será atualizado automaticamente.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full py-2 mb-3 rounded-lg bg-violet-600 text-white font-semibold hover:bg-violet-700 transition-colors shadow-md cursor-pointer"
+          >
+            Já paguei, mas não atualizou?
+          </button>
+          <button
+            onClick={() => setIsWaitingTokenPayment(false)}
+            className="w-full py-1 text-xs text-gray-400 hover:text-violet-600 underline transition-colors cursor-pointer"
+          >
+            Cancelar espera
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <ClinicHeader clinicName={clinicData?.nome} onSignOut={handleSignOut} />
@@ -508,7 +655,52 @@ export default function ClinicDashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {outOfTokens ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                    <p className="text-xs font-semibold text-red-700">IA Pausada</p>
+                    <p className="mt-1 text-xs text-red-600 leading-tight">
+                      A IA não está funcionando. Seus tokens acabaram.
+                    </p>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="mt-2 h-7 w-full text-xs"
+                      onClick={() => setBuyTokensOpen(true)}
+                    >
+                      Comprar mais
+                    </Button>
+                  </div>
+                ) : usingPurchasedTokens ? (
+                  <div className="rounded-xl border border-border/60 bg-violet-50/60 px-4 py-3">
+                    <p className="text-xs text-violet-700">Saldo Extra Disponível</p>
+                    <p className="mt-1 text-lg font-semibold text-violet-900">
+                      {new Intl.NumberFormat('pt-BR').format(tokensComprados)}
+                    </p>
+                    <p className="text-[10px] text-violet-700/70">
+                      Tokens comprados
+                    </p>
+                    <Button
+                      // variant="outline"
+                      size="sm"
+                      className="bg-gray-100 border-1 mt-2 h-6 w-full text-[10px] border-violet-200 text-violet-700 hover:bg-violet-100"
+                      onClick={() => setBuyTokensOpen(true)}
+                    >
+                      Comprar mais
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-border/60 bg-violet-50/60 px-4 py-3">
+                    <p className="text-xs text-violet-700">Tokens utilizados IA</p>
+                    <p className="mt-1 text-lg font-semibold text-violet-900">
+                      {Math.floor(tokenPercentage)}%
+                    </p>
+                    <Progress value={tokenPercentage || 0} className="mt-2 h-1.5 bg-violet-200" indicatorClassName="bg-violet-500" />
+                    <p className="mt-1 text-[10px] text-violet-700/70">
+                      {new Intl.NumberFormat('pt-BR').format(usedPlanTokens)} / {new Intl.NumberFormat('pt-BR').format(totalTokens)}
+                    </p>
+                  </div>
+                )}
                 <div className="rounded-xl border border-border/60 bg-emerald-50/60 px-4 py-3">
                   <p className="text-xs text-emerald-700">Consultas hoje</p>
                   <p className="mt-1 text-2xl font-semibold text-emerald-900">
@@ -537,12 +729,10 @@ export default function ClinicDashboard() {
                 </Button>
                 {clinicData?.calendar_refresh_token ? (
                   <Button
+                    className="hover:text-black"
                     variant="outline"
                     onClick={() => {
-                      const calendarUrl = clinicData?.tipo_calendario === 'google'
-                        ? 'https://calendar.google.com'
-                        : 'https://outlook.live.com/calendar'
-                      window.open(calendarUrl, '_blank')
+                      router.push('/dashboard/calendario')
                     }}
                   >
                     Ver calendário
@@ -588,6 +778,8 @@ export default function ClinicDashboard() {
             <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-emerald-100/60 blur-2xl" />
           </Card>
 
+
+
           <Card className="border-border/60 bg-white/90">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -605,6 +797,7 @@ export default function ClinicDashboard() {
                   </p>
                 </div>
                 <Switch
+                  className="cursor-pointer"
                   checked={clinicData?.ia_ativa ?? false}
                   onCheckedChange={handleToggleIA}
                 />
@@ -683,7 +876,8 @@ export default function ClinicDashboard() {
                         Criar instância
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="ghost"
+                        className="bg-gray-300"
                         onClick={handleConnectUazapi}
                         disabled={uazapiLoading || uazapiStatus === "not_configured"}
                       >
@@ -710,7 +904,6 @@ export default function ClinicDashboard() {
           <Card className="border-border/60 bg-white/90">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Conversas</CardTitle>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="w-full md:w-1/3">
@@ -722,7 +915,7 @@ export default function ClinicDashboard() {
                   Ir para conversas
                 </Button>
               </div>
-              <div className="h-24 w-full md:w-2/3 md:pl-4 overflow-visible">
+              <div className="relative h-24 w-full md:w-2/3 md:pl-4 overflow-visible">
                 <svg viewBox="0 0 100 40" className="h-full w-full overflow-visible">
                   <polyline
                     fill="none"
@@ -739,12 +932,30 @@ export default function ClinicDashboard() {
                         key={item.label}
                         cx={x}
                         cy={y}
-                        r="2"
-                        className="fill-emerald-500"
+                        r="3"
+                        className="fill-emerald-500 hover:fill-emerald-600 transition-colors cursor-pointer"
+                        onMouseEnter={() => setHoveredPoint({ label: item.label, count: item.count, x, y })}
+                        onMouseLeave={() => setHoveredPoint(null)}
                       />
                     )
                   })}
                 </svg>
+                {hoveredPoint && (
+                  <div
+                    className="absolute z-10 bg-slate-900/90 text-white text-[10px] rounded-md py-1.5 px-2.5 pointer-events-none transform -translate-x-1/2 -translate-y-full shadow-xl ring-1 ring-white/10 backdrop-blur-sm"
+                    style={{
+                      left: `${hoveredPoint.x}%`,
+                      top: `${(hoveredPoint.y / 40) * 100}%`,
+                      marginTop: '-8px'
+                    }}
+                  >
+                    <div className="font-bold flex items-center gap-1">
+                      {hoveredPoint.count}
+                      <span className="font-normal opacity-70">conv.</span>
+                    </div>
+                    <div className="text-white/60 font-medium whitespace-nowrap">{hoveredPoint.label}</div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -772,6 +983,126 @@ export default function ClinicDashboard() {
             </CardContent>
           </Card>
         </div>
+        <Dialog open={buyTokensOpen} onOpenChange={setBuyTokensOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Comprar Mais Tokens</DialogTitle>
+              <DialogDescription>
+                Adicione mais tokens para continuar usando a IA sem interrupções.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-6 space-y-6">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-slate-700">Quantidade</span>
+                  <span className="text-lg font-bold text-violet-700">{tokenAmount} {tokenAmount === 1 ? "milhão" : "milhões"} de tokens</span>
+                </div>
+
+                <Slider
+                  defaultValue={[1]}
+                  max={50}
+                  min={1}
+                  step={1}
+                  value={[tokenAmount]}
+                  onValueChange={(vals) => setTokenAmount(vals[0])}
+                  className="py-4"
+                />
+
+                <p className="text-xs text-slate-500">
+                  Cada 1 milhão de tokens custa <strong>R$ 5,00</strong>.
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex justify-between items-center">
+                <span className="text-slate-600 font-medium">Total a Pagar</span>
+                <span className="text-2xl font-bold text-slate-900">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(tokenAmount * 5)}
+                </span>
+              </div>
+            </div>
+
+            <DialogFooter className="sm:justify-end gap-2">
+              <Button variant="ghost" onClick={() => setBuyTokensOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleBuyTokens}
+                disabled={buyingTokens}
+                className="bg-violet-600 hover:bg-violet-700 text-white"
+              >
+                {buyingTokens ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                    Gerando Pix...
+                  </>
+                ) : (
+                  <>Comprar Agora</>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={buyTokensOpen} onOpenChange={setBuyTokensOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Comprar Mais Tokens</DialogTitle>
+              <DialogDescription>
+                Adicione mais tokens para continuar usando a IA sem interrupções.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-6 space-y-6">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-slate-700">Quantidade</span>
+                  <span className="text-lg font-bold text-violet-700">{tokenAmount} {tokenAmount === 1 ? "milhão" : "milhões"} de tokens</span>
+                </div>
+
+                <Slider
+                  defaultValue={[1]}
+                  max={50}
+                  min={1}
+                  step={1}
+                  value={[tokenAmount]}
+                  onValueChange={(vals) => setTokenAmount(vals[0])}
+                  className="py-4"
+                />
+
+                <p className="text-xs text-slate-500">
+                  Cada 1 milhão de tokens custa <strong>R$ 5,00</strong>.
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex justify-between items-center">
+                <span className="text-slate-600 font-medium">Total a Pagar</span>
+                <span className="text-2xl font-bold text-slate-900">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(tokenAmount * 5)}
+                </span>
+              </div>
+            </div>
+
+            <DialogFooter className="sm:justify-end gap-2">
+              <Button variant="ghost" onClick={() => setBuyTokensOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleBuyTokens}
+                disabled={buyingTokens}
+                className="bg-violet-600 hover:bg-violet-700 text-white"
+              >
+                {buyingTokens ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                    Gerando Pix...
+                  </>
+                ) : (
+                  <>Comprar Agora</>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   )

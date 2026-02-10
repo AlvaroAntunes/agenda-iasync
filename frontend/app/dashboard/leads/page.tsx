@@ -512,7 +512,7 @@ export default function LeadsPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Leads</CardTitle>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => setTagDialogOpen(true)}>
+              <Button className="hover:text-black" variant="outline" onClick={() => setTagDialogOpen(true)}>
                 <Tag className="mr-2 h-4 w-4" /> Tags
               </Button>
               <Button onClick={() => setShowNewLeadModal(true)}>
@@ -663,6 +663,7 @@ export default function LeadsPage() {
                 </Button>
                 {tagEditingId && (
                   <Button
+                    className="hover:text-black"
                     variant="ghost"
                     onClick={() => {
                       setTagEditingId(null)
@@ -721,7 +722,7 @@ export default function LeadsPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogCancel className="hover:text-black">Cancelar</AlertDialogCancel>
               <AlertDialogAction onClick={handleDeleteLead}>Excluir</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -444,7 +444,7 @@ export default function ConversasPage() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "chat_messages", filter: `clinic_id=eq.${clinicId}` },
-        (payload) => {
+        (payload: any) => {
           const newMessage = payload.new as ChatMessage & { clinic_id: string }
           if (!newMessage?.session_id) return
           const createdAtMs = new Date(newMessage.created_at).getTime()
@@ -467,8 +467,8 @@ export default function ConversasPage() {
             }
             const next = existing
               ? prev.map((conversation) =>
-                  conversation.sessionId === newMessage.session_id ? updated : conversation
-                )
+                conversation.sessionId === newMessage.session_id ? updated : conversation
+              )
               : [updated, ...prev]
             next.sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime())
             return next
@@ -493,7 +493,7 @@ export default function ConversasPage() {
           }
         }
       )
-      .subscribe((status) => {
+      .subscribe((status: any) => {
         logger.info("Realtime chat_messages status:", { status, clinicId })
       })
 
@@ -502,7 +502,7 @@ export default function ConversasPage() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "leads", filter: `clinic_id=eq.${clinicId}` },
-        (payload) => {
+        (payload: any) => {
           const lead = payload.new as { telefone?: string | null; nome?: string | null }
           if (!lead?.telefone) return
           leadNameCacheRef.current.set(lead.telefone, lead.nome ?? null)
@@ -518,7 +518,7 @@ export default function ConversasPage() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "leads", filter: `clinic_id=eq.${clinicId}` },
-        (payload) => {
+        (payload: any) => {
           const lead = payload.new as { telefone?: string | null; nome?: string | null }
           if (!lead?.telefone) return
           leadNameCacheRef.current.set(lead.telefone, lead.nome ?? null)
@@ -531,7 +531,7 @@ export default function ConversasPage() {
           )
         }
       )
-      .subscribe((status) => {
+      .subscribe((status: any) => {
         logger.info("Realtime leads status:", { status, clinicId })
       })
 
@@ -733,55 +733,55 @@ export default function ConversasPage() {
           return
         }
         phone = raw
-          const { data: existing } = await supabase
+        const { data: existing } = await supabase
+          .from("leads")
+          .select("id")
+          .eq("clinic_id", clinicId)
+          .eq("telefone", raw)
+          .limit(1)
+        if (existing && existing.length) {
+          leadId = existing[0].id
+        } else {
+          const { data: created, error } = await supabase
             .from("leads")
+            .insert({
+              clinic_id: clinicId,
+              nome: newLeadName.trim() || "Sem nome",
+              telefone: raw,
+              lid: raw,
+              status_ia: true,
+            })
             .select("id")
-            .eq("clinic_id", clinicId)
-            .eq("telefone", raw)
-            .limit(1)
-          if (existing && existing.length) {
-            leadId = existing[0].id
-          } else {
-            const { data: created, error } = await supabase
-              .from("leads")
-              .insert({
-                clinic_id: clinicId,
-                nome: newLeadName.trim() || "Sem nome",
-                telefone: raw,
-                lid: raw,
-                status_ia: true,
-              })
-              .select("id")
-              .single()
-            if (error) throw error
-            leadId = created?.id || null
-            if (leadId) {
-              await ensureDefaultTags()
-              const { data: latestTags } = await supabase
-                .from("tags")
-                .select("id, name, color")
-                .eq("clinic_id", clinicId)
-              const novoTag = (latestTags || tags).find(
-                (tag: any) => tag.name?.toLowerCase() === "novo"
+            .single()
+          if (error) throw error
+          leadId = created?.id || null
+          if (leadId) {
+            await ensureDefaultTags()
+            const { data: latestTags } = await supabase
+              .from("tags")
+              .select("id, name, color")
+              .eq("clinic_id", clinicId)
+            const novoTag = (latestTags || tags).find(
+              (tag: any) => tag.name?.toLowerCase() === "novo"
+            )
+            const leadTag = (latestTags || tags).find(
+              (tag: any) => tag.name?.toLowerCase() === "lead"
+            )
+            const tagIds = [novoTag?.id, leadTag?.id].filter(Boolean) as string[]
+            if (tagIds.length) {
+              await supabase.from("lead_tags").upsert(
+                tagIds.map((tagId) => ({
+                  clinic_id: clinicId,
+                  lead_id: leadId!,
+                  tag_id: tagId,
+                })),
+                { onConflict: "lead_id,tag_id" }
               )
-              const leadTag = (latestTags || tags).find(
-                (tag: any) => tag.name?.toLowerCase() === "lead"
-              )
-              const tagIds = [novoTag?.id, leadTag?.id].filter(Boolean) as string[]
-              if (tagIds.length) {
-                await supabase.from("lead_tags").upsert(
-                  tagIds.map((tagId) => ({
-                    clinic_id: clinicId,
-                    lead_id: leadId!,
-                    tag_id: tagId,
-                  })),
-                  { onConflict: "lead_id,tag_id" }
-                )
-              }
             }
-            loadLeadOptions()
           }
+          loadLeadOptions()
         }
+      }
 
       setSelectedSessionId(phone)
       const selectedLeadName =
@@ -925,11 +925,11 @@ export default function ConversasPage() {
 
   const getReplyPayload = async () => {
     if (!selectedSessionId) return null
-      if (!replyFile) {
-        const text = replyText.trim()
-        if (!text) return null
-        return { type: "text", number: selectedSessionId, text }
-      }
+    if (!replyFile) {
+      const text = replyText.trim()
+      if (!text) return null
+      return { type: "text", number: selectedSessionId, text }
+    }
     const reader = new FileReader()
     const base64 = await new Promise<string>((resolve, reject) => {
       reader.onload = () => resolve(String(reader.result || ""))
@@ -973,33 +973,33 @@ export default function ConversasPage() {
         throw new Error(data?.detail || "Erro ao enviar mensagem")
       }
       const nowIso = new Date().toISOString()
-    if (payload.type === "text") {
-      const optimisticMessage: ChatMessage = {
-        id: `local-${nowIso}`,
-        session_id: selectedSessionId,
-        quem_enviou: "ai",
-        conteudo: payload.text,
-        created_at: nowIso,
+      if (payload.type === "text") {
+        const optimisticMessage: ChatMessage = {
+          id: `local-${nowIso}`,
+          session_id: selectedSessionId,
+          quem_enviou: "ai",
+          conteudo: payload.text || "",
+          created_at: nowIso,
+        }
+        setMessages((prev) => [...prev, optimisticMessage])
+      } else {
+        const label = mediaLabel(payload.type as ChatMediaType)
+        const optimisticMessage: ChatMessage = {
+          id: `local-${nowIso}`,
+          session_id: selectedSessionId,
+          quem_enviou: "ai",
+          conteudo: payload.caption || label,
+          created_at: nowIso,
+          media: {
+            type: payload.type as ChatMediaType,
+            mimeType: payload.mime_type,
+            fileName: payload.file_name,
+            caption: payload.caption,
+            dataUrl: payload.media_base64,
+          },
+        }
+        setMessages((prev) => [...prev, optimisticMessage])
       }
-      setMessages((prev) => [...prev, optimisticMessage])
-    } else {
-      const label = mediaLabel(payload.type as ChatMediaType)
-      const optimisticMessage: ChatMessage = {
-        id: `local-${nowIso}`,
-        session_id: selectedSessionId,
-        quem_enviou: "ai",
-        conteudo: payload.caption || label,
-        created_at: nowIso,
-        media: {
-          type: payload.type as ChatMediaType,
-          mimeType: payload.mime_type,
-          fileName: payload.file_name,
-          caption: payload.caption,
-          dataUrl: payload.media_base64,
-        },
-      }
-      setMessages((prev) => [...prev, optimisticMessage])
-    }
       setReplyText("")
       setReplyFile(null)
     } catch (err: any) {
@@ -1259,7 +1259,7 @@ export default function ConversasPage() {
             session_id: selectedSessionId,
             total: data?.length || 0,
           })
-          const ordered = (data || []).slice().reverse().map((row) => normalizeStoredMessage(row))
+          const ordered = (data || []).slice().reverse().map((row: any) => normalizeStoredMessage(row))
           setMessages((prev) => {
             const map = new Map<string, ChatMessage>()
             for (const msg of ordered) map.set(msg.id, msg)
@@ -1325,11 +1325,11 @@ export default function ConversasPage() {
               for (const msg of historyJson.messages) {
                 const ts = normalizeUazapiTimestamp(
                   msg?.messageTimestamp ||
-                    msg?.timestamp ||
-                    msg?.created_at ||
-                    msg?.createdAt ||
-                    msg?.t ||
-                    msg?.time
+                  msg?.timestamp ||
+                  msg?.created_at ||
+                  msg?.createdAt ||
+                  msg?.t ||
+                  msg?.time
                 )
                 if (!oldestTs || ts < oldestTs) oldestTs = ts
                 if (!newestTs || ts > newestTs) newestTs = ts
@@ -1354,19 +1354,19 @@ export default function ConversasPage() {
               if (isDescending === null) {
                 const firstTs = normalizeUazapiTimestamp(
                   historyList[0]?.messageTimestamp ||
-                    historyList[0]?.timestamp ||
-                    historyList[0]?.created_at ||
-                    historyList[0]?.createdAt ||
-                    historyList[0]?.t ||
-                    historyList[0]?.time
+                  historyList[0]?.timestamp ||
+                  historyList[0]?.created_at ||
+                  historyList[0]?.createdAt ||
+                  historyList[0]?.t ||
+                  historyList[0]?.time
                 )
                 const lastTs = normalizeUazapiTimestamp(
                   historyList[historyList.length - 1]?.messageTimestamp ||
-                    historyList[historyList.length - 1]?.timestamp ||
-                    historyList[historyList.length - 1]?.created_at ||
-                    historyList[historyList.length - 1]?.createdAt ||
-                    historyList[historyList.length - 1]?.t ||
-                    historyList[historyList.length - 1]?.time
+                  historyList[historyList.length - 1]?.timestamp ||
+                  historyList[historyList.length - 1]?.created_at ||
+                  historyList[historyList.length - 1]?.createdAt ||
+                  historyList[historyList.length - 1]?.t ||
+                  historyList[historyList.length - 1]?.time
                 )
                 isDescending = firstTs >= lastTs
                 logger.info("Uazapi history order", {
@@ -1378,11 +1378,11 @@ export default function ConversasPage() {
               const mapped = historyList.map((msg: any, idx: number) => {
                 const createdAt = normalizeUazapiTimestamp(
                   msg?.messageTimestamp ||
-                    msg?.timestamp ||
-                    msg?.created_at ||
-                    msg?.createdAt ||
-                    msg?.t ||
-                    msg?.time
+                  msg?.timestamp ||
+                  msg?.created_at ||
+                  msg?.createdAt ||
+                  msg?.t ||
+                  msg?.time
                 )
                 const rawContent = msg?.text ?? msg?.content ?? msg?.message ?? ""
                 const parsedContent = tryParseJson(rawContent)
@@ -1410,7 +1410,7 @@ export default function ConversasPage() {
                   media,
                 }
               })
-              allMessages = allMessages.concat(mapped)
+              allMessages = allMessages.concat(mapped as ChatMessage[])
               if (allMessages.length > pageLimit * 2) {
                 allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
                 allMessages = allMessages.slice(-pageLimit)
@@ -1448,11 +1448,11 @@ export default function ConversasPage() {
                 prev.map((conversation) =>
                   conversation.sessionId === selectedSessionId
                     ? {
-                        ...conversation,
-                        lastMessage: displayContent,
-                        lastSender: lastMessage.quem_enviou,
-                        lastAt: lastMessage.created_at,
-                      }
+                      ...conversation,
+                      lastMessage: displayContent,
+                      lastSender: lastMessage.quem_enviou,
+                      lastAt: lastMessage.created_at,
+                    }
                     : conversation
                 )
               )
@@ -1558,26 +1558,26 @@ export default function ConversasPage() {
           <Card className="h-full lg:order-1">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Conversas</CardTitle>
-                <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-                  <Button size="sm" onClick={() => setNewConversationOpen(true)} className="w-full sm:w-auto">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Nova conversa
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      if (!clinicId) return
-                      fetchUazapiStatus(clinicId).then(() => {
-                        loadConversations(clinicId)
-                      })
-                    }}
-                    disabled={loading}
-                    className="self-end sm:self-auto"
-                  >
-                    <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-                  </Button>
-                </div>
+              <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+                <Button size="sm" onClick={() => setNewConversationOpen(true)} className="w-full sm:w-auto">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nova conversa
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    if (!clinicId) return
+                    fetchUazapiStatus(clinicId).then(() => {
+                      loadConversations(clinicId)
+                    })
+                  }}
+                  disabled={loading}
+                  className="self-end sm:self-auto"
+                >
+                  <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+                </Button>
+              </div>
             </CardHeader>
 
             <CardContent className="space-y-2">
@@ -1610,7 +1610,7 @@ export default function ConversasPage() {
                       selectedSessionId === conversation.sessionId && "border-primary/60 bg-muted"
                     )}
                   >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="font-medium text-sm">
                         {conversation.leadName || "Contato sem nome"}
                       </div>
@@ -1890,6 +1890,7 @@ export default function ConversasPage() {
                       </div>
                     </div>
                     <Switch
+                      className="cursor-pointer"
                       checked={Boolean(selectedLead?.status_ia)}
                       onCheckedChange={(checked) => handleToggleLeadIA(checked)}
                       disabled={!selectedLead || leadIaUpdating || leadInfoLoading}

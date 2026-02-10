@@ -23,6 +23,13 @@ PLAN_HIERARCHY = {
     'corporate': 3
 }
 
+PLAN_TOKENS = {
+    'trial': 600000,
+    'consultorio': 8000000,
+    'clinica_pro': 26000000,
+    'corporate': 80000000
+}
+
 @router.post("/webhook/asaas")
 def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(None)):
     """
@@ -48,7 +55,8 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
         subscription_id = payment.get("subscription")
         installment_id = payment.get("installment")
         payment_id = payment.get("paymentLink")
-        asaas_id_referencia = subscription_id or installment_id or payment_id
+        id = payment.get("id")
+        asaas_id_referencia = subscription_id or installment_id or payment_id or id
         
         print(f"💰 Webhook Asaas: {event} | Asaas id: {asaas_id_referencia}")
 
@@ -58,6 +66,43 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
         # 2. Lógica de Pagamento Recebido (Ativação/Renovação)
         if event in ["PAYMENT_RECEIVED", "PAYMENT_CONFIRMED"]:
             
+            # --- CHECK FOR TOKEN PURCHASE ---
+            token_purchase = supabase.table('compra_tokens')\
+                .select('*')\
+                .eq('asaas_id', asaas_id_referencia)\
+                .eq('status', 'pendente')\
+                .maybe_single()\
+                .execute()
+            
+            if token_purchase.data:
+                purchase = token_purchase.data
+                print(f"🪙 Pagamento de Tokens Recebido: {purchase['id']} - {purchase['quantidade_tokens']} tokens")
+                
+                # 1. Marcar como pago
+                supabase.table('compra_tokens').update({
+                    'status': 'pago', 
+                    'pagamento_at': dt.datetime.now().isoformat()
+                }).eq('id', purchase['id']).execute()
+                
+                # 2. Adicionar saldo à clínica (Incremento)
+                # Precisamos ler o saldo atual primeiro para incrementar com segurança (concorrência é rara aqui)
+                # Ou usar uma RPC se tivesse, mas vamos de read-modify-write
+                
+                clinic_res = supabase.table('clinicas').select('tokens_comprados').eq('id', purchase['clinic_id']).single().execute()
+
+                if clinic_res.data:
+                    current_balance = clinic_res.data.get('tokens_comprados', 0) or 0
+                    new_balance = current_balance + purchase['quantidade_tokens']
+                    
+                    supabase.table('clinicas').update({
+                        'tokens_comprados': new_balance,
+                        'ia_ativa': True # Reativar IA se estava pausada
+                    }).eq('id', purchase['clinic_id']).execute()
+                    
+                    print(f"✅ Saldo de tokens atualizado para {new_balance}")
+                
+                return {"status": "processed_token_purchase"}
+
             # A. Verificar se existe uma intenção de compra (Checkout Session) pendente
             # Isso indica uma Nova Assinatura ou um Upgrade/Troca de Plano
             sessao_query = supabase.table('checkout_sessions')\

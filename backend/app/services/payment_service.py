@@ -297,3 +297,39 @@ def atualizar_vencimento_assinatura_asaas(subscription_id, proximo_vencimento):
     except Exception as e:
         print(f"❌ Erro conexão Asaas (Update Vencimento): {e}")
         return False
+
+def criar_cobranca_avulsa(customer_asaas_id, valor, descricao):
+    """
+    Cria uma cobrança avulsa (pagamento único) no Asaas.
+    Permite pagamento via PIX, Boleto ou Cartão (definido pelo usuário no link).
+    """
+    url = f"{ASAAS_API_URL}/payments"
+    
+    # Data de vencimento: +1 dia para dar tempo do cliente pagar
+    vencimento = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    body = {
+        "customer": customer_asaas_id,
+        "billingType": "UNDEFINED", # Permite que o cliente escolha a forma de pagamento
+        "value": float(valor),
+        "dueDate": vencimento,
+        "description": descricao
+    }
+    
+    try:
+        response = requests.post(url, json=body, headers=get_headers())
+        
+        if response.status_code == 200:
+            pay = response.json()
+            return {
+                "asaas_id": pay["id"],
+                "checkout_url": pay["invoiceUrl"],
+                "due_date": pay["dueDate"]
+            }
+        
+        print(f"❌ Erro Criar Cobrança Avulsa: {response.text}")
+        return None
+        
+    except Exception as e:
+        print(f"❌ Erro conexão Asaas (Avulsa): {e}")
+        return None

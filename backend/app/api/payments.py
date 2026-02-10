@@ -6,7 +6,8 @@ from app.services.payment_service import (
     criar_cliente_asaas, 
     buscar_fatura_pendente,
     criar_checkout_anual,
-    cancelar_assinatura_asaas
+    cancelar_assinatura_asaas,
+    criar_cobranca_avulsa
 )
 from dotenv import load_dotenv
 from app.core.database import get_supabase
@@ -223,3 +224,57 @@ async def cancel_subscription(data: CancelRequest):
     except Exception as e:
         print(f"Erro interno no cancelamento: {str(e)}")
         raise HTTPException(status_code=500, detail="Erro interno ao cancelar assinatura.")
+
+class TokenPurchaseInput(BaseModel):
+    clinic_id: str
+    amount_tokens: int
+
+@router.post("/checkout/tokens")
+def create_token_checkout(dados: TokenPurchaseInput):
+    """
+    Gera cobrança avulsa para compra de tokens.
+    Preço: R$ 5,00 por 1 milhão de tokens.
+    """
+    try:
+        # 1. Validar e Calcular
+        if dados.amount_tokens < 1000000:
+            raise HTTPException(status_code=400, detail="Mínimo de 1 milhão de tokens.")
+        
+        milhoes = dados.amount_tokens / 1000000
+        valor = milhoes * 5.00
+        
+        # 2. Buscar Cliente Asaas
+        clinica = supabase.table('clinicas').select('asaas_customer_id, nome').eq('id', dados.clinic_id).single().execute()
+        
+        if not clinica.data or not clinica.data.get('asaas_customer_id'):
+            raise HTTPException(status_code=404, detail="Clínica não configurada para pagamentos.")
+             
+        asaas_customer_id = clinica.data['asaas_customer_id']
+        descricao = f"Compra de {int(milhoes)} Milhões de Tokens IA"
+        
+        # 3. Criar Cobrança
+        cobranca = criar_cobranca_avulsa(asaas_customer_id, valor, descricao)
+        
+        if not cobranca:
+             raise HTTPException(status_code=500, detail="Erro ao gerar cobrança no Asaas.")
+             
+        # 4. Salvar Intenção de Compra
+        try:
+            supabase.table('compra_tokens').insert({
+                "clinic_id": dados.clinic_id,
+                "asaas_id": cobranca['asaas_id'],
+                "quantidade_tokens": dados.amount_tokens,
+                "valor": valor,
+                "status": "pendente"
+            }).execute()
+        except Exception as e:
+            print(f"⚠️ Erro ao salvar intenção de compra de tokens: {e}")
+            raise HTTPException(status_code=500, detail="Erro interno ao registrar compra (Tabela compra_tokens existe?).")
+
+        return {"url": cobranca['checkout_url']}
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"❌ Erro Checkout Tokens: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

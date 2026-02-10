@@ -135,6 +135,24 @@ class GoogleCalendarService(CalendarService):
         
         return events_result.get('items', [])
 
+    def listar_eventos_periodo(self, start_dt: dt.datetime, end_dt: dt.datetime, calendar_id='primary'):
+        """
+        Lista eventos em um intervalo personalizado.
+        As datas já devem ter timezone info se possível, ou serão tratadas como UTC/Local dependendo da config.
+        """
+        print(f"🔍 Buscando eventos (range) entre {start_dt.isoformat()} e {end_dt.isoformat()}")
+
+        events_result = self.service.events().list(
+            calendarId=calendar_id,
+            timeMin=start_dt.isoformat(),
+            timeMax=end_dt.isoformat(),
+            maxResults=2500,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        
+        return events_result.get('items', [])
+
     def criar_evento(self, calendar_id, resumo, inicio_dt: dt.datetime, descricao: str = None):
         # inicio_dt deve ser um objeto datetime
         fim_dt = inicio_dt + dt.timedelta(hours=1)
@@ -199,3 +217,20 @@ class GoogleCalendarService(CalendarService):
         except Exception as e:
             print(f"⚠️ Erro ao mover evento no Google Calendar: {e}")
             raise e # Lança o erro para o Agente saber que falhou
+
+    def atualizar_evento(self, calendar_id: str, event_id: str, body: dict):
+        """
+        Atualiza campos de um evento (PATCH).
+        Body pode conter summary, description, start, end, etc.
+        """
+        try:
+            print(f"✏️ Atualizando evento {event_id} em {calendar_id}...")
+            evento_atualizado = self.service.events().patch(
+                calendarId=calendar_id,
+                eventId=event_id,
+                body=body
+            ).execute()
+            return evento_atualizado
+        except Exception as e:
+            print(f"⚠️ Erro ao atualizar evento no Google Calendar: {e}")
+            raise e

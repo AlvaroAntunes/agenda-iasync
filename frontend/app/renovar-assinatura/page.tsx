@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { Button } from "@/components/ui/button"
-import { Check, Clock, MessageCircle, LogOut, Sparkles } from "lucide-react"
+import { Check, Clock, LogOut, Sparkles, ArrowRight } from "lucide-react"
 import { logger } from '@/lib/logger'
 
 export default function RenovarAssinaturaPage() {
@@ -251,12 +251,12 @@ export default function RenovarAssinaturaPage() {
                 whileTap={{ scale: 0.98 }}
               >
                 <Button
-                  onClick={handleRenovarWhatsApp}
+                  onClick={() => router.push('/planos')}
                   className="w-full h-12 sm:h-14 bg-white text-cyan-900 hover:bg-cyan-50 font-semibold text-base sm:text-lg shadow-xl"
                   size="lg"
                 >
-                  <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2 flex-shrink-0" />
-                  <span className="truncate">Falar com Especialista</span>
+                  <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 mr-2 flex-shrink-0" />
+                  <span className="truncate">Ver Planos Disponíveis</span>
                 </Button>
               </motion.div>
 

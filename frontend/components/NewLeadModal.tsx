@@ -169,7 +169,7 @@ export function NewLeadModal({
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+          <Button className="hover:text-black mx-4" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
             Cancelar
           </Button>
           <Button onClick={handleSubmit} disabled={submitting}>
