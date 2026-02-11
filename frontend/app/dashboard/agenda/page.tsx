@@ -78,7 +78,7 @@ export default function CalendarPage() {
   const [todayEvents, setTodayEvents] = useState<CalendarEvent[]>([])
   const [tomorrowEvents, setTomorrowEvents] = useState<CalendarEvent[]>([])
   const [occupancyRate, setOccupancyRate] = useState(0)
-  const [nextAvailableSlot, setNextAvailableSlot] = useState<string | null>(null)
+  const [bookingSuccessRate, setBookingSuccessRate] = useState(0)
   const [cancellationRate, setCancellationRate] = useState(0)
   const [avgAppointmentsPerDay, setAvgAppointmentsPerDay] = useState(0)
 
@@ -179,82 +179,9 @@ export default function CalendarPage() {
     const occupiedSlots = next7DaysEvts.length
     const rate = Math.min(100, Math.round((occupiedSlots / totalSlots) * 100))
 
-    // Calculate next available slot
-    // Working hours from clinic settings
-    const findNextAvailableSlot = () => {
-      const workStart = clinicData?.hora_abertura || 8 // Default 8:00 if not set
-      const workEnd = clinicData?.hora_fechamento || 18 // Default 18:00 if not set
-      const slotDuration = 5 // minutes
-
-      // Start from current time, rounded up to next 5-min slot
-      let checkTime = new Date()
-      const minutes = checkTime.getMinutes()
-      const roundedMinutes = Math.ceil(minutes / 5) * 5
-      checkTime.setMinutes(roundedMinutes, 0, 0)
-
-      if (roundedMinutes >= 60) {
-        checkTime.setHours(checkTime.getHours() + 1, 0, 0, 0)
-      }
-
-      // Check next 7 days
-      for (let day = 0; day < 7; day++) {
-        const currentDay = new Date(checkTime)
-        currentDay.setDate(currentDay.getDate() + day)
-
-        // Reset to work start if checking future days
-        if (day > 0) {
-          currentDay.setHours(workStart, 0, 0, 0)
-        }
-
-        // Check all slots in this day
-        for (let hour = currentDay.getHours(); hour < workEnd; hour++) {
-          for (let minute of [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]) {
-            // Skip if before current time on first day
-            if (day === 0 && (hour < checkTime.getHours() || (hour === checkTime.getHours() && minute < checkTime.getMinutes()))) {
-              continue
-            }
-
-            const slotStart = new Date(currentDay)
-            slotStart.setHours(hour, minute, 0, 0)
-
-            const slotEnd = new Date(slotStart)
-            slotEnd.setMinutes(slotEnd.getMinutes() + slotDuration)
-
-            // Check if this slot conflicts with any event
-            const hasConflict = allEvents.some(event => {
-              const eventStart = new Date(event.start.dateTime)
-              const eventEnd = new Date(event.end.dateTime)
-
-              return (slotStart < eventEnd && slotEnd > eventStart)
-            })
-
-            if (!hasConflict) {
-              // Found available slot!
-              const isToday = slotStart.toDateString() === new Date().toDateString()
-              const isTomorrow = slotStart.toDateString() === new Date(Date.now() + 86400000).toDateString()
-
-              const timeStr = slotStart.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-
-              if (isToday) {
-                return `Hoje às ${timeStr}`
-              } else if (isTomorrow) {
-                return `Amanhã às ${timeStr}`
-              } else {
-                const dateStr = slotStart.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-                return `${dateStr} às ${timeStr}`
-              }
-            }
-          }
-        }
-      }
-
-      return "Sem horários livres"
-    }
-
     setTodayEvents(todayEvts)
     setTomorrowEvents(tomorrowEvts)
     setOccupancyRate(rate)
-    setNextAvailableSlot(findNextAvailableSlot())
   }
 
   const fetchAppointmentsStats = async () => {
@@ -285,6 +212,45 @@ export default function CalendarPage() {
 
       setCancellationRate(cancelRate)
       setAvgAppointmentsPerDay(parseFloat(avgPerDay))
+
+      // Calculate booking success rate
+      // Get all leads with tags
+      const { data: leadTags, error: leadTagsError } = await supabase
+        .from('lead_tags')
+        .select('lead_id, tag_id, tags(name)')
+        .eq('clinic_id', clinicData.id)
+
+      if (leadTagsError) throw leadTagsError
+
+      // Group tags by lead_id
+      const leadTagsMap = new Map<string, string[]>()
+      leadTags?.forEach((lt: any) => {
+        const leadId = lt.lead_id
+        const tagName = lt.tags?.name
+        if (!leadTagsMap.has(leadId)) {
+          leadTagsMap.set(leadId, [])
+        }
+        if (tagName) {
+          leadTagsMap.get(leadId)!.push(tagName)
+        }
+      })
+
+      // Count total leads and leads with "Agendado" tag
+      const totalLeads = leadTagsMap.size
+      let leadsBooked = 0
+
+      leadTagsMap.forEach((tags) => {
+        if (tags.includes('Agendado')) {
+          leadsBooked++
+        }
+      })
+
+      // Calculate success rate
+      const successRate = totalLeads > 0
+        ? Math.round((leadsBooked / totalLeads) * 100)
+        : 0
+
+      setBookingSuccessRate(successRate)
     } catch (error) {
       logger.error('Error fetching appointments stats:', error)
     }
@@ -617,14 +583,14 @@ export default function CalendarPage() {
           <Card className="sm:col-span-2 lg:col-span-1">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Próximo Horário Livre
+                <TrendingUp className="h-4 w-4" />
+                Taxa de Sucesso do Agendamento
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-lg sm:text-xl font-bold text-foreground">{nextAvailableSlot || "Calculando..."}</div>
+              <div className="text-2xl font-bold text-foreground">{bookingSuccessRate}%</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Disponível para agendamento
+                Leads que agendaram consulta
               </p>
             </CardContent>
           </Card>

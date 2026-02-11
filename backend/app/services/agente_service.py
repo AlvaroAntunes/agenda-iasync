@@ -765,6 +765,25 @@ class AgenteClinica:
                     }, on_conflict='lead_id, tag_id').execute()
                     
                     print(f"✅ Tag 'Agendado' associada ao lead {paciente_id}")
+                    
+                    # Remove tags "Novo" e "Lead" se existirem
+                    tags_to_remove = supabase.table('tags')\
+                        .select('id')\
+                        .eq('clinic_id', self.clinic_id)\
+                        .in_('name', ['Novo', 'Lead'])\
+                        .execute()
+                    
+                    if tags_to_remove.data:
+                        tag_ids_to_remove = [t['id'] for t in tags_to_remove.data]
+                        
+                        supabase.table('lead_tags')\
+                            .delete()\
+                            .eq('lead_id', paciente_id)\
+                            .in_('tag_id', tag_ids_to_remove)\
+                            .execute()
+                        
+                        print(f"🗑️ Tags 'Novo' e 'Lead' removidas do lead {paciente_id}")
+                        
             except Exception as tag_err:
                 print(f"⚠️ Erro ao associar tag 'Agendado': {tag_err}")
             
