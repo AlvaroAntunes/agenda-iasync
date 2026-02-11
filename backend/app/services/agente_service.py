@@ -1064,8 +1064,9 @@ class AgenteClinica:
                 'clinic_id': self.clinic_id,
                 'lid': self.lid,
                 'telefone': telefone,
-                'nome': nome_cliente
-            }, on_conflict='clinic_id, lid').execute()
+                'nome': nome_cliente,
+                'status_ia': True
+            }, on_conflict='clinic_id, telefone').execute()
             return f"Nome '{nome_cliente}' salvo com sucesso."
         except Exception as e:
             return f"Erro ao salvar nome do cliente: {str(e)}"
