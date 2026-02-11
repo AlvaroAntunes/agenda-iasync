@@ -903,7 +903,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                         'clinic_id': clinic_id,
                         'lid': raw_chatid or lid or telefone_cliente,
                         'telefone': telefone_cliente,
-                        'nome': None,
+                        'nome': '',
                         'status_ia': True
                     }
                     supabase.table('leads').upsert(

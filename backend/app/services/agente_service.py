@@ -234,6 +234,10 @@ class AgenteClinica:
                 
             if response.data and len(response.data) > 0:
                 print(f"✅ [DEBUG] Paciente identificado: {response.data[0].get('nome')}")
+
+                if response.data[0].get('nome') == '':
+                    return None
+                
                 return response.data[0]
             
             print(f"⚠️ [DEBUG] Nenhum paciente encontrado para este telefone")
