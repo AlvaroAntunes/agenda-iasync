@@ -744,6 +744,30 @@ class AgenteClinica:
                 'lembrete_2h': flag_2h
             }).execute()
             
+            # Associar tag "Agendado" ao lead
+            try:
+                # Busca o ID da tag "Agendado"
+                tag_resp = supabase.table('tags')\
+                    .select('id')\
+                    .eq('clinic_id', self.clinic_id)\
+                    .eq('name', 'Agendado')\
+                    .limit(1)\
+                    .execute()
+                
+                if tag_resp.data and len(tag_resp.data) > 0:
+                    tag_id = tag_resp.data[0]['id']
+                    
+                    # Associa a tag ao lead (upsert para evitar duplicação)
+                    supabase.table('lead_tags').upsert({
+                        'clinic_id': self.clinic_id,
+                        'lead_id': paciente_id,
+                        'tag_id': tag_id
+                    }, on_conflict='lead_id, tag_id').execute()
+                    
+                    print(f"✅ Tag 'Agendado' associada ao lead {paciente_id}")
+            except Exception as tag_err:
+                print(f"⚠️ Erro ao associar tag 'Agendado': {tag_err}")
+            
         except Exception as e:
             return f"Erro técnico no Google Calendar: {str(e)}"
 
@@ -1244,7 +1268,7 @@ class AgenteClinica:
         
         texto_output = normalizar_output(resposta.get("output"))
         tokens_output = self._contar_tokens(texto_output)
-        total_tokens = int((tokens_prompt + tokens_output) * 1.1)
+        total_tokens = int((tokens_prompt + tokens_output) * 1.15)
         
         print(f"💰 Uso nesta interação:")
         print(f"   - Total Tokens: {total_tokens}")
