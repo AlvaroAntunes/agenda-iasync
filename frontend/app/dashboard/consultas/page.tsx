@@ -49,7 +49,8 @@ export default function ConsultasPage() {
     const [loading, setLoading] = useState(true)
     const [appointments, setAppointments] = useState<Appointment[]>([])
     const [searchQuery, setSearchQuery] = useState("")
-    const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month'>('today')
+    const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('today')
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
     const [updatingId, setUpdatingId] = useState<string | null>(null)
 
     useEffect(() => {
@@ -62,7 +63,7 @@ export default function ConsultasPage() {
             fetchAppointments()
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [clinicData?.id, dateFilter])
+    }, [clinicData?.id, dateFilter, selectedYear])
 
     const checkAuthAndLoadClinic = async () => {
         try {
@@ -104,20 +105,7 @@ export default function ConsultasPage() {
 
         setLoading(true)
         try {
-            const now = new Date()
-            let startDate = new Date()
-
-            if (dateFilter === 'today') {
-                startDate.setHours(0, 0, 0, 0)
-            } else if (dateFilter === 'week') {
-                startDate.setDate(now.getDate() - now.getDay())
-                startDate.setHours(0, 0, 0, 0)
-            } else {
-                startDate.setDate(1)
-                startDate.setHours(0, 0, 0, 0)
-            }
-
-            const { data, error } = await supabase
+            let query = supabase
                 .from('consultas')
                 .select(`
           id,
@@ -130,8 +118,36 @@ export default function ConsultasPage() {
           )
         `)
                 .eq('clinic_id', clinicData.id)
-                .gte('horario_consulta', startDate.toISOString())
-                .order('horario_consulta', { ascending: true })
+
+            if (dateFilter !== 'all') {
+                const now = new Date()
+                let startDate = new Date()
+                let endDate = new Date()
+
+                if (dateFilter === 'today') {
+                    startDate.setHours(0, 0, 0, 0)
+                    endDate.setHours(23, 59, 59, 999)
+                } else if (dateFilter === 'week') {
+                    startDate.setDate(now.getDate() - now.getDay())
+                    startDate.setHours(0, 0, 0, 0)
+                    endDate.setDate(startDate.getDate() + 6)
+                    endDate.setHours(23, 59, 59, 999)
+                } else if (dateFilter === 'month') {
+                    startDate.setDate(1)
+                    startDate.setHours(0, 0, 0, 0)
+                    endDate.setMonth(startDate.getMonth() + 1, 0)
+                    endDate.setHours(23, 59, 59, 999)
+                } else if (dateFilter === 'year') {
+                    startDate = new Date(selectedYear, 0, 1, 0, 0, 0, 0)
+                    endDate = new Date(selectedYear, 11, 31, 23, 59, 59, 999)
+                }
+
+                query = query
+                    .gte('horario_consulta', startDate.toISOString())
+                    .lte('horario_consulta', endDate.toISOString())
+            }
+
+            const { data, error } = await query.order('horario_consulta', { ascending: true })
 
             if (error) throw error
             setAppointments(data || [])
@@ -204,39 +220,67 @@ export default function ConsultasPage() {
                     <CardContent className="pt-6">
                         <div className="flex flex-col sm:flex-row gap-4">
                             {/* Date Filter Buttons */}
-                            <div className="flex gap-2">
+                            <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
                                 <Button
                                     variant={dateFilter === 'today' ? 'default' : 'outline'}
                                     onClick={() => setDateFilter('today')}
-                                    className={dateFilter === 'today' ? 'bg-cyan-600 hover:bg-cyan-700' : 'hover:text-black'}
+                                    className={`w-full sm:w-auto ${dateFilter === 'today' ? 'bg-cyan-600 hover:bg-cyan-700' : 'hover:text-black'}`}
                                 >
                                     Hoje
                                 </Button>
                                 <Button
                                     variant={dateFilter === 'week' ? 'default' : 'outline'}
                                     onClick={() => setDateFilter('week')}
-                                    className={dateFilter === 'week' ? 'bg-cyan-600 hover:bg-cyan-700' : 'hover:text-black'}
+                                    className={`w-full sm:w-auto ${dateFilter === 'week' ? 'bg-cyan-600 hover:bg-cyan-700' : 'hover:text-black'}`}
                                 >
                                     Semana
                                 </Button>
                                 <Button
                                     variant={dateFilter === 'month' ? 'default' : 'outline'}
                                     onClick={() => setDateFilter('month')}
-                                    className={dateFilter === 'month' ? 'bg-cyan-600 hover:bg-cyan-700' : 'hover:text-black'}
+                                    className={`w-full sm:w-auto ${dateFilter === 'month' ? 'bg-cyan-600 hover:bg-cyan-700' : 'hover:text-black'}`}
                                 >
                                     Mês
                                 </Button>
+                                <Button
+                                    variant={dateFilter === 'year' ? 'default' : 'outline'}
+                                    onClick={() => setDateFilter('year')}
+                                    className={`w-full sm:w-auto ${dateFilter === 'year' ? 'bg-cyan-600 hover:bg-cyan-700' : 'hover:text-black'}`}
+                                >
+                                    Ano
+                                </Button>
+                                <Button
+                                    variant={dateFilter === 'all' ? 'default' : 'outline'}
+                                    onClick={() => setDateFilter('all')}
+                                    className={`w-full sm:w-auto ${dateFilter === 'all' ? 'bg-cyan-600 hover:bg-cyan-700' : 'hover:text-black'}`}
+                                >
+                                    Todas
+                                </Button>
                             </div>
 
-                            {/* Search Input */}
-                            <div className="flex-1 relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Buscar por nome do paciente..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-10"
-                                />
+                            {/* Search Input and Year Selector */}
+                            <div className="flex-1 flex gap-2 items-center">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Buscar por nome do paciente..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="pl-10 h-10"
+                                    />
+                                </div>
+                                {dateFilter === 'year' && (
+                                    <div className="w-24">
+                                        <Input
+                                            type="number"
+                                            value={selectedYear}
+                                            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                                            className="h-10"
+                                            min={2020}
+                                            max={2100}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </CardContent>

@@ -803,7 +803,7 @@ export default function SettingsPage() {
         onSignOut={handleSignOut}
       />
 
-      <main className="relative z-10 container mx-auto px-4 py-8 max-w-5xl space-y-8">
+      <main className="relative z-10 container mx-auto px-3 sm:px-4 py-8 max-w-5xl space-y-8">
         {clinicData?.id && (
           <div className="mb-8">
             <TrialBanner clinicId={clinicData.id} blockAccess={false} />
@@ -811,15 +811,15 @@ export default function SettingsPage() {
         )}
 
         {/* Success/Error Alerts Flutuantes */}
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none items-center">
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none items-center w-full px-4">
           {success && (
-            <Alert className="pointer-events-auto w-auto min-w-[300px] border-emerald-200 bg-emerald-50 shadow-lg animate-in slide-in-from-right-10">
+            <Alert className="pointer-events-auto w-full max-w-md border-emerald-200 bg-emerald-50 shadow-lg animate-in slide-in-from-right-10">
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
               <AlertDescription className="text-emerald-700 font-medium">{success}</AlertDescription>
             </Alert>
           )}
           {error && (
-            <Alert className="pointer-events-auto w-auto min-w-[300px] border-red-200 bg-red-50 shadow-lg animate-in slide-in-from-right-10">
+            <Alert className="pointer-events-auto w-full max-w-md border-red-200 bg-red-50 shadow-lg animate-in slide-in-from-right-10">
               <AlertTriangle className="h-4 w-4 text-red-600" />
               <AlertDescription className="text-red-700 font-medium">{error}</AlertDescription>
             </Alert>
@@ -827,31 +827,31 @@ export default function SettingsPage() {
         </div>
 
         {/* Clinic Information Card */}
-        <div className="bg-white rounded-3xl p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden">
+        <div className="bg-white rounded-3xl p-3 sm:p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden">
           {/* Header do Card */}
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-blue-500" />
 
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-700">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-8 min">
+            <div className="w-10 h-10 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-700 flex-shrink-0">
               <Building2 className="h-5 w-5" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900">Informações Gerais</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 break-words">Informações Gerais</h2>
           </div>
 
           <div className="grid gap-6 mb-2 md:mb-4">
-            <div className="space-y-2">
+            <div className="space-y-2 min-w-0">
               <Label htmlFor="nome" className="text-slate-700 font-medium">Nome da Clínica *</Label>
               <Input
                 id="nome"
                 value={formData.nome || ''}
                 onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                 placeholder="Clínica Dental São Paulo"
-                className="h-12 rounded-xl border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20"
+                className="h-12 w-full rounded-xl border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20"
               />
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-2">
+              <div className="space-y-2 min-w-0">
                 <Label htmlFor="email" className="text-slate-700 font-medium">Email</Label>
                 <Input
                   id="email"
@@ -859,11 +859,11 @@ export default function SettingsPage() {
                   value={formData.email || ''}
                   readOnly
                   title="Para alterar seu email, entre em contato com o suporte"
-                  className="h-12 rounded-xl border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed focus:ring-0 focus:border-slate-200"
+                  className="h-12 w-full rounded-xl border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed focus:ring-0 focus:border-slate-200"
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 min-w-0">
                 <Label htmlFor="telefone" className="text-slate-700 font-medium">Telefone *</Label>
                 <Input
                   id="telefone"
@@ -874,19 +874,19 @@ export default function SettingsPage() {
                   }}
                   placeholder="(11) 99999-9999"
                   maxLength={15}
-                  className="h-12 rounded-xl border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20"
+                  className="h-12 w-full rounded-xl border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20"
                 />
               </div>
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-2">
+              <div className="space-y-2 min-w-0">
                 <Label htmlFor="uf" className="text-slate-700 font-medium">UF</Label>
                 <select
                   id="uf"
                   value={formData.uf || ''}
                   onChange={(e) => setFormData({ ...formData, uf: e.target.value })}
-                  className="h-12 cursor-pointer w-full border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 bg-white rounded-xl border px-3 text-sm text-slate-500 options:text-slate-700"
+                  className="h-12 cursor-pointer w-full max-w-full border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 bg-white rounded-xl border px-3 text-sm text-slate-500 options:text-slate-700"
                 >
                   <option value="" className="cursor-pointer">Selecione</option>
                   {UFS.map((uf) => (
@@ -897,30 +897,30 @@ export default function SettingsPage() {
                 </select>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 min-w-0">
                 <Label htmlFor="cidade" className="text-slate-700 font-medium">Cidade</Label>
                 <Input
                   id="cidade"
                   value={formData.cidade || ''}
                   onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
                   placeholder="São Paulo"
-                  className="h-12 rounded-xl border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20"
+                  className="h-12 w-full rounded-xl border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 min-w-0">
               <Label htmlFor="endereco" className="text-slate-700 font-medium">Endereço</Label>
               <Input
                 id="endereco"
                 value={formData.endereco || ''}
                 onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
                 placeholder="Rua exemplo, 123"
-                className="h-12 rounded-xl border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20"
+                className="h-12 w-full rounded-xl border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20"
               />
             </div>
 
-            <div className="flex items-center justify-between p-6 bg-slate-50/80 rounded-2xl border border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-6 bg-slate-50/80 rounded-2xl border border-slate-100 gap-4">
               <div className="space-y-1">
                 <Label htmlFor="ia_ativa" className="text-base font-semibold text-slate-900">
                   Bot de IA
@@ -929,27 +929,29 @@ export default function SettingsPage() {
                   Ative o agendamento automático via IA para seus pacientes
                 </p>
               </div>
-              <Switch
-                id="ia_ativa"
-                checked={formData.ia_ativa ?? true}
-                onCheckedChange={(checked) => setFormData({ ...formData, ia_ativa: checked })}
-                className="cursor-pointer"
-              />
+              <div className="flex justify-end">
+                <Switch
+                  id="ia_ativa"
+                  checked={formData.ia_ativa ?? true}
+                  onCheckedChange={(checked) => setFormData({ ...formData, ia_ativa: checked })}
+                  className="cursor-pointer"
+                />
+              </div>
             </div>
 
             {/* Seção de Prompt do Agente */}
             {clinicData?.prompt_ia && (
               <div className="space-y-6 pt-6 border-t border-slate-100">
-                <div className="flex justify-between items-start">
-                  <div className="space-y-1">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                  <div className="space-y-1 min-w-0">
                     <Label htmlFor="prompt_ia" className="text-base font-semibold text-slate-900">Instruções do Agente IA</Label>
-                    <p className="text-sm text-slate-500">Defina a personalidade e as regras de negócio do seu agente.</p>
+                    <p className="text-sm text-slate-500 break-words">Defina a personalidade e as regras de negócio do seu agente.</p>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setIsPromptExpanded(!isPromptExpanded)}
-                    className="text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50"
+                    className="text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 h-auto py-1"
                   >
                     {isPromptExpanded ? <Minimize2 className="h-4 w-4 mr-2" /> : <Maximize2 className="h-4 w-4 mr-2" />}
                     {isPromptExpanded ? 'Reduzir' : 'Expandir'}
@@ -982,97 +984,122 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
+          </div>
 
-            {/* Seção de Plano Refatorada */}
-            <div className="mt-8 pt-8 border-t border-slate-100">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end pt-6 mt-6 border-t border-slate-100 gap-3">
+            <Button
+              onClick={handleCancelEdit}
+              disabled={saving}
+              className="h-12 w-full sm:w-auto px-6 rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-500 transition-colors"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveClinic}
+              disabled={saving}
+              className="h-12 w-full sm:w-auto px-8 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all hover:scale-[1.02]"
+            >
+              {saving ? 'Salvando Alterações...' : 'Salvar Alterações'}
+            </Button>
+          </div>
+        </div >
 
-              {/* Alert de Troca Pendente */}
-              {pendingSwitchDate && (
-                <div className="mb-6 p-4 rounded-xl border border-amber-200 bg-amber-50 flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-2">
-                  <div className="p-2 bg-white rounded-full text-amber-500 shadow-sm border border-amber-100">
-                    <AlertTriangle className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-amber-900 font-bold mb-1">Mudança de Plano Agendada</h4>
-                    <p className="text-amber-700 text-sm leading-relaxed">
-                      Sua solicitação de mudança para o plano <strong>{getPlanLabel(pendingPlanName || 'consultorio')}</strong> foi processada.
-                      O novo plano entrará em vigor automaticamente em <strong>{pendingSwitchDate}</strong>, ao final do ciclo atual.
-                    </p>
-                  </div>
-                </div>
-              )}
+        {/* Seção de Plano Refatorada */}
+        < div className="bg-white rounded-3xl p-3 sm:p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden" >
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500" />
 
-              <Label className="mb-4 text-lg font-bold text-slate-900">Sua Assinatura</Label>
-
-              <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-200 p-6 relative overflow-hidden group hover:border-cyan-200 transition-colors duration-300">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-
-                  <div className="flex items-center gap-4">
-                    <div className="h-14 w-14 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-center justify-center">
-                      {clinicData?.plano === 'corporate' ? <Building2 className="h-7 w-7 text-blue-600" /> :
-                        clinicData?.plano === 'clinica_pro' ? <Bot className="h-7 w-7 text-cyan-600" /> : <Users className="h-7 w-7 text-slate-600" />}
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">
-                        Plano Atual
-                      </p>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-bold text-xl text-slate-900 capitalize">
-                          {clinicData?.plano === 'corporate' ? 'Plano Corporate' :
-                            clinicData?.plano === 'clinica_pro' ? 'Plano Clínica Pro' :
-                              clinicData?.plano === 'consultorio' ? 'Plano Consultório' :
-                                clinicData?.plano === 'trial' ? 'Plano Trial' : clinicData?.plano}
-                        </h3>
-                        {clinicData?.subscription_status === 'active' && (
-                          <Badge className="rounded-md px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200">
-                            Ativo
-                          </Badge>
-                        )}
-                        {clinicData?.subscription_status === 'canceled' && (
-                          <Badge className="rounded-md px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 border-red-200">
-                            Cancelado
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-slate-500 text-sm">
-                        {clinicData?.subscription_interval === 'yearly' ? 'Ciclo Anual' : 'Ciclo Mensal'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-left md:text-right bg-white/50 p-4 rounded-xl border border-slate-100 w-full md:w-auto">
-                    {clinicData?.subscription_end_date ? (
-                      <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">
-                          {clinicData.subscription_status === 'active' ? (
-                            clinicData.plano === 'trial' || clinicData.plan_id === 'trial' ? 'Período de testes encerra em' :
-                              (clinicData.subscription_interval === 'yearly' ? 'Vencimento em' : 'Renovação automática em')
-                          ) : 'Acesso atual expira em'}
-                        </p>
-                        <div className="flex items-center gap-2 text-slate-900 font-medium">
-                          <Calendar className="h-4 w-4 text-cyan-600" />
-                          {new Date(clinicData.subscription_end_date).toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: 'long',
-                            year: 'numeric'
-                          })}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-slate-400 text-sm">Sem data de renovação</div>
-                    )}
-                  </div>
-
-                </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 flex-shrink-0">
+                <CreditCard className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 break-words">Sua Assinatura</h2>
+                <p className="text-slate-500 text-sm break-words">Gerencie seu plano e ciclo de faturamento</p>
               </div>
             </div>
 
           </div>
 
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-            <Label className="text-lg font-bold text-slate-900"></Label>
+          <div className="space-y-6">
+            {/* Alert de Troca Pendente */}
+            {pendingSwitchDate && (
+              <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-2">
+                <div className="p-2 bg-white rounded-full text-amber-500 shadow-sm border border-amber-100 flex-shrink-0">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-amber-900 font-bold mb-1">Mudança de Plano Agendada</h4>
+                  <p className="text-amber-700 text-sm leading-relaxed break-words">
+                    Sua solicitação de mudança para o plano <strong>{getPlanLabel(pendingPlanName || 'consultorio')}</strong> foi processada.
+                    O novo plano entrará em vigor automaticamente em <strong>{pendingSwitchDate}</strong>, ao final do ciclo atual.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/50 rounded-2xl border border-slate-200 p-4 sm:p-6 relative overflow-hidden group hover:border-indigo-200 transition-colors duration-300">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-14 w-14 rounded-2xl bg-white border border-indigo-100 shadow-sm flex items-center justify-center flex-shrink-0">
+                    {clinicData?.plano === 'corporate' ? <Building2 className="h-7 w-7 text-indigo-600" /> :
+                      clinicData?.plano === 'clinica_pro' ? <Bot className="h-7 w-7 text-indigo-600" /> : <Users className="h-7 w-7 text-slate-600" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-indigo-500 uppercase tracking-wider font-semibold mb-1">
+                      Plano Atual
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <h3 className="font-bold text-xl text-slate-900 capitalize">
+                        {clinicData?.plano === 'corporate' ? 'Plano Corporate' :
+                          clinicData?.plano === 'clinica_pro' ? 'Plano Clínica Pro' :
+                            clinicData?.plano === 'consultorio' ? 'Plano Consultório' :
+                              clinicData?.plano === 'trial' ? 'Plano Trial' : clinicData?.plano}
+                      </h3>
+                      {clinicData?.subscription_status === 'active' && (
+                        <Badge className="rounded-md px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200">
+                          Ativo
+                        </Badge>
+                      )}
+                      {clinicData?.subscription_status === 'canceled' && (
+                        <Badge className="rounded-md px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 border-red-200">
+                          Cancelado
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-slate-500 text-sm">
+                      {clinicData?.subscription_interval === 'yearly' ? 'Ciclo Anual' : 'Ciclo Mensal'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-left md:text-right bg-white/60 backdrop-blur-sm p-4 rounded-xl border border-indigo-100 w-full md:w-auto">
+                  {clinicData?.subscription_end_date ? (
+                    <div>
+                      <p className="text-xs text-indigo-500 uppercase tracking-wider font-semibold mb-1">
+                        {clinicData.subscription_status === 'active' ? (
+                          clinicData.plano === 'trial' || clinicData.plan_id === 'trial' ? 'Período de testes encerra em' :
+                            (clinicData.subscription_interval === 'yearly' ? 'Vencimento em' : 'Renovação automática em')
+                        ) : 'Acesso atual expira em'}
+                      </p>
+                      <div className="flex items-center gap-2 text-slate-900 font-medium">
+                        <Calendar className="h-4 w-4 text-indigo-600" />
+                        {new Date(clinicData.subscription_end_date).toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: 'long',
+                          year: 'numeric'
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-slate-400 text-sm">Sem data de renovação</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {clinicData?.subscription_status === 'active' && (
-              <>
+              <div className="flex flex-wrap gap-2 justify-end">
                 {(clinicData?.plano === 'trial' || clinicData?.plan_id === 'trial') ? (
                   <Button
                     size="sm"
@@ -1188,7 +1215,7 @@ export default function SettingsPage() {
                         </DialogHeader>
                         <DialogFooter className="gap-2 sm:gap-0">
                           <Button variant="outline" className="rounded-xl border-slate-200 hover:text-green-900" onClick={() => setIsCancelSubscriptionOpen(false)}>Manter Plano</Button>
-                          <Button onClick={handleCancelSubscription} disabled={saving} className="mx-4 rounded-xl bg-red-600 hover:bg-red-700">
+                          <Button onClick={handleCancelSubscription} disabled={saving} className="sm:mx-4 rounded-xl bg-red-600 hover:bg-red-700">
                             {saving ? 'Cancelando...' : 'Sim, cancelar'}
                           </Button>
                         </DialogFooter>
@@ -1196,37 +1223,23 @@ export default function SettingsPage() {
                     </Dialog>
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
-
-          <div className="flex justify-end pt-6 mt-6 border-t border-slate-100 gap-3">
-            <Button
-              onClick={handleCancelEdit}
-              disabled={saving}
-              className="h-12 px-6 rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-500 transition-colors"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSaveClinic}
-              disabled={saving}
-              className="h-12 px-8 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all hover:scale-[1.02]"
-            >
-              {saving ? 'Salvando Alterações...' : 'Salvar Alterações'}
-            </Button>
-          </div>
-        </div>
+        </div >
 
         {/* Closed Days Management Card */}
-        <div className="bg-white rounded-3xl p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-700">
+        < div className="bg-white rounded-3xl p-3 sm:p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden" > 
+
+          {/* Header do Card */}
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-400 to-red-600" /> 
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-8">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-700 flex-shrink-0">
               <Calendar className="h-5 w-5" />
             </div>
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900">Dias Fechados</h2>
-              <p className="text-slate-500 text-sm">Gerencie os dias em que a clínica não atenderá (não precisa adicionar feriados nacionais e estaduais, já vem cadastrado)</p>
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 break-words">Dias Fechados</h2>
+              <p className="text-slate-500 text-sm break-words">Gerencie os dias em que a clínica não atenderá (não precisa adicionar feriados nacionais e estaduais, já vem cadastrado)</p>
             </div>
           </div>
 
@@ -1243,7 +1256,7 @@ export default function SettingsPage() {
                   value={newClosedDay}
                   onChange={(e) => setNewClosedDay(e.target.value)}
                   disabled={savingClosedDay}
-                  className="flex-1 h-12 rounded-xl border-slate-200 focus:border-cyan-500 focus:ring-cyan-500"
+                  className="w-full sm:flex-1 h-12 rounded-xl border-slate-200 focus:border-cyan-500 focus:ring-cyan-500"
                 />
                 <Input
                   id="new-closed-day-description"
@@ -1252,7 +1265,7 @@ export default function SettingsPage() {
                   value={newClosedDayDescription}
                   onChange={(e) => setNewClosedDayDescription(e.target.value)}
                   disabled={savingClosedDay}
-                  className="flex-1 h-12 rounded-xl border-slate-200 focus:border-cyan-500 focus:ring-cyan-500"
+                  className="w-full sm:flex-1 h-12 rounded-xl border-slate-200 focus:border-cyan-500 focus:ring-cyan-500"
                 />
                 <Button
                   onClick={handleAddClosedDay}
@@ -1423,7 +1436,7 @@ export default function SettingsPage() {
                     setEditClosedDayDescription('')
                   }}
                   disabled={savingClosedDay}
-                  className="rounded-xl mx-4 hover:text-black"
+                  className="rounded-xl sm:mx-4 hover:text-black"
                 >
                   Cancelar
                 </Button>
@@ -1437,17 +1450,18 @@ export default function SettingsPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
+        </div >
 
         {/* Doctors Management Card */}
-        <div className="bg-white rounded-3xl p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50">
-          <div id="profissionais-section" className="flex items-center justify-between mb-8">
+        < div className="bg-white rounded-3xl p-3 sm:p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden" >
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-600 to-blue-600" />
+          <div id="profissionais-section" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 flex-shrink-0">
                 <Users className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-slate-900">Profissionais</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 break-words">Profissionais</h2>
                 <p className="text-slate-500 text-sm hidden sm:block">Gerencie a equipe da clínica</p>
               </div>
             </div>
@@ -1455,8 +1469,7 @@ export default function SettingsPage() {
               <DialogTrigger asChild>
                 <Button className="h-10 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all hover:scale-[1.02]">
                   <Plus className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Adicionar</span>
-                  <span className="sm:hidden">Add</span>
+                  <span>Adicionar</span>
                 </Button>
               </DialogTrigger>
               {/* Dialog Content mantido similar mas com classes de rounded atualizadas */}
@@ -1552,18 +1565,22 @@ export default function SettingsPage() {
           </div>
 
           {/* Alerts de Profissionais */}
-          {profissionalSuccess && (
-            <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              <span className="text-emerald-700 font-medium">{profissionalSuccess}</span>
-            </div>
-          )}
-          {profissionalError && (
-            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
-              <span className="text-red-700 font-medium">{profissionalError}</span>
-            </div>
-          )}
+          {
+            profissionalSuccess && (
+              <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-3">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                <span className="text-emerald-700 font-medium">{profissionalSuccess}</span>
+              </div>
+            )
+          }
+          {
+            profissionalError && (
+              <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+                <span className="text-red-700 font-medium">{profissionalError}</span>
+              </div>
+            )
+          }
 
           <div className="grid gap-4">
             {profissionais.length === 0 ? (
@@ -1613,85 +1630,88 @@ export default function SettingsPage() {
               ))
             )}
           </div>
-        </div>
+        </div >
 
         {/* Operating Hours Editor */}
-        {clinicData?.horario_funcionamento && (
-          <div className="bg-white rounded-3xl p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-700">
-                <Calendar className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-slate-900">Horário de Funcionamento</h2>
-                <p className="text-slate-500 text-sm">Configure os dias e horários de atendimento da clínica</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {horarioFuncionamento.map((item, index) => (
-                <div key={item.dia} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl gap-4 hover:border-cyan-200 transition-colors">
-                  <div className="flex items-center gap-4 min-w-[140px]">
-                    <Switch
-                      checked={item.ativo}
-                      onCheckedChange={(checked) => {
-                        const newHorarios = [...horarioFuncionamento]
-                        newHorarios[index].ativo = checked
-                        setHorarioFuncionamento(newHorarios)
-                      }}
-                      className="data-[state=checked]:bg-cyan-600 cursor-pointer"
-                    />
-                    <span className={`font-medium ${item.ativo ? 'text-slate-900' : 'text-slate-400'}`}>
-                      {item.dia}
-                    </span>
-                  </div>
-
-                  {item.ativo ? (
-                    <div className="flex items-center gap-2 flex-1 sm:justify-end">
-                      <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-200">
-                        <Input
-                          type="time"
-                          value={item.abertura}
-                          onChange={(e) => {
-                            const newHorarios = [...horarioFuncionamento]
-                            newHorarios[index].abertura = e.target.value
-                            setHorarioFuncionamento(newHorarios)
-                          }}
-                          className="w-24 h-8 text-sm border-0 bg-transparent focus-visible:ring-0 text-center font-medium shadow-none p-0"
-                        />
-                        <span className="text-slate-400 text-xs">até</span>
-                        <Input
-                          type="time"
-                          value={item.fechamento}
-                          onChange={(e) => {
-                            const newHorarios = [...horarioFuncionamento]
-                            newHorarios[index].fechamento = e.target.value
-                            setHorarioFuncionamento(newHorarios)
-                          }}
-                          className="w-24 h-8 text-sm border-0 bg-transparent focus-visible:ring-0 text-center font-medium shadow-none p-0"
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex-1 text-right text-sm text-slate-400 italic pr-4">
-                      Fechado
-                    </div>
-                  )}
+        {
+          clinicData?.horario_funcionamento && (
+            <div className="bg-white rounded-3xl p-3 sm:p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-600 to-blue-600" />
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-8">
+                <div className="w-10 h-10 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-700 flex-shrink-0">
+                  <Calendar className="h-5 w-5" />
                 </div>
-              ))}
-            </div>
+                <div className="min-w-0">
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 break-words">Horário de Funcionamento</h2>
+                  <p className="text-slate-500 text-sm break-words">Configure os dias e horários de atendimento da clínica</p>
+                </div>
+              </div>
 
-            <div className="flex justify-end pt-6 mt-6 border-t border-slate-100">
-              <Button
-                onClick={handleSaveClinic}
-                disabled={saving}
-                className="h-12 px-8 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all hover:scale-[1.02]"
-              >
-                {saving ? 'Salvando...' : 'Salvar Horários'}
-              </Button>
+              <div className="space-y-4">
+                {horarioFuncionamento.map((item, index) => (
+                  <div key={item.dia} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl gap-4 hover:border-cyan-200 transition-colors">
+                    <div className="flex items-center gap-4 min-w-[140px]">
+                      <Switch
+                        checked={item.ativo}
+                        onCheckedChange={(checked) => {
+                          const newHorarios = [...horarioFuncionamento]
+                          newHorarios[index].ativo = checked
+                          setHorarioFuncionamento(newHorarios)
+                        }}
+                        className="data-[state=checked]:bg-cyan-600 cursor-pointer"
+                      />
+                      <span className={`font-medium ${item.ativo ? 'text-slate-900' : 'text-slate-400'}`}>
+                        {item.dia}
+                      </span>
+                    </div>
+
+                    {item.ativo ? (
+                      <div className="flex items-center gap-2 flex-1 sm:justify-end">
+                        <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-200">
+                          <Input
+                            type="time"
+                            value={item.abertura}
+                            onChange={(e) => {
+                              const newHorarios = [...horarioFuncionamento]
+                              newHorarios[index].abertura = e.target.value
+                              setHorarioFuncionamento(newHorarios)
+                            }}
+                            className="w-24 h-8 text-sm border-0 bg-transparent focus-visible:ring-0 text-center font-medium shadow-none p-0"
+                          />
+                          <span className="text-slate-400 text-xs">até</span>
+                          <Input
+                            type="time"
+                            value={item.fechamento}
+                            onChange={(e) => {
+                              const newHorarios = [...horarioFuncionamento]
+                              newHorarios[index].fechamento = e.target.value
+                              setHorarioFuncionamento(newHorarios)
+                            }}
+                            className="w-24 h-8 text-sm border-0 bg-transparent focus-visible:ring-0 text-center font-medium shadow-none p-0"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1 text-right text-sm text-slate-400 italic pr-4">
+                        Fechado
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end pt-6 mt-6 border-t border-slate-100">
+                <Button
+                  onClick={handleSaveClinic}
+                  disabled={saving}
+                  className="h-12 px-8 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all hover:scale-[1.02]"
+                >
+                  {saving ? 'Salvando...' : 'Salvar Horários'}
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
         {/* Dialog de Editar Profissional (Mantendo estrutura, apenas ajustando estilos) */}
         <Dialog open={isEditProfissionalOpen} onOpenChange={setIsEditProfissionalOpen}>
@@ -1808,7 +1828,7 @@ export default function SettingsPage() {
               <Button
                 onClick={handleDeleteProfissional}
                 disabled={saving}
-                className="mx-4 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20 font-semibold transition-all"
+                className="sm:mx-4 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20 font-semibold transition-all"
               >
                 {saving ? 'Excluindo...' : 'Sim, excluir'}
               </Button>
