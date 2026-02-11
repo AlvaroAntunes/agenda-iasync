@@ -30,6 +30,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { logger } from "@/lib/logger"
 
 // Helper para formatar datas e gerar dias do mês
@@ -330,6 +337,10 @@ export default function CalendarPage() {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
   }
 
+  const handleMonthYearChange = (month: number, year: number) => {
+    setCurrentDate(new Date(year, month, 1))
+  }
+
   const handleDayClick = (day: number) => {
     const clickedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
     const daysEvents = getEventsForDay(day)
@@ -535,7 +546,7 @@ export default function CalendarPage() {
           </div>
           <div className="flex gap-1 sm:gap-2">
             <Button
-              className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all text-xs sm:text-sm px-2 sm:px-4"
+              className="mr-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all text-xs sm:text-sm px-2 sm:px-4"
               onClick={() => {
                 const today = new Date()
                 const dateStr = today.toISOString().split('T')[0]
@@ -547,7 +558,7 @@ export default function CalendarPage() {
               <Plus className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Novo Evento</span>
             </Button>
-            <Button className="bg-gray-200 text-black border-1 border-gray-300 hover:bg-gray-300 hover:text-black" size="icon" onClick={fetchEvents} disabled={loadingEvents}>
+            <Button className="mr-3 bg-gray-200 text-black border-1 border-gray-300 hover:bg-gray-300 hover:text-black" size="icon" onClick={fetchEvents} disabled={loadingEvents}>
               <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${loadingEvents ? 'animate-spin' : ''}`} />
             </Button>
             <Button className="bg-gray-200 text-black border-1 border-gray-300 hover:bg-gray-300 hover:text-black text-xs sm:text-sm px-2 sm:px-4" onClick={() => setCurrentDate(new Date())}>
@@ -651,10 +662,41 @@ export default function CalendarPage() {
 
         <Card className="border-border/60 bg-white/90 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between py-2 sm:py-4 px-2 sm:px-6">
-            <div className="flex items-center gap-2 sm:gap-4">
-              <h2 className="text-base sm:text-2xl font-semibold text-gray-800 capitalize">
-                {MONTHS[currentDate.getMonth()]} <span className="text-gray-400">{currentDate.getFullYear()}</span>
-              </h2>
+            <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Select
+                  value={currentDate.getMonth().toString()}
+                  onValueChange={(value) => handleMonthYearChange(parseInt(value), currentDate.getFullYear())}
+                >
+                  <SelectTrigger className="w-[120px] sm:w-[140px] h-8 sm:h-9 text-sm sm:text-base font-semibold cursor-pointer">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((month, index) => (
+                      <SelectItem className="cursor-pointer" key={index} value={index.toString()}>
+                        {month}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={currentDate.getFullYear().toString()}
+                  onValueChange={(value) => handleMonthYearChange(currentDate.getMonth(), parseInt(value))}
+                >
+                  <SelectTrigger className="w-[90px] sm:w-[100px] h-8 sm:h-9 text-sm sm:text-base font-semibold cursor-pointer">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 11 }, (_, i) => 2020 + i).map((year) => (
+                      <SelectItem className="cursor-pointer" key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="flex items-center gap-0.5 sm:gap-1 bg-gray-100 rounded-md p-0.5 sm:p-1">
                 <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-8 sm:w-8" onClick={prevMonth}>
                   <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />

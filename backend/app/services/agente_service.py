@@ -746,13 +746,6 @@ class AgenteClinica:
         # 5. Invalidar cache de disponibilidade
         data_agendamento = dt_inicio.strftime("%d/%m/%Y")
         self.cache_service.invalidate_availability_cache(prof_data['id'], data_agendamento)
-        
-        # 6. Logar Sucesso (KPI)
-        supabase.table('ia_logs').insert({
-            'clinic_id': self.clinic_id,
-            'session_id': self.session_id,
-            'event_type': 'INTENT_SCHEDULE_SUCCESS'
-        }).execute()
 
         return "Agendamento realizado com sucesso! Confirme para o usuário."
     
@@ -1047,12 +1040,6 @@ class AgenteClinica:
             
             # Invalida cache do profissional novo na data nova (pode ser o mesmo)
             self.cache_service.invalidate_availability_cache(prof_novo_data['id'], data_nova_fmt)
-            
-            supabase.table('ia_logs').insert({
-                'clinic_id': self.clinic_id,
-                'session_id': self.session_id,
-                'event_type': 'INTENT_SCHEDULE_SUCCESS'
-            }).execute()
 
             medico_nome = prof_novo_data['nome']
             return f"Sucesso! Reagendado para {dt_novo.strftime('%d/%m/%Y às %H:%M')} com {medico_nome}."
