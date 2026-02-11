@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Calendar, CreditCard, AlertTriangle, XCircle, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -49,6 +49,12 @@ type ClinicData = {
   subscription_end_date?: string
   plan_id?: string
   clinica_fechada?: Array<{ date: string, description: string }> | string[] | null
+  horario_funcionamento?: Array<{
+    dia: string
+    ativo: boolean
+    abertura: string
+    fechamento: string
+  }> | null
 }
 
 const UFS = [
@@ -69,6 +75,7 @@ type Profissional = {
 
 export default function SettingsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = getSupabaseBrowserClient()
   useSubscriptionCheck() // Verificar status da assinatura automaticamente
 
@@ -109,6 +116,8 @@ export default function SettingsPage() {
   const [editingClosedDay, setEditingClosedDay] = useState<{ date: string, description: string } | null>(null)
   const [editClosedDayDate, setEditClosedDayDate] = useState('')
   const [editClosedDayDescription, setEditClosedDayDescription] = useState('')
+
+  const [horarioFuncionamento, setHorarioFuncionamento] = useState<any[]>([])
 
   useEffect(() => {
     checkAuthAndLoadClinic()
@@ -211,6 +220,13 @@ export default function SettingsPage() {
         setClosedDays(normalized)
       }
 
+      // Initialize operating hours if available
+      if (clinicDataClean.horario_funcionamento) {
+        setHorarioFuncionamento(clinicDataClean.horario_funcionamento)
+      } else {
+        setHorarioFuncionamento([])
+      }
+
       // Carregar profissionais da clínica
       await loadProfissionais(profile.clinic_id)
 
@@ -224,6 +240,22 @@ export default function SettingsPage() {
       setLoading(false)
     }
   }
+
+  // Scroll to section on load if param exists
+  useEffect(() => {
+    if (!loading) {
+      const scrollTo = searchParams.get('scrollTo')
+      if (scrollTo === 'profissionais') {
+        // Delay to ensure rendering
+        setTimeout(() => {
+          const element = document.getElementById('profissionais-section')
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        }, 100)
+      }
+    }
+  }, [searchParams, loading])
 
   const fetchCalendars = async (clinicId: string) => {
     try {
@@ -432,6 +464,24 @@ export default function SettingsPage() {
       // Garantir que o telefone seja salvo apenas com números
       const telefoneClean = formData.telefone ? unformatTelefone(formData.telefone) : (formData.telefone || '')
 
+      // Atualizar o prompt com o horário de funcionamento
+      let currentPrompt = formData.prompt_ia ?? clinicData.prompt_ia ?? ''
+
+      if (horarioFuncionamento && horarioFuncionamento.length > 0) {
+        const activeHours = horarioFuncionamento.filter((h: any) => h.ativo)
+
+        if (activeHours.length > 0) {
+          const hoursString = activeHours
+            .map((h: any) => `${h.dia}: ${h.abertura} às ${h.fechamento}`)
+            .join('; ') + '.'
+
+          const pattern = /- \*\*Horário de Funcionamento:\*\* .*/
+          if (pattern.test(currentPrompt)) {
+            currentPrompt = currentPrompt.replace(pattern, `- **Horário de Funcionamento:** ${hoursString}`)
+          }
+        }
+      }
+
       const { error: updateError } = await supabase
         .from('clinicas')
         .update({
@@ -441,9 +491,10 @@ export default function SettingsPage() {
           endereco: formData.endereco,
           cidade: formData.cidade,
           uf: formData.uf,
-          prompt_ia: formData.prompt_ia,
+          prompt_ia: currentPrompt,
           ia_ativa: formData.ia_ativa,
           tipo_calendario: formData.tipo_calendario,
+          ...(clinicData.horario_funcionamento ? { horario_funcionamento: horarioFuncionamento } : {}),
         })
         .eq('id', clinicData.id)
 
@@ -887,48 +938,50 @@ export default function SettingsPage() {
             </div>
 
             {/* Seção de Prompt do Agente */}
-            <div className="space-y-6 pt-6 border-t border-slate-100">
-              <div className="flex justify-between items-start">
-                <div className="space-y-1">
-                  <Label htmlFor="prompt_ia" className="text-base font-semibold text-slate-900">Instruções do Agente IA</Label>
-                  <p className="text-sm text-slate-500">Defina a personalidade e as regras de negócio do seu agente.</p>
+            {clinicData?.prompt_ia && (
+              <div className="space-y-6 pt-6 border-t border-slate-100">
+                <div className="flex justify-between items-start">
+                  <div className="space-y-1">
+                    <Label htmlFor="prompt_ia" className="text-base font-semibold text-slate-900">Instruções do Agente IA</Label>
+                    <p className="text-sm text-slate-500">Defina a personalidade e as regras de negócio do seu agente.</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsPromptExpanded(!isPromptExpanded)}
+                    className="text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50"
+                  >
+                    {isPromptExpanded ? <Minimize2 className="h-4 w-4 mr-2" /> : <Maximize2 className="h-4 w-4 mr-2" />}
+                    {isPromptExpanded ? 'Reduzir' : 'Expandir'}
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsPromptExpanded(!isPromptExpanded)}
-                  className="text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50"
-                >
-                  {isPromptExpanded ? <Minimize2 className="h-4 w-4 mr-2" /> : <Maximize2 className="h-4 w-4 mr-2" />}
-                  {isPromptExpanded ? 'Reduzir' : 'Expandir'}
-                </Button>
-              </div>
 
-              <div className={`transition-all duration-300 ease-in-out ${isPromptExpanded ? 'fixed inset-4 z-50 bg-white shadow-2xl rounded-2xl p-6 ring-2 ring-cyan-100 flex flex-col' : ''}`}>
-                {isPromptExpanded && (
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-slate-800">Editor de Prompt Fullscreen</h3>
-                    <Button variant="ghost" size="sm" onClick={() => setIsPromptExpanded(false)}>
-                      <Minimize2 className="h-4 w-4 mr-2" /> Reduzir
-                    </Button>
-                  </div>
-                )}
-                <Textarea
-                  id="prompt_ia"
-                  value={formData.prompt_ia || ''}
-                  onChange={(e) => setFormData({ ...formData, prompt_ia: e.target.value })}
-                  placeholder="Você é uma assistente virtual especializada..."
-                  className={`rounded-xl border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 font-mono text-sm leading-relaxed ${isPromptExpanded ? 'flex-1 resize-none' : 'h-52 resize-y'}`}
-                />
-                {isPromptExpanded && (
-                  <div className="mt-4 flex justify-end">
-                    <Button onClick={() => setIsPromptExpanded(false)} className="bg-cyan-600 text-white hover:bg-cyan-700">
-                      Concluir Edição
-                    </Button>
-                  </div>
-                )}
+                <div className={`transition-all duration-300 ease-in-out ${isPromptExpanded ? 'fixed inset-4 z-50 bg-white shadow-2xl rounded-2xl p-6 ring-2 ring-cyan-100 flex flex-col' : ''}`}>
+                  {isPromptExpanded && (
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-bold text-slate-800">Editor de Prompt Fullscreen</h3>
+                      <Button variant="ghost" size="sm" onClick={() => setIsPromptExpanded(false)}>
+                        <Minimize2 className="h-4 w-4 mr-2" /> Reduzir
+                      </Button>
+                    </div>
+                  )}
+                  <Textarea
+                    id="prompt_ia"
+                    value={formData.prompt_ia || ''}
+                    onChange={(e) => setFormData({ ...formData, prompt_ia: e.target.value })}
+                    placeholder="Você é uma assistente virtual especializada..."
+                    className={`rounded-xl border-cyan-200 focus:border-cyan-400 focus:ring-cyan-400/20 font-mono text-sm leading-relaxed ${isPromptExpanded ? 'flex-1 resize-none' : 'h-52 resize-y'}`}
+                  />
+                  {isPromptExpanded && (
+                    <div className="mt-4 flex justify-end">
+                      <Button onClick={() => setIsPromptExpanded(false)} className="bg-cyan-600 text-white hover:bg-cyan-700">
+                        Concluir Edição
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Seção de Plano Refatorada */}
             <div className="mt-8 pt-8 border-t border-slate-100">
@@ -1388,7 +1441,7 @@ export default function SettingsPage() {
 
         {/* Doctors Management Card */}
         <div className="bg-white rounded-3xl p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50">
-          <div className="flex items-center justify-between mb-8">
+          <div id="profissionais-section" className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700">
                 <Users className="h-5 w-5" />
@@ -1535,7 +1588,6 @@ export default function SettingsPage() {
                           <span className="truncate">{profissional.especialidade}</span>
                         )}
                         {profissional.especialidade && <span className="text-slate-300">•</span>}
-                        {/* <span className="truncate text-xs bg-slate-100 px-2 py-0.5 rounded-md">Cal: {profissional.external_calendar_id}</span> */}
                       </div>
                     </div>
                   </div>
@@ -1562,6 +1614,84 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
+
+        {/* Operating Hours Editor */}
+        {clinicData?.horario_funcionamento && (
+          <div className="bg-white rounded-3xl p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-10 h-10 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-700">
+                <Calendar className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">Horário de Funcionamento</h2>
+                <p className="text-slate-500 text-sm">Configure os dias e horários de atendimento da clínica</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {horarioFuncionamento.map((item, index) => (
+                <div key={item.dia} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl gap-4 hover:border-cyan-200 transition-colors">
+                  <div className="flex items-center gap-4 min-w-[140px]">
+                    <Switch
+                      checked={item.ativo}
+                      onCheckedChange={(checked) => {
+                        const newHorarios = [...horarioFuncionamento]
+                        newHorarios[index].ativo = checked
+                        setHorarioFuncionamento(newHorarios)
+                      }}
+                      className="data-[state=checked]:bg-cyan-600 cursor-pointer"
+                    />
+                    <span className={`font-medium ${item.ativo ? 'text-slate-900' : 'text-slate-400'}`}>
+                      {item.dia}
+                    </span>
+                  </div>
+
+                  {item.ativo ? (
+                    <div className="flex items-center gap-2 flex-1 sm:justify-end">
+                      <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-200">
+                        <Input
+                          type="time"
+                          value={item.abertura}
+                          onChange={(e) => {
+                            const newHorarios = [...horarioFuncionamento]
+                            newHorarios[index].abertura = e.target.value
+                            setHorarioFuncionamento(newHorarios)
+                          }}
+                          className="w-24 h-8 text-sm border-0 bg-transparent focus-visible:ring-0 text-center font-medium shadow-none p-0"
+                        />
+                        <span className="text-slate-400 text-xs">até</span>
+                        <Input
+                          type="time"
+                          value={item.fechamento}
+                          onChange={(e) => {
+                            const newHorarios = [...horarioFuncionamento]
+                            newHorarios[index].fechamento = e.target.value
+                            setHorarioFuncionamento(newHorarios)
+                          }}
+                          className="w-24 h-8 text-sm border-0 bg-transparent focus-visible:ring-0 text-center font-medium shadow-none p-0"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 text-right text-sm text-slate-400 italic pr-4">
+                      Fechado
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end pt-6 mt-6 border-t border-slate-100">
+              <Button
+                onClick={handleSaveClinic}
+                disabled={saving}
+                className="h-12 px-8 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all hover:scale-[1.02]"
+              >
+                {saving ? 'Salvando...' : 'Salvar Horários'}
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Dialog de Editar Profissional (Mantendo estrutura, apenas ajustando estilos) */}
         <Dialog open={isEditProfissionalOpen} onOpenChange={setIsEditProfissionalOpen}>

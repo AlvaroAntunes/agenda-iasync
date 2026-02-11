@@ -268,7 +268,7 @@ export default function CalendarPage() {
       // Calculate cancellation rate
       const total = appointments?.length || 0
       const cancelled = appointments?.filter(
-        (a: { status: string }) => a.status === 'CANCELADO' || a.status === 'NO_SHOW'
+        (a: { status: string }) => a.status === 'CANCELADO' || a.status === 'FALTOU'
       ).length || 0
       const cancelRate = total > 0 ? Math.round((cancelled / total) * 100) : 0
 

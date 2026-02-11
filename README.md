@@ -10,7 +10,7 @@ O sistema opera em uma arquitetura de microsserviços modular, separando respons
 graph TD
     User[Usuário/Paciente] -->|WhatsApp| WA[UAZApi]
     WA -->|Webhook| Backend[Backend Python FastAPI]
-    Backend -->|LangChain| AI[OpenAI GPT-4o-mini]
+    Backend -->|LangChain| AI[OpenAI GPT-4.1-mini]
     Backend -->|Sync| GCal[Google Calendar]
     Backend -->|Persistência| DB[(Supabase PostgreSQL)]
     

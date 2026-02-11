@@ -81,6 +81,7 @@ export default function ClinicDashboard() {
 
   // Prompt Setup State
   const [isPromptSetupOpen, setIsPromptSetupOpen] = useState(false)
+  const [isProfessionalWarningOpen, setIsProfessionalWarningOpen] = useState(false)
   const [promptFormData, setPromptFormData] = useState({
     nomeRecepcionista: '',
     nomeClinica: '',
@@ -600,7 +601,7 @@ Siga esta ordem estrita. Não pule etapas.
 4. **Verificação Prévia:** Use \`_logic_verificar_consultas_existentes\`.
    - *Se já tiver consulta:* Informe e pergunte se quer manter ou reagendar.
    - *Se não tiver:* Siga para o passo 5.
-5. **Profissional:** Pergunte se prefere um profissional específico ou se pode ser qualquer um disponível.
+5. **Profissional:** Pergunte se prefere um profissional específico.
 6. **Data:** Pergunte a preferência de dia da semana.
 7. **Oferta:** Use \`_logic_verificar_disponibilidade\`. Apresente os horários disponíveis agrupados.
    - *Ex:* "Para sexta tenho: Manhã das 8h às 10h. Tarde às 14h e 16h."
@@ -610,7 +611,90 @@ Siga esta ordem estrita. Não pule etapas.
 9. **Confirmação:** Repita os dados (Dia, Hora, Profissional) e peça um "OK" explícito. Faça essa confirmação para reagendamentos também.
    - *Ex:* "Terça, 15/08 às 14h30 com [PROFISSIONAL]. Posso confirmar?"
 10. **Finalização:** Só chame a tool de agendamento após o "Sim".
-    - Envie a mensagem final com: Data formatada (Dia da semana, DD/MM/AAAA), Endereço completo e frase de apoio.`
+    - Envie a mensagem final com: Data formatada (Dia da semana, DD/MM/AAAA), Endereço completo e frase de apoio.
+
+---
+
+# EXEMPLOS DE COMPORTAMENTO (Few-Shot)
+
+**Exemplo 1 (Fluxo Ideal):**
+User: Quero marcar consulta.
+[NOME_RECEPCIONISTA]: Claro! Qual seu nome, por favor?
+User: Carlos.
+[NOME_RECEPCIONISTA]: (Tool: _logic_salvar_nome_cliente)
+[NOME_RECEPCIONISTA]: Prazer, Carlos! 😊 Você prefere algum profissional específico ou o primeiro disponível?
+User: Tanto faz. Para sexta.
+[NOME_RECEPCIONISTA]: (Tool: _logic_verificar_disponibilidade)
+Para sexta (08/08) tenho horários livres:
+Pela manhã: das 8h às 10h.
+Pela tarde: 14h e 15h30. Qual prefere?
+User: 14h.
+[NOME_RECEPCIONISTA]: A consulta é R$ [VALOR].
+Posso confirmar sexta às 14h?
+User: Pode.
+[NOME_RECEPCIONISTA]: (Tool: _logic_realizar_agendamento)
+Pronto, Carlos! Agendado para **Sexta, 08/08/2025 às 14h**.
+📍 **[ENDEREÇO_COMPLETO]**.
+Qualquer dúvida, estou por aqui!
+
+**Exemplo 2 (Tratando "Hoje" fora do horário):**
+
+User: Tem horário para hoje agora? (São 17h50 e fecha às 18h)
+[NOME_RECEPCIONISTA]: (Tool: verifica horário de funcionamento)
+Poxa, para hoje estamos encerrando (fechamos às 18h). 😕
+Podemos ver algo para amanhã de manhã?
+
+**Exemplo 3 (Cliente já tem consulta):**
+
+User: Queria marcar para quinta.
+[NOME_RECEPCIONISTA]: (Tool: _logic_verificar_consultas_existentes)
+Oi! Vi aqui que você já tem uma consulta marcada nesta quinta às 14h.
+Gostaria de manter ou prefere remarcar?
+
+**Exemplo 4 (Cancelamento com Retenção):**
+
+User: Preciso cancelar minha consulta de amanhã.
+[NOME_RECEPCIONISTA]: (Tool: _logic_listar_consultas_futuras)
+Encontrei sua consulta de amanhã às 9h.
+Não prefere apenas remarcar para outro dia? 😊
+User: Não, vou viajar. Pode cancelar.
+[NOME_RECEPCIONISTA]: (Tool: _logic_cancelar_agendamento)
+Entendido! Cancelei aqui.
+Quando voltar, é só me chamar! Boa viagem! ✈️
+
+**Exemplo 5 (Reagendamento):**
+
+User: Quero mudar meu horário.
+[NOME_RECEPCIONISTA]: (Tool: _logic_listar_consultas_futuras)
+Vi que está marcado para Sexta às 14h. Para qual dia gostaria de mudar?
+User: Segunda de manhã.
+[NOME_RECEPCIONISTA]: (Tool: _logic_verificar_disponibilidade)
+Tenho horário às 9h e 10h30. Qual fica melhor?
+User: 9h.
+[NOME_RECEPCIONISTA]: Vou trocar: cancelo sexta e marco Segunda, 15/05 às 9h. Pode ser?
+User: Pode.
+[NOME_RECEPCIONISTA]: (Tool: _logic_reagendar_agendamento)
+Prontinho! Remarcado para **Segunda às 9h**.
+
+**Exemplo 6 (Resposta ao Lembrete - Positivo):**
+
+[Histórico] [NOME_RECEPCIONISTA]: Olá! Lembrando da sua consulta amanhã às 14h. Podemos confirmar?
+User: Sim, confirmado.
+[NOME_RECEPCIONISTA]: Maravilha! 😉 Estamos te aguardando. Ótimo dia!
+
+
+**Exemplo 7 (Resposta ao Lembrete - Negativo):**
+
+[Histórico] [NOME_RECEPCIONISTA]: Sua consulta é logo mais, às 16h. Estamos te aguardando! 😊
+User: Não vou conseguir ir.
+[NOME_RECEPCIONISTA]: Poxa, que pena! 😕
+Quer que eu veja um horário para amanhã ou outro dia?
+User: Amanhã de manhã.
+[NOME_RECEPCIONISTA]: (Tool: _logic_verificar_disponibilidade)
+Tenho às 9h e 11h30. Qual serve?
+User: 9h.
+[NOME_RECEPCIONISTA]: (Tool: _logic_reagendar_agendamento)
+Prontinho! Remarquei para amanhã às 9h. Até lá!`
 
     const procedimentosText = data.procedimentos
       .map(p => `  - ${p.nome}: R$ ${p.valor}.`)
@@ -675,20 +759,32 @@ Siga esta ordem estrita. Não pule etapas.
       setIsPromptSetupOpen(false)
       toast.success('Prompt configurado com sucesso!')
 
+      // Check if there are professionals registered
+      if (!clinicData.profissionais || clinicData.profissionais.length === 0) {
+        setIsProfessionalWarningOpen(true)
+        return
+      }
+
       // Continue connection
-      handleConnectUazapi()
+      handleConnectUazapi(true)
     } catch (error) {
       logger.error('Erro ao salvar prompt:', error)
       toast.error('Erro ao salvar prompt')
     }
   }
 
-  const handleConnectUazapi = async () => {
+  const handleConnectUazapi = async (skipPromptCheck = false) => {
     if (!clinicData?.id) return
 
     // Check if prompt is configured
-    if (!clinicData.prompt_ia || clinicData.prompt_ia.trim() === '') {
+    if (!skipPromptCheck && (!clinicData.prompt_ia || clinicData.prompt_ia.trim() === '')) {
       setIsPromptSetupOpen(true)
+      return
+    }
+
+    // Check if there are professionals registered
+    if (!clinicData.profissionais || clinicData.profissionais.length === 0) {
+      setIsProfessionalWarningOpen(true)
       return
     }
 
@@ -1112,7 +1208,7 @@ Siga esta ordem estrita. Não pule etapas.
                       <Button
                         variant="ghost"
                         className="bg-black text-white"
-                        onClick={handleConnectUazapi}
+                        onClick={() => handleConnectUazapi()}
                         disabled={uazapiLoading || uazapiStatus === "not_configured"}
                       >
                         <QrCode className="mr-2 h-4 w-4" />
@@ -1351,7 +1447,7 @@ Siga esta ordem estrita. Não pule etapas.
             <div className="space-y-6 py-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Nome da Recepcionista</Label>
+                  <Label>Nome da Recepcionista *</Label>
                   <Input
                     placeholder="Ex: Luanna"
                     value={promptFormData.nomeRecepcionista}
@@ -1360,9 +1456,9 @@ Siga esta ordem estrita. Não pule etapas.
                   <p className="text-xs text-muted-foreground">Nome que a IA usará para se apresentar.</p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Slogan da Clínica</Label>
+                  <Label>Slogan da Clínica *</Label>
                   <Input
-                    placeholder="Ex: Seu sorriso é nossa assinatura"
+                    placeholder="Ex: Sua saúde em primeiro lugar"
                     value={promptFormData.sloganClinica}
                     onChange={(e) => setPromptFormData({ ...promptFormData, sloganClinica: e.target.value })}
                   />
@@ -1370,7 +1466,7 @@ Siga esta ordem estrita. Não pule etapas.
               </div>
 
               <div className="space-y-2">
-                <Label>Descrição da Clínica</Label>
+                <Label>Descrição da Clínica *</Label>
                 <Textarea
                   placeholder="Ex: clínica referência em sorrisos há 12 anos..."
                   value={promptFormData.descricaoClinica}
@@ -1379,7 +1475,7 @@ Siga esta ordem estrita. Não pule etapas.
               </div>
 
               <div className="space-y-2">
-                <Label>Diferenciais da Clínica</Label>
+                <Label>Diferenciais da Clínica *</Label>
                 <Textarea
                   placeholder="Ex: Scanner 3D, anestesia computadorizada, sala de relaxamento..."
                   value={promptFormData.diferenciaisClinica}
@@ -1394,7 +1490,7 @@ Siga esta ordem estrita. Não pule etapas.
                     <div key={horario.dia} className="flex items-center gap-3">
                       <div className="flex items-center gap-2 w-32">
                         <Switch
-                          className="cursor-pointer"
+                          className="data-[state=checked]:bg-cyan-600 cursor-pointer"
                           checked={horario.ativo}
                           onCheckedChange={(checked) => {
                             const newHorarios = [...promptFormData.horariosFuncionamento]
@@ -1450,8 +1546,9 @@ Siga esta ordem estrita. Não pule etapas.
 
               <div className="space-y-4 rounded-lg border p-4">
                 <div className="flex items-center justify-between">
-                  <Label className="text-base">Procedimentos e Valores (Estimativa)</Label>
+                  <Label className="text-base">Procedimentos e Valores (Estimativa) *</Label>
                   <Button
+                    className="hover:text-black"
                     variant="outline"
                     size="sm"
                     onClick={() => setPromptFormData({
@@ -1467,7 +1564,7 @@ Siga esta ordem estrita. Não pule etapas.
                   <div key={index} className="flex gap-2 items-start">
                     <div className="flex-1">
                       <Input
-                        placeholder="Nome do Procedimento"
+                        placeholder="Procedimento (Ex: Avaliação)"
                         value={proc.nome}
                         onChange={(e) => {
                           const newProcs = [...promptFormData.procedimentos]
@@ -1507,8 +1604,57 @@ Siga esta ordem estrita. Não pule etapas.
               <Button className="hover:text-black" variant="outline" onClick={() => setIsPromptSetupOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleSavePrompt} className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white">
+              <Button
+                onClick={handleSavePrompt}
+                disabled={
+                  !promptFormData.nomeRecepcionista.trim() ||
+                  !promptFormData.sloganClinica.trim() ||
+                  !promptFormData.descricaoClinica.trim() ||
+                  !promptFormData.diferenciaisClinica.trim() ||
+                  !promptFormData.procedimentos.some((p) => p.nome.trim() !== '' && p.valor.trim() !== '')
+                }
+                className={`bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700 shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] ${(!promptFormData.nomeRecepcionista.trim() ||
+                  !promptFormData.sloganClinica.trim() ||
+                  !promptFormData.descricaoClinica.trim() ||
+                  !promptFormData.diferenciaisClinica.trim() ||
+                  !promptFormData.procedimentos.some((p) => p.nome.trim() !== '' && p.valor.trim() !== ''))
+                  ? 'opacity-50 cursor-not-allowed grayscale'
+                  : ''
+                  }`}
+              >
                 Salvar e Continuar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Warning Modal - No Professionals */}
+        <Dialog open={isProfessionalWarningOpen} onOpenChange={setIsProfessionalWarningOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-600">
+                <User className="h-5 w-5" />
+                Cadastre um Profissional
+              </DialogTitle>
+              <DialogDescription className="pt-2">
+                Antes de se conectar ao WhatsApp, é necessário cadastrar pelo menos um profissional.
+                <br /><br />
+                Isso é importante para que a IA saiba com quem realizar os agendamentos.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:justify-end mt-4">
+              <Button
+                variant="ghost"
+                onClick={() => setIsProfessionalWarningOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => router.push('/dashboard/settings?scrollTo=profissionais')}
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+              >
+                Cadastrar Profissionais
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </DialogFooter>
           </DialogContent>
