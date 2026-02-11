@@ -55,6 +55,7 @@ type ClinicData = {
     abertura: string
     fechamento: string
   }> | null
+  max_profissionais?: number
 }
 
 const UFS = [
@@ -172,7 +173,7 @@ export default function SettingsPage() {
       // Buscar assinatura ativa ou mais recente com plano
       const { data: assinaturas } = await supabase
         .from('assinaturas')
-        .select('*, planos(nome)')
+        .select('*, planos(nome, max_profissionais)')
         .eq('clinic_id', profile.clinic_id)
         .order('data_fim', { ascending: false })
         .limit(1)
@@ -194,7 +195,8 @@ export default function SettingsPage() {
           subscription_interval: assinatura.ciclo === 'mensal' ? 'monthly' : 'yearly',
           subscription_end_date: assinatura.data_fim,
           plan_id: assinatura.planos?.nome || assinatura.plan_id,
-          plano: (assinatura.planos?.nome || assinatura.plan_id) as any // Atualiza o plano visual com o da assinatura real
+          plano: (assinatura.planos?.nome || assinatura.plan_id) as any, // Atualiza o plano visual com o da assinatura real
+          max_profissionais: assinatura.planos?.max_profissionais
         }
       }
 
@@ -290,6 +292,11 @@ export default function SettingsPage() {
   const handleAddProfissional = async () => {
     if (!clinicData || !profissionalForm.nome || !profissionalForm.especialidade || !profissionalForm.genero) {
       setProfissionalError("Preencha todos os campos obrigatórios")
+      return
+    }
+
+    if (clinicData.max_profissionais && profissionais.length >= clinicData.max_profissionais) {
+      setProfissionalError(`Seu plano permite no máximo ${clinicData.max_profissionais} profissionais.`)
       return
     }
 
@@ -1229,10 +1236,10 @@ export default function SettingsPage() {
         </div >
 
         {/* Closed Days Management Card */}
-        < div className="bg-white rounded-3xl p-3 sm:p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden" > 
+        < div className="bg-white rounded-3xl p-3 sm:p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden" >
 
           {/* Header do Card */}
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-400 to-red-600" /> 
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-400 to-red-600" />
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-700 flex-shrink-0">
               <Calendar className="h-5 w-5" />
@@ -1461,107 +1468,129 @@ export default function SettingsPage() {
                 <Users className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 break-words">Profissionais</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 break-words">Profissionais</h2>
+                  {clinicData?.max_profissionais && (
+                    <Badge variant="outline" className="text-slate-500 border-slate-200 bg-slate-50">
+                      {profissionais.length} / {clinicData.max_profissionais}
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-slate-500 text-sm hidden sm:block">Gerencie a equipe da clínica</p>
               </div>
             </div>
-            <Dialog open={isAddProfissionalOpen} onOpenChange={setIsAddProfissionalOpen}>
-              <DialogTrigger asChild>
-                <Button className="h-10 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all hover:scale-[1.02]">
+            {clinicData && clinicData.max_profissionais && profissionais.length >= clinicData.max_profissionais ? (
+              <div className="flex flex-col items-end gap-1">
+                <Button disabled className="h-10 rounded-xl bg-slate-100 text-slate-400 cursor-not-allowed mb-2">
                   <Plus className="h-4 w-4 mr-2" />
                   <span>Adicionar</span>
                 </Button>
-              </DialogTrigger>
-              {/* Dialog Content mantido similar mas com classes de rounded atualizadas */}
-              <DialogContent className="sm:max-w-md rounded-2xl">
-                <DialogHeader>
-                  <DialogTitle>Adicionar Profissional</DialogTitle>
-                  <DialogDescription>
-                    Preencha os dados do novo profissional.
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="prof-nome">Nome *</Label>
-                    <Input
-                      id="prof-nome"
-                      value={profissionalForm.nome}
-                      onChange={(e) => setProfissionalForm({ ...profissionalForm, nome: e.target.value })}
-                      placeholder="João Silva"
-                      className="rounded-xl border-slate-200"
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="prof-especialidade">Especialidade *</Label>
-                    <Input
-                      id="prof-especialidade"
-                      value={profissionalForm.especialidade}
-                      onChange={(e) => setProfissionalForm({ ...profissionalForm, especialidade: e.target.value })}
-                      placeholder="Dentista Geral"
-                      className="rounded-xl border-slate-200"
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="prof-genero">Gênero *</Label>
-                    <Select
-                      value={profissionalForm.genero}
-                      onValueChange={(value) => setProfissionalForm({ ...profissionalForm, genero: value as 'masculino' | 'feminino' })}
-                    >
-                      <SelectTrigger id="prof-genero" className="rounded-xl border-slate-200 cursor-pointer">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem className="cursor-pointer" value="masculino">Masculino</SelectItem>
-                        <SelectItem className="cursor-pointer" value="feminino">Feminino</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="prof-calendar">Calendário</Label>
-                    <Select
-                      value={profissionalForm.external_calendar_id}
-                      onValueChange={(value) => setProfissionalForm({ ...profissionalForm, external_calendar_id: value })}
-                    >
-                      <SelectTrigger id="prof-calendar" className="rounded-xl border-slate-200 cursor-pointer">
-                        <SelectValue placeholder="Selecione um calendário" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="primary" className="cursor-pointer">Principal (clínica)</SelectItem>
-                        {calendars
-                          .filter(c => c.id !== 'primary')
-                          .map((calendar) => (
-                            <SelectItem key={calendar.id} value={calendar.id} className="cursor-pointer">
-                              {calendar.summary}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="flex items-center gap-1.5 text-amber-600 bg-amber-50 px-2 py-1 rounded-md border border-amber-100">
+                  <AlertTriangle className="h-3 w-3" />
+                  <span className="text-xs font-medium">
+                    Limite de {clinicData.max_profissionais} {clinicData.max_profissionais > 1 ? 'profissionais' : 'profissional'} atingido.
+                  </span>
                 </div>
+              </div>
+            ) : (
+              <Dialog open={isAddProfissionalOpen} onOpenChange={setIsAddProfissionalOpen}>
+                <DialogTrigger asChild>
+                  <Button className="h-10 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all hover:scale-[1.02]">
+                    <Plus className="h-4 w-4 mr-2" />
+                    <span>Adicionar</span>
+                  </Button>
+                </DialogTrigger>
+                {/* Dialog Content mantido similar mas com classes de rounded atualizadas */}
+                <DialogContent className="sm:max-w-md rounded-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Adicionar Profissional</DialogTitle>
+                    <DialogDescription>
+                      Preencha os dados do novo profissional.
+                    </DialogDescription>
+                  </DialogHeader>
 
-                <DialogFooter>
-                  <Button onClick={() => setIsAddProfissionalOpen(false)} disabled={saving} className="rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-500 transition-colors">
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={handleAddProfissional}
-                    disabled={
-                      saving ||
-                      !profissionalForm.nome ||
-                      !profissionalForm.especialidade ||
-                      !profissionalForm.genero
-                    }
-                    className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all"
-                  >
-                    {saving ? 'Adicionando...' : 'Adicionar'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="prof-nome">Nome *</Label>
+                      <Input
+                        id="prof-nome"
+                        value={profissionalForm.nome}
+                        onChange={(e) => setProfissionalForm({ ...profissionalForm, nome: e.target.value })}
+                        placeholder="João Silva"
+                        className="rounded-xl border-slate-200"
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="prof-especialidade">Especialidade *</Label>
+                      <Input
+                        id="prof-especialidade"
+                        value={profissionalForm.especialidade}
+                        onChange={(e) => setProfissionalForm({ ...profissionalForm, especialidade: e.target.value })}
+                        placeholder="Dentista Geral"
+                        className="rounded-xl border-slate-200"
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="prof-genero">Gênero *</Label>
+                      <Select
+                        value={profissionalForm.genero}
+                        onValueChange={(value) => setProfissionalForm({ ...profissionalForm, genero: value as 'masculino' | 'feminino' })}
+                      >
+                        <SelectTrigger id="prof-genero" className="rounded-xl border-slate-200 cursor-pointer">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem className="cursor-pointer" value="masculino">Masculino</SelectItem>
+                          <SelectItem className="cursor-pointer" value="feminino">Feminino</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="prof-calendar">Calendário</Label>
+                      <Select
+                        value={profissionalForm.external_calendar_id}
+                        onValueChange={(value) => setProfissionalForm({ ...profissionalForm, external_calendar_id: value })}
+                      >
+                        <SelectTrigger id="prof-calendar" className="rounded-xl border-slate-200 cursor-pointer">
+                          <SelectValue placeholder="Selecione um calendário" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="primary" className="cursor-pointer">Principal (clínica)</SelectItem>
+                          {calendars
+                            .filter(c => c.id !== 'primary')
+                            .map((calendar) => (
+                              <SelectItem key={calendar.id} value={calendar.id} className="cursor-pointer">
+                                {calendar.summary}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button onClick={() => setIsAddProfissionalOpen(false)} disabled={saving} className="rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-500 transition-colors">
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={handleAddProfissional}
+                      disabled={
+                        saving ||
+                        !profissionalForm.nome ||
+                        !profissionalForm.especialidade ||
+                        !profissionalForm.genero
+                      }
+                      className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all"
+                    >
+                      {saving ? 'Adicionando...' : 'Adicionar'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
 
           {/* Alerts de Profissionais */}

@@ -201,13 +201,13 @@ export default function CalendarPage() {
     dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1)
 
     // Debug Stats
-    console.log(`📊 CalculateStats: ${allEvents.length} eventos totais`)
+    logger.log(`📊 CalculateStats: ${allEvents.length} eventos totais`)
     const byCal = allEvents.reduce((acc: any, e) => {
       const k = e.calendarSummary || 'primary'
       acc[k] = (acc[k] || 0) + 1
       return acc
     }, {})
-    console.log(`📊 Por Calendário:`, byCal)
+    logger.log(`📊 Por Calendário:`, byCal)
 
     const next7Days = new Date(today)
     next7Days.setDate(next7Days.getDate() + 7)
