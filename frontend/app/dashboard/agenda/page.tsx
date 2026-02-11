@@ -58,6 +58,52 @@ type CalendarEvent = {
   end: { dateTime: string; timeZone: string }
   location?: string
   status?: string
+  profissional_nome?: string
+  profissional_id?: string
+  calendarSummary?: string
+  calendarId?: string
+  color?: string
+}
+
+// Generate a consistent color based on string
+const stringToColor = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+  return '#' + "00000".substring(0, 6 - c.length) + c;
+}
+
+// Get a pastel background color based on string
+const getPastelColor = (str: string) => {
+  if (!str) return { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' }
+
+  const colors = [
+    { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
+    { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
+    { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+    { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
+    { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+    { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200' },
+    { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200' },
+    { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' },
+    { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+    { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' },
+    { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200' },
+    { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+    { bg: 'bg-fuchsia-50', text: 'text-fuchsia-700', border: 'border-fuchsia-200' },
+    { bg: 'bg-pink-50', text: 'text-pink-700', border: 'border-pink-200' },
+    { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
+  ]
+
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
 }
 
 export default function CalendarPage() {
@@ -153,6 +199,16 @@ export default function CalendarPage() {
     tomorrow.setDate(tomorrow.getDate() + 1)
     const dayAfterTomorrow = new Date(tomorrow)
     dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1)
+
+    // Debug Stats
+    console.log(`📊 CalculateStats: ${allEvents.length} eventos totais`)
+    const byCal = allEvents.reduce((acc: any, e) => {
+      const k = e.calendarSummary || 'primary'
+      acc[k] = (acc[k] || 0) + 1
+      return acc
+    }, {})
+    console.log(`📊 Por Calendário:`, byCal)
+
     const next7Days = new Date(today)
     next7Days.setDate(next7Days.getDate() + 7)
 
@@ -270,7 +326,10 @@ export default function CalendarPage() {
       // Por enquanto, vamos pegar STRICTLY o mês, o backend filtra.
 
       const startDate = new Date(year, month, 1)
+      startDate.setDate(startDate.getDate() - 7) // Pega final do mês anterior
+
       const endDate = new Date(year, month + 1, 0, 23, 59, 59)
+      endDate.setDate(endDate.getDate() + 7) // Pega início do mês seguinte
 
       const url = `${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData.id}?start=${startDate.toISOString()}&end=${endDate.toISOString()}`
 
@@ -373,11 +432,29 @@ export default function CalendarPage() {
           </div>
 
           <div className="mt-1 sm:mt-2 space-y-0.5 sm:space-y-1 overflow-hidden max-h-[calc(100%-24px)] sm:max-h-[calc(100%-32px)]">
-            {dayEvents.slice(0, 2).map((event, idx) => (
-              <div key={idx} className="text-[8px] sm:text-[10px] truncate px-1 sm:px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 border-l-2 border-l-blue-500 hidden sm:block">
-                {new Date(event.start.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} {event.summary}
-              </div>
-            ))}
+            {dayEvents.slice(0, 2).map((event, idx) => {
+              // Determine identifier for color generation (Professional Name > Calendar Name > Event Summary)
+              const colorKey = event.profissional_nome || event.calendarSummary || event.summary || 'default'
+              const colorStyle = getPastelColor(colorKey)
+
+              return (
+                <div
+                  key={idx}
+                  className={`text-[8px] sm:text-[10px] truncate px-1 sm:px-1.5 py-0.5 rounded border border-l-2 hidden sm:block ${colorStyle.bg} ${colorStyle.text} ${colorStyle.border} border-l-current`}
+                >
+                  <span className="font-semibold mr-1">
+                    {new Date(event.start.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span>{event.summary}</span>
+                  {/* Optional: Show professional name if available */}
+                  {(event.profissional_nome || event.calendarSummary) && (
+                    <span className="ml-1 opacity-70 text-[8px]">
+                      ({event.profissional_nome || event.calendarSummary})
+                    </span>
+                  )}
+                </div>
+              )
+            })}
             {dayEvents.length > 2 && (
               <div className="text-[8px] sm:text-[10px] text-gray-400 pl-1 hidden sm:block">
                 + {dayEvents.length - 2} mais
@@ -405,12 +482,15 @@ export default function CalendarPage() {
 
     try {
       setLoadingEvents(true)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData.id}/${editingEvent.id}`, {
+      const calendarId = editingEvent.calendarId || 'primary'
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData.id}/${editingEvent.id}?calendar_id=${encodeURIComponent(calendarId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           summary: editingEvent.summary,
-          description: editingEvent.description
+          description: editingEvent.description,
+          start: editingEvent.start,
+          end: editingEvent.end
         })
       })
 
@@ -435,7 +515,8 @@ export default function CalendarPage() {
 
     try {
       setLoadingEvents(true)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData?.id}/${eventToDelete.id}`, {
+      const calendarId = eventToDelete.calendarId || 'primary'
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData?.id}/${eventToDelete.id}?calendar_id=${encodeURIComponent(calendarId)}`, {
         method: "DELETE"
       })
 
@@ -718,6 +799,83 @@ export default function CalendarPage() {
                     onChange={e => setEditingEvent({ ...editingEvent, summary: e.target.value })}
                   />
                 </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-sm font-medium">Data</label>
+                    <input
+                      type="date"
+                      className="w-full mt-1 p-2 border rounded-md"
+                      value={(() => {
+                        const d = new Date(editingEvent.start.dateTime)
+                        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                      })()}
+                      onChange={e => {
+                        const newDate = e.target.value
+                        if (!newDate) return
+
+                        const startD = new Date(editingEvent.start.dateTime)
+                        const endD = new Date(editingEvent.end.dateTime)
+
+                        const startTime = startD.getHours().toString().padStart(2, '0') + ':' + startD.getMinutes().toString().padStart(2, '0')
+                        const endTime = endD.getHours().toString().padStart(2, '0') + ':' + endD.getMinutes().toString().padStart(2, '0')
+
+                        const newStart = new Date(`${newDate}T${startTime}:00`)
+                        const newEnd = new Date(`${newDate}T${endTime}:00`)
+
+                        setEditingEvent({
+                          ...editingEvent,
+                          start: { ...editingEvent.start, dateTime: newStart.toISOString() },
+                          end: { ...editingEvent.end, dateTime: newEnd.toISOString() }
+                        })
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Início</label>
+                    <input
+                      type="time"
+                      className="w-full mt-1 p-2 border rounded-md"
+                      value={new Date(editingEvent.start.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      onChange={e => {
+                        const newTime = e.target.value
+                        if (!newTime) return
+
+                        const d = new Date(editingEvent.start.dateTime)
+                        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+                        const newStart = new Date(`${dateStr}T${newTime}:00`)
+
+                        setEditingEvent({
+                          ...editingEvent,
+                          start: { ...editingEvent.start, dateTime: newStart.toISOString() }
+                        })
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Fim</label>
+                    <input
+                      type="time"
+                      className="w-full mt-1 p-2 border rounded-md"
+                      value={new Date(editingEvent.end.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      onChange={e => {
+                        const newTime = e.target.value
+                        if (!newTime) return
+
+                        const d = new Date(editingEvent.end.dateTime)
+                        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+                        const newEnd = new Date(`${dateStr}T${newTime}:00`)
+
+                        setEditingEvent({
+                          ...editingEvent,
+                          end: { ...editingEvent.end, dateTime: newEnd.toISOString() }
+                        })
+                      }}
+                    />
+                  </div>
+                </div>
                 <div>
                   <label className="text-sm font-medium">Descrição</label>
                   <textarea
@@ -745,43 +903,57 @@ export default function CalendarPage() {
                 <p>Nenhum evento para este dia.</p>
               </div>
             ) : (
-              selectedDayEvents.map((evt, idx) => (
-                <div key={idx} className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-violet-500" />
-                  <div className="flex items-start justify-between pl-3">
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900 text-sm">{evt.summary}</h4>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                        <Clock className="h-3 w-3" />
-                        {new Date(evt.start.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                        {' - '}
-                        {new Date(evt.end.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                      {evt.location && (
-                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                          <MapPin className="h-3 w-3" />
-                          {evt.location}
-                        </div>
-                      )}
-                      {evt.description && (
-                        <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100">
-                          {evt.description}
-                        </div>
-                      )}
-                    </div>
+              selectedDayEvents.map((evt, idx) => {
+                const colorKey = evt.profissional_nome || evt.calendarSummary || evt.summary || 'default'
+                const colorStyle = getPastelColor(colorKey)
+                const borderColor = colorStyle.border.replace('border-', 'bg-').replace('200', '500')
 
-                    {/* Botões de Ação */}
-                    <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-500 hover:text-blue-600" onClick={() => setEditingEvent(evt)}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-500 hover:text-red-600" onClick={() => setEventToDelete(evt)}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                      </Button>
+                return (
+                  <div key={idx} className={`p-3 bg-white border ${colorStyle.border} rounded-xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group`}>
+                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${borderColor}`} />
+                    <div className="flex items-start justify-between pl-3">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900 text-sm">{evt.summary}</h4>
+
+                        {(evt.profissional_nome || evt.calendarSummary) && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <Badge variant="outline" className={`text-[10px] h-5 px-1.5 ${colorStyle.bg} ${colorStyle.text} border-none font-medium`}>
+                              {evt.profissional_nome || evt.calendarSummary}
+                            </Badge>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+                          <Clock className="h-3 w-3" />
+                          {new Date(evt.start.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          {' - '}
+                          {new Date(evt.end.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        {evt.location && (
+                          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                            <MapPin className="h-3 w-3" />
+                            {evt.location}
+                          </div>
+                        )}
+                        {evt.description && (
+                          <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 italic">
+                            {evt.description}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-500 hover:text-blue-600" onClick={() => setEditingEvent(evt)}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-500 hover:text-red-600" onClick={() => setEventToDelete(evt)}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </DialogContent>

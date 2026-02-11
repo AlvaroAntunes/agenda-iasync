@@ -4,6 +4,7 @@ Endpoint para listar calendários disponíveis na conta conectada.
 
 from fastapi import APIRouter, HTTPException
 from app.services.factory import get_calendar_service
+from app.core.database import get_supabase
 
 router = APIRouter()
 
@@ -29,18 +30,11 @@ def list_calendars(clinic_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/calendars/events/{clinic_id}")
-def list_events(clinic_id: str, start: str, end: str, calendar_id: str = "primary"):
+def list_events(clinic_id: str, start: str, end: str, calendar_id: str = None):
     """
-    Lista eventos de um calendário específico em um intervalo de tempo.
-    
-    Args:
-        clinic_id: ID da clínica
-        start: Data/hora inicial no formato ISO (ex: 2023-10-25T00:00:00Z)
-        end: Data/hora final no formato ISO
-        calendar_id: ID do calendário (padrão: "primary")
-    
-    Returns:
-        Dict com lista de eventos
+    Lista eventos.
+    - Se calendar_id for informado: Traz apenas daquele calendário.
+    - Se calendar_id for None: Traz de TODOS os calendários da conta e mescla os resultados.
     """
     try:
         from datetime import datetime
@@ -58,17 +52,95 @@ def list_events(clinic_id: str, start: str, end: str, calendar_id: str = "primar
                 detail=f"Formato de data inválido. Use ISO 8601: {str(ve)}"
             )
         
-        # Valida que end > start
         if dt_end <= dt_start:
-            raise HTTPException(
-                status_code=400,
-                detail="A data final deve ser posterior à data inicial"
-            )
+            raise HTTPException(status_code=400, detail="Data final deve ser maior que inicial")
+
+        all_events = []
+
+        # LÓGICA DE BUSCA
+        supabase = get_supabase()
         
-        # Busca eventos no período
-        events = calendar_service.listar_eventos_periodo(dt_start, dt_end, calendar_id)
-        
-        return {"events": events}
+        if calendar_id:
+            # Busca única (Comportamento antigo/específico)
+            events = calendar_service.listar_eventos_periodo(dt_start, dt_end, calendar_id)
+            all_events.extend(events)
+        else:
+            # Busca Múltipla (Itera sobre todos os calendários)
+            
+            # A. Carrega todos os profissionais para mapear nomes
+            profissionais_resp = supabase.table('profissionais')\
+                .select('id, nome, external_calendar_id')\
+                .eq('clinic_id', clinic_id)\
+                .execute()
+            
+            mapa_profissionais = {}
+            if profissionais_resp.data:
+                for p in profissionais_resp.data:
+                    if p.get('external_calendar_id'):
+                        mapa_profissionais[p['external_calendar_id']] = p
+
+            # B. Pega a lista de calendários disponíveis no Google
+            available_calendars = calendar_service.listar_calendarios()
+            
+            # Identifica qual é REALMENTE o calendário principal
+            primary_cal_id = next((c['id'] for c in available_calendars if c.get('primary')), None)
+            
+            # Fallback 1: ID que parece email e não é grupo
+            if not primary_cal_id:
+                primary_cal_id = next((c['id'] for c in available_calendars if '@' in c['id'] and not c['id'].endswith('group.calendar.google.com')), None)
+            
+            # Fallback 2: O primeiro da lista
+            if not primary_cal_id and available_calendars:
+                primary_cal_id = available_calendars[0]['id']
+
+            for cal in available_calendars:
+                cal_id = cal['id']
+                is_main_cal = (cal_id == primary_cal_id)
+                
+                is_professional = cal_id in mapa_profissionais
+                
+                # Se for o calendário principal, verifica se tem profissional cadastrado com 'primary'
+                if is_main_cal:
+                    if 'primary' in mapa_profissionais:
+                        is_professional = True
+                    elif cal_id in mapa_profissionais:
+                        is_professional = True
+                
+                # FILTRO: Apenas calendário principal ou de médicos cadastrados
+                if not is_main_cal and not is_professional:
+                    continue
+
+                try:
+                    # 2. Busca eventos deste calendário específico
+                    events = calendar_service.listar_eventos_periodo(dt_start, dt_end, cal_id)
+                    
+                    # 3. Enriquece evento com metadados
+                    for event in events:
+                        event['calendarId'] = cal_id
+                        event['calendarSummary'] = cal.get('summary', 'Agenda')
+                        
+                        # Se for calendário de um médico, sobrescreve nome com o do médico
+                        prof = None
+                        if cal_id in mapa_profissionais:
+                            prof = mapa_profissionais.get(cal_id)
+                        elif is_main_cal and 'primary' in mapa_profissionais:
+                            prof = mapa_profissionais.get('primary')
+                            
+                        if prof:
+                            event['profissional_nome'] = prof['nome']
+                            event['profissional_id'] = prof['id']
+                            event['calendarSummary'] = prof['nome'] # Mostra nome do médico no front
+                        
+                        if 'backgroundColor' in cal:
+                            event['color'] = cal['backgroundColor'] 
+                    
+                    all_events.extend(events)
+                    
+                except Exception as e_cal:
+                    print(f"⚠️ Erro ao ler eventos do calendário {cal_id}: {e_cal}")
+                    continue
+
+        return {"events": all_events}
 
     except HTTPException:
         raise
