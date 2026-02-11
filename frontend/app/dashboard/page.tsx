@@ -181,7 +181,7 @@ export default function ClinicDashboard() {
             window.location.reload();
           }
         } catch (error) {
-          console.error("Erro ao verificar pagamento de tokens:", error);
+          logger.error("Erro ao verificar pagamento de tokens:", error);
         }
       }, 3000); // Verifica a cada 3 segundos
     }
@@ -220,7 +220,7 @@ export default function ClinicDashboard() {
         setIsWaitingTokenPayment(true)
       }
     } catch (error: any) {
-      console.error("Erro na compra de tokens:", error)
+      logger.error("Erro na compra de tokens:", error)
       alert(error.message || "Erro ao iniciar compra de tokens")
     } finally {
       setBuyingTokens(false)
@@ -1436,9 +1436,9 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
 
         {/* Prompt Setup Modal */}
         <Dialog open={isPromptSetupOpen} onOpenChange={setIsPromptSetupOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl w-[95vw] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
             <DialogHeader>
-              <DialogTitle>Configurar Atendimento com IA</DialogTitle>
+              <DialogTitle className="pr-8">Configurar Atendimento com IA</DialogTitle>
               <DialogDescription>
                 Preencha os dados da sua clínica para personalizar o atendimento automático do WhatsApp.
               </DialogDescription>
@@ -1487,27 +1487,29 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                 <Label className="text-base block mb-2">Horários de Funcionamento</Label>
                 <div className="space-y-3">
                   {promptFormData.horariosFuncionamento.map((horario, index) => (
-                    <div key={horario.dia} className="flex items-center gap-3">
-                      <div className="flex items-center gap-2 w-32">
-                        <Switch
-                          className="data-[state=checked]:bg-cyan-600 cursor-pointer"
-                          checked={horario.ativo}
-                          onCheckedChange={(checked) => {
-                            const newHorarios = [...promptFormData.horariosFuncionamento]
-                            newHorarios[index].ativo = checked
-                            setPromptFormData({ ...promptFormData, horariosFuncionamento: newHorarios })
-                          }}
-                        />
-                        <span className={`text-sm ${horario.ativo ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          {horario.dia}
-                        </span>
+                    <div key={horario.dia} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 border-b border-gray-100 pb-2 sm:border-0 sm:pb-0 last:border-0 last:pb-0">
+                      <div className="flex items-center gap-2 w-full sm:w-32 justify-between sm:justify-start">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            className="data-[state=checked]:bg-cyan-600 cursor-pointer"
+                            checked={horario.ativo}
+                            onCheckedChange={(checked) => {
+                              const newHorarios = [...promptFormData.horariosFuncionamento]
+                              newHorarios[index].ativo = checked
+                              setPromptFormData({ ...promptFormData, horariosFuncionamento: newHorarios })
+                            }}
+                          />
+                          <span className={`text-sm ${horario.ativo ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            {horario.dia}
+                          </span>
+                        </div>
                       </div>
 
                       {horario.ativo ? (
-                        <div className="flex items-center gap-2 flex-1">
+                        <div className="flex items-center gap-2 w-full sm:flex-1 justify-between sm:justify-start">
                           <Input
                             type="time"
-                            className="w-28 text-center"
+                            className="flex-1 sm:w-28 text-center"
                             value={horario.abertura}
                             onChange={(e) => {
                               const newHorarios = [...promptFormData.horariosFuncionamento]
@@ -1515,10 +1517,10 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                               setPromptFormData({ ...promptFormData, horariosFuncionamento: newHorarios })
                             }}
                           />
-                          <span className="text-muted-foreground">às</span>
+                          <span className="text-muted-foreground text-xs sm:text-base">às</span>
                           <Input
                             type="time"
-                            className="w-28 text-center"
+                            className="flex-1 sm:w-28 text-center"
                             value={horario.fechamento}
                             onChange={(e) => {
                               const newHorarios = [...promptFormData.horariosFuncionamento]
@@ -1528,7 +1530,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                           />
                         </div>
                       ) : (
-                        <span className="text-sm text-muted-foreground italic">Fechado</span>
+                        <span className="text-sm text-muted-foreground italic pl-2 sm:pl-0">Fechado</span>
                       )}
                     </div>
                   ))}
@@ -1561,8 +1563,8 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                 </div>
 
                 {promptFormData.procedimentos.map((proc, index) => (
-                  <div key={index} className="flex gap-2 items-start">
-                    <div className="flex-1">
+                  <div key={index} className="flex flex-col sm:flex-row gap-2 items-start bg-slate-50 p-2 rounded-lg sm:bg-transparent sm:p-0">
+                    <div className="w-full sm:flex-1">
                       <Input
                         placeholder="Procedimento (Ex: Avaliação)"
                         value={proc.nome}
@@ -1573,28 +1575,30 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                         }}
                       />
                     </div>
-                    <div className="w-1/3">
-                      <Input
-                        placeholder="Valor (Ex: 150,00)"
-                        value={proc.valor}
-                        onChange={(e) => {
-                          const newProcs = [...promptFormData.procedimentos]
-                          newProcs[index].valor = e.target.value
+                    <div className="flex w-full sm:w-auto gap-2">
+                      <div className="flex-1 sm:w-32">
+                        <Input
+                          placeholder="Valor (Ex: 150,00)"
+                          value={proc.valor}
+                          onChange={(e) => {
+                            const newProcs = [...promptFormData.procedimentos]
+                            newProcs[index].valor = e.target.value
+                            setPromptFormData({ ...promptFormData, procedimentos: newProcs })
+                          }}
+                        />
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-500 hover:bg-red-50 flex-shrink-0"
+                        onClick={() => {
+                          const newProcs = promptFormData.procedimentos.filter((_, i) => i !== index)
                           setPromptFormData({ ...promptFormData, procedimentos: newProcs })
                         }}
-                      />
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-red-500 hover:bg-red-50"
-                      onClick={() => {
-                        const newProcs = promptFormData.procedimentos.filter((_, i) => i !== index)
-                        setPromptFormData({ ...promptFormData, procedimentos: newProcs })
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
                   </div>
                 ))}
               </div>

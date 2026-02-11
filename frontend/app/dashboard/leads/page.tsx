@@ -280,14 +280,19 @@ export default function LeadsPage() {
       }
 
       const { error } = await supabase.from("leads").insert(insertData).select().single()
-      if (error) throw error
+      if (error) {
+        // Detecta erro de duplicidade
+        if (error.code === '23505' || error.message?.includes('duplicate') || error.message?.includes('unique')) {
+          throw new Error("Este telefone já está cadastrado no sistema")
+        }
+        throw error
+      }
 
-      toast.success(`Lead "${fullName || "Sem nome"}" criado com sucesso`)
       setShowNewLeadModal(false)
       refresh()
     } catch (err: any) {
       logger.error("Erro ao criar lead:", err)
-      toast.error(err?.message || "Erro ao criar lead")
+      throw err
     }
   }
 
@@ -512,10 +517,10 @@ export default function LeadsPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Leads</CardTitle>
             <div className="flex items-center gap-2">
-              <Button className="hover:text-black" variant="outline" onClick={() => setTagDialogOpen(true)}>
+              <Button className="hover:text-black" variant="outline" size="sm" onClick={() => setTagDialogOpen(true)}>
                 <Tag className="mr-2 h-4 w-4" /> Tags
               </Button>
-              <Button onClick={() => setShowNewLeadModal(true)}>
+              <Button size="sm" onClick={() => setShowNewLeadModal(true)}>
                 <Plus className="mr-2 h-4 w-4" /> Novo lead
               </Button>
             </div>
@@ -551,6 +556,7 @@ export default function LeadsPage() {
                         <TableCell>{lead.telefone || "-"}</TableCell>
                         <TableCell>
                           <Switch
+                            className="cursor-pointer data-[state=checked]:bg-blue-600"
                             checked={Boolean(lead.status_ia)}
                             onCheckedChange={(checked) => handleToggleLeadIA(lead.id, checked)}
                             disabled={updatingLeadId === lead.id}
@@ -584,6 +590,7 @@ export default function LeadsPage() {
                                       <DropdownMenuCheckboxItem
                                         key={tag.id}
                                         checked={isChecked}
+                                        className="cursor-pointer"
                                         onCheckedChange={(checked) =>
                                           toggleLeadTag(lead.id, tag.id, Boolean(checked))
                                         }
@@ -650,12 +657,13 @@ export default function LeadsPage() {
                   value={tagName}
                   onChange={(event) => setTagName(event.target.value)}
                   disabled={tagEditingIsSystem}
+                  className="disabled:cursor-not-allowed flex-1"
                 />
                 <input
                   type="color"
                   value={tagColor}
                   onChange={(event) => setTagColor(event.target.value)}
-                  className="h-9 w-12 rounded border border-border bg-transparent"
+                  className="cursor-pointer h-9 w-8 rounded border border-border bg-transparent shrink-0"
                   aria-label="Cor da tag"
                 />
                 <Button onClick={handleSaveTag} disabled={tagSaving}>
@@ -669,6 +677,7 @@ export default function LeadsPage() {
                       setTagEditingId(null)
                       setTagName("")
                       setTagColor("#22c55e")
+                      setTagEditingIsSystem(false)
                     }}
                   >
                     Cancelar
@@ -685,13 +694,13 @@ export default function LeadsPage() {
                         className="h-2 w-2 rounded-full"
                         style={{ backgroundColor: tag.color }}
                       />
-                      <span className="text-xs font-medium text-white">{tag.name}</span>
+                      <span className="text-xs font-medium text-black">{tag.name}</span>
                       {tag.is_system && (
                         <span className="text-[10px] text-muted-foreground">padrão</span>
                       )}
                       <button
                         type="button"
-                        className="text-xs text-muted-foreground hover:text-foreground"
+                        className="cursor-pointer text-xs text-muted-foreground hover:text-foreground"
                         onClick={() => handleEditTag(tag)}
                       >
                         editar
@@ -699,7 +708,7 @@ export default function LeadsPage() {
                       {!tag.is_system && (
                         <button
                           type="button"
-                          className="text-xs text-red-500 hover:text-red-600"
+                          className="cursor-pointer text-xs text-red-500 hover:text-red-600"
                           onClick={() => handleDeleteTag(tag.id)}
                         >
                           excluir

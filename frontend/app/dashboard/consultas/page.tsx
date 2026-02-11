@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Check, X, Ban, Search, Calendar } from "lucide-react"
 import { toast } from "sonner"
+import { logger } from "@/lib/logger"
 
 type Appointment = {
     id: string
@@ -92,7 +93,7 @@ export default function ConsultasPage() {
                 setClinicData(clinic)
             }
         } catch (error) {
-            console.error('Erro ao carregar dados:', error)
+            logger.error('Erro ao carregar dados:', error)
         } finally {
             setLoading(false)
         }
@@ -135,7 +136,7 @@ export default function ConsultasPage() {
             if (error) throw error
             setAppointments(data || [])
         } catch (error) {
-            console.error('Erro ao buscar consultas:', error)
+            logger.error('Erro ao buscar consultas:', error)
             toast.error('Erro ao carregar consultas')
         } finally {
             setLoading(false)
@@ -159,7 +160,7 @@ export default function ConsultasPage() {
             toast.success(`Status atualizado para ${newStatus}`)
             fetchAppointments()
         } catch (error) {
-            console.error('Erro ao atualizar status:', error)
+            logger.error('Erro ao atualizar status:', error)
             toast.error('Erro ao atualizar status')
         } finally {
             setUpdatingId(null)

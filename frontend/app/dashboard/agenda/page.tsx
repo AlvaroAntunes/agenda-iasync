@@ -30,6 +30,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { logger } from "@/lib/logger"
 
 // Helper para formatar datas e gerar dias do mês
 const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate()
@@ -132,7 +133,7 @@ export default function CalendarPage() {
         setClinicData(clinic)
       }
     } catch (error) {
-      console.error('Erro ao carregar dados:', error)
+      logger.error('Erro ao carregar dados:', error)
     } finally {
       setLoading(false)
     }
@@ -278,7 +279,7 @@ export default function CalendarPage() {
       setCancellationRate(cancelRate)
       setAvgAppointmentsPerDay(parseFloat(avgPerDay))
     } catch (error) {
-      console.error('Error fetching appointments stats:', error)
+      logger.error('Error fetching appointments stats:', error)
     }
   }
 
@@ -314,7 +315,7 @@ export default function CalendarPage() {
       calculateStats(fetchedEvents)
 
     } catch (error) {
-      console.error("Erro ao buscar eventos do calendário:", error)
+      logger.error("Erro ao buscar eventos do calendário:", error)
       toast.error("Erro ao sincronizar calendário.")
     } finally {
       setLoadingEvents(false)
@@ -444,7 +445,7 @@ export default function CalendarPage() {
       fetchEvents()
     } catch (err) {
       toast.error("Erro ao atualizar evento")
-      console.error(err)
+      logger.error(err)
     } finally {
       setLoadingEvents(false)
     }
@@ -469,7 +470,7 @@ export default function CalendarPage() {
       fetchEvents()
     } catch (err) {
       toast.error("Erro ao excluir evento")
-      console.error(err)
+      logger.error(err)
     } finally {
       setLoadingEvents(false)
     }
@@ -514,7 +515,7 @@ export default function CalendarPage() {
       fetchEvents()
     } catch (err) {
       toast.error("Erro ao criar evento")
-      console.error(err)
+      logger.error(err)
     } finally {
       setLoadingEvents(false)
     }
