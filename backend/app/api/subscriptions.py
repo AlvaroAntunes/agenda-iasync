@@ -166,6 +166,12 @@ def sync_subscription(clinic_id: str):
 
                 # Marcar sessão como concluída
                 supabase.table('checkout_sessions').update({'status': 'concluido'}).eq('id', sessao['id']).execute()
+
+                plano_novo_query = supabase.table('planos').select('max_tokens').eq('id', sessao['plan_id']).maybe_single().execute()
+
+                if plano_novo_query and plano_novo_query.data:
+                    tokens_novo = plano_novo_query.data['max_tokens']
+                    supabase.table('clinicas').update({'saldo_tokens': tokens_novo}).eq('id', clinic_id).execute()
                 
                 return {"status": "switched", "new_plan": sessao['plan_id']}
             

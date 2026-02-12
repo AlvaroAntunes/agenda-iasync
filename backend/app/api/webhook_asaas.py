@@ -110,6 +110,11 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                 sessao = sessao_query.data[0]
                 print(f"🚀 Efetivando compra da sessão: {sessao['id']}")
                 
+                # Buscar detalhes do novo plano (para pegar o nome e limites)
+                p_new_query = supabase.table('planos').select('nome, max_tokens').eq('id', sessao['plan_id']).maybe_single().execute()
+                new_plan_name = p_new_query.data['nome'] if p_new_query and p_new_query.data else 'unknown'
+                tokens_liberados = p_new_query.data['max_tokens'] if p_new_query and p_new_query.data else 0
+
                 # Calcular datas
                 data_inicio = dt.datetime.now()
                 
@@ -127,22 +132,19 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                     old_sub = existing_sub.data[0]
                     old_asaas_id = old_sub.get('asaas_id')
                     old_plan_id = old_sub.get('plan_id')
-                    new_plan_id = sessao.get('plan_id')
                     
                     # Checagem de Downgrade (DELAYED DOWNGRADE)
-                    if old_plan_id and new_plan_id and old_plan_id != new_plan_id:
+                    if old_plan_id and sessao['plan_id'] and old_plan_id != sessao['plan_id']:
                         try:
                             # Buscar nomes dos planos para comparar hierarquia
-                            # otimização: buscar ambos em uma query usando 'or' se possível, mas simples queries funcionam
-                            p_old = supabase.table('planos').select('nome').eq('id', old_plan_id).single().execute()
-                            p_new = supabase.table('planos').select('nome').eq('id', new_plan_id).single().execute()
+                            p_old = supabase.table('planos').select('nome').eq('id', old_plan_id).maybe_single().execute()
                             
-                            if p_old and p_new and p_old.data and p_new.data:
+                            if p_old and p_old.data:
                                 level_old = PLAN_HIERARCHY.get(p_old.data['nome'], 0)
-                                level_new = PLAN_HIERARCHY.get(p_new.data['nome'], 0)
+                                level_new = PLAN_HIERARCHY.get(new_plan_name, 0)
                                 
                                 if level_new < level_old:
-                                    print(f"📉 Downgrade detectado ({p_old.data['nome']} -> {p_new.data['nome']}). Agendando troca.")
+                                    print(f"📉 Downgrade detectado ({p_old.data['nome']} -> {new_plan_name}). Agendando troca.")
                                     is_delayed_downgrade = True
                                     
                                     # 1. Marcar sessão como 'esperando_troca' (aguardando troca)
@@ -174,7 +176,7 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                         "updated_at": dt.datetime.now().isoformat()
                     }
 
-                    if existing_sub.data:
+                    if existing_sub and existing_sub.data:
                         # Update
                         supabase.table('assinaturas').update(dados_assinatura).eq('id', existing_sub.data[0]['id']).execute()
                     else:
@@ -183,16 +185,16 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
 
                     # Reativar IA da clínica quando assinatura é ativada
                     supabase.table('clinicas')\
-                        .update({'ia_ativa': True})\
+                        .update({'ia_ativa': True, 'saldo_tokens': tokens_liberados})\
                         .eq('id', sessao['clinic_id'])\
                         .execute()
 
                     # Marcar a sessão como PAGO
                     supabase.table('checkout_sessions').update({'status': 'pago'}).eq('id', sessao['id']).execute()
                     
-                    print("✅ Assinatura ativada e sessão concluída com sucesso!")
+                    print(f"✅ Assinatura {new_plan_name} ativada e sessão concluída com sucesso!")
                 else:
-                    print("⏳ Downgrade agendado. Assinatura antiga mantida até o fim do ciclo.")
+                    print(f"⏳ Downgrade agendado para {new_plan_name}. Assinatura antiga mantida até o fim do ciclo.")
 
             else:
                 # B. Nenhuma sessão pendente = Renovação Recorrente (Mês 2, Mês 3...)
@@ -220,7 +222,7 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                     # Garantir que IA está ativa quando assinatura é renovada
                     if clinic_id:
                         supabase.table('clinicas')\
-                            .update({'ia_ativa': True})\
+                            .update({'ia_ativa': True, 'saldo_tokens': tokens_liberados})\
                             .eq('id', clinic_id)\
                             .execute()
                     
