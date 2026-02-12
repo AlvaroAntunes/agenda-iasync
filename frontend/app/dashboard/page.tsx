@@ -847,7 +847,6 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
       setUazapiQrCode(null)
       setUazapiPairingCode(null)
       toast.success("Instância excluída")
-      window.location.reload()
     } catch (err: any) {
       toast.error(err?.message || "Erro ao excluir instância")
     } finally {
@@ -1161,7 +1160,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                 variant="ghost"
                 onClick={handleRefreshUazapiStatus}
                 disabled={uazapiLoading}
-                className="w-full justify-center gap-2"
+                className="w-full justify-center gap-2 [&:hover]:!bg-primary/40"
               >
                 <RefreshCw className={uazapiLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
                 Atualizar status
@@ -1195,6 +1194,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                   {uazapiStatus === "connected" ? null : (
                     <>
                       <Button
+                        className="[&:disabled:hover]:!bg-primary [&:disabled:hover]:!opacity-50"  
                         onClick={handleCreateUazapiInstance}
                         disabled={
                           uazapiLoading ||
@@ -1207,7 +1207,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                       </Button>
                       <Button
                         variant="ghost"
-                        className="bg-black text-white"
+                        className="bg-black text-white [&:not(disabled):hover]:!bg-primary/40 [&:disabled:hover]:!bg-black [&:disabled:hover]:!opacity-50"
                         onClick={() => handleConnectUazapi()}
                         disabled={uazapiLoading || uazapiStatus === "not_configured"}
                       >
@@ -1217,6 +1217,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                     </>
                   )}
                   <Button
+                    className="[&:not(disabled):hover]:!bg-primary/40 [&:disabled:hover]:!bg-transparent [&:disabled:hover]:!text-primary"
                     variant="ghost"
                     onClick={handleDeleteUazapiInstance}
                     disabled={uazapiLoading || uazapiStatus === "not_configured"}
