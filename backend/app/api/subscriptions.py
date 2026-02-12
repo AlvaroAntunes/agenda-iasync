@@ -257,6 +257,8 @@ def check_expiration(clinic_id: str):
             
         return {"status": "active"}
 
+
     except Exception as e:
         print(f"❌ Erro check-expiration: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+

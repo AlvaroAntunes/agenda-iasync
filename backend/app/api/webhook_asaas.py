@@ -165,6 +165,7 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
 
                 if not is_delayed_downgrade:
                     # Dados para a tabela oficial de assinaturas
+                    hoje = dt.datetime.now().isoformat()
                     dados_assinatura = {
                         "clinic_id": sessao['clinic_id'],
                         "plan_id": sessao['plan_id'],
@@ -173,7 +174,8 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                         "ciclo": sessao.get('ciclo', 'mensal'),
                         "data_inicio": data_inicio.isoformat(),
                         "data_fim": data_fim.isoformat(),
-                        "updated_at": dt.datetime.now().isoformat()
+                        "updated_at": hoje,
+                        "ultima_recarga_tokens": hoje
                     }
 
                     if existing_sub and existing_sub.data:
@@ -212,11 +214,13 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                         nova_data_fim = data_inicio + relativedelta(months=1)
                 
                     clinic_id = sub_atual.data.get('clinic_id')
+                    hoje = dt.datetime.now().isoformat()
                     
                     supabase.table('assinaturas').update({
                         'status': 'ativa',
                         'data_fim': nova_data_fim.isoformat(),
-                        'updated_at': dt.datetime.now().isoformat()
+                        'updated_at': hoje,
+                        'ultima_recarga_tokens': hoje
                     }).eq('id', sub_atual.data['id']).execute()
                     
                     # Garantir que IA está ativa quando assinatura é renovada

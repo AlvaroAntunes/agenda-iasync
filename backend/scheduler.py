@@ -2,6 +2,7 @@ import time
 import schedule
 from app.services.reminder_service import processar_lembretes
 from app.services.cleanup_service import limpar_checkouts_antigos
+from app.services.renew_token_service import renovar_tokens_diario
 
 print("--- INICIANDO SERVIÇO DE AGENDAMENTO (SCHEDULER) ---", flush=True)
 
@@ -20,6 +21,10 @@ schedule.every(10).minutes.do(processar_lembretes)
 # Limpeza: Roda todo dia às 04:00 da manhã
 # Limpa checkouts pendentes há mais de 7 dias ou vencidos
 schedule.every().day.at("04:00").do(limpar_checkouts_antigos)
+
+# Renovação de Tokens: Roda todo dia às 00:10 da manhã
+# Garante que clínicas com plano anual recebam tokens mensais
+schedule.every().day.at("00:10").do(renovar_tokens_diario)
 
 print("✅ Scheduler ativo e aguardando horários...", flush=True)
 
