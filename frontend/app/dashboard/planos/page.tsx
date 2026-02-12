@@ -141,7 +141,7 @@ export default function PlanosPage() {
             clearInterval(interval);
             setIsWaitingPayment(false);
             // Se for esperando_troca, melhor ir para settings para ver o aviso
-            const redirectUrl = data.status === 'esperando_troca' ? "/dashboard/settings" : "/dashboard";
+            const redirectUrl = data.status === 'esperando_troca' ? "/dashboard/settings?scrollTo=assinatura" : "/dashboard/planos";
             window.location.href = redirectUrl;
           }
         } catch (error) {
@@ -301,6 +301,9 @@ export default function PlanosPage() {
                 </li>
                 <li>
                   <strong>Downgrade (Plano Inferior):</strong> A alteração será agendada e só entrará em vigor no final do ciclo atual da sua assinatura.
+                  <br />
+                  <br />
+                  <span className="text-red-600 font-semibold">Atenção: Ao mudar para um plano inferior, você terá direito a menos profissionais. No dia da renovação, os profissionais excedentes (os mais recentes) serão removidos automaticamente pelo sistema. Se preferir, remova manualmente agora.</span>
                 </li>
               </ul>
             </div>

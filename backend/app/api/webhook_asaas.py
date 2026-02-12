@@ -23,13 +23,6 @@ PLAN_HIERARCHY = {
     'corporate': 3
 }
 
-PLAN_TOKENS = {
-    'trial': 600000,
-    'consultorio': 8000000,
-    'clinica_pro': 26000000,
-    'corporate': 80000000
-}
-
 @router.post("/webhook/asaas")
 def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(None)):
     """
@@ -73,8 +66,8 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                 .eq('status', 'pendente')\
                 .maybe_single()\
                 .execute()
-            
-            if token_purchase.data:
+
+            if token_purchase and token_purchase.data:
                 purchase = token_purchase.data
                 print(f"🪙 Pagamento de Tokens Recebido: {purchase['id']} - {purchase['quantidade_tokens']} tokens")
                 
@@ -90,7 +83,7 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                 
                 clinic_res = supabase.table('clinicas').select('tokens_comprados').eq('id', purchase['clinic_id']).single().execute()
 
-                if clinic_res.data:
+                if clinic_res and clinic_res.data:
                     current_balance = clinic_res.data.get('tokens_comprados', 0) or 0
                     new_balance = current_balance + purchase['quantidade_tokens']
                     
@@ -113,7 +106,7 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                 .limit(1)\
                 .execute()
             
-            if sessao_query.data:
+            if sessao_query and sessao_query.data:
                 sessao = sessao_query.data[0]
                 print(f"🚀 Efetivando compra da sessão: {sessao['id']}")
                 
@@ -130,7 +123,7 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                 
                 is_delayed_downgrade = False
                 
-                if existing_sub.data:
+                if existing_sub and existing_sub.data:
                     old_sub = existing_sub.data[0]
                     old_asaas_id = old_sub.get('asaas_id')
                     old_plan_id = old_sub.get('plan_id')
@@ -144,7 +137,7 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                             p_old = supabase.table('planos').select('nome').eq('id', old_plan_id).single().execute()
                             p_new = supabase.table('planos').select('nome').eq('id', new_plan_id).single().execute()
                             
-                            if p_old.data and p_new.data:
+                            if p_old and p_new and p_old.data and p_new.data:
                                 level_old = PLAN_HIERARCHY.get(p_old.data['nome'], 0)
                                 level_new = PLAN_HIERARCHY.get(p_new.data['nome'], 0)
                                 
@@ -157,13 +150,13 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                                     
                                     # 2. Cancelar renovação da antiga no Asaas (mas MANTEMOS ela ativa no banco até vencer)
                                     if old_asaas_id and old_asaas_id != asaas_id_referencia:
-                                         cancelar_assinatura_asaas(old_asaas_id)
+                                        cancelar_assinatura_asaas(old_asaas_id)
                                          
                         except Exception as e:
                             print(f"⚠️ Erro ao verificar hierarquia de planos: {e}")
 
                     if not is_delayed_downgrade:
-                         # --- SWAP LOGIC Padrão (Upgrade ou mesmo nível) ---
+                        # --- SWAP LOGIC Padrão (Upgrade ou mesmo nível) ---
                         if old_asaas_id and old_asaas_id != asaas_id_referencia:
                             print(f"🔀 Swap: Cancelando assinatura antiga {old_asaas_id} para ativar a nova {asaas_id_referencia}...")
                             cancelar_assinatura_asaas(old_asaas_id)
@@ -207,7 +200,7 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                 
                 sub_atual = supabase.table('assinaturas').select('*').eq('asaas_id', asaas_id_referencia).maybe_single().execute()
                 
-                if sub_atual.data:                    
+                if sub_atual and sub_atual.data:                    
                     # Calcular datas
                     data_inicio = dt.datetime.now()
                     
@@ -246,7 +239,7 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                 .maybe_single()\
                 .execute()
 
-            if sessao_pendente.data:
+            if sessao_pendente and sessao_pendente.data:
                 print(f"🚫 Swap Overdue: Cancelando assinatura pendente {asaas_id_referencia} por falta de pagamento.")
                 cancelar_assinatura_asaas(asaas_id_referencia)
                 supabase.table('checkout_sessions').update({'status': 'cancelado'}).eq('id', sessao_pendente.data['id']).execute()
@@ -259,7 +252,7 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                 .maybe_single()\
                 .execute()
             
-            if assinatura_data.data:
+            if assinatura_data and assinatura_data.data:
                 clinic_id = assinatura_data.data['clinic_id']
                 # Atualizar status da assinatura
                 supabase.table('assinaturas')\
@@ -282,7 +275,7 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                 .single()\
                 .execute()
             
-            if assinatura_data.data:
+            if assinatura_data and assinatura_data.data:
                 clinic_id = assinatura_data.data['clinic_id']
                 # Atualizar status da assinatura
                 supabase.table('assinaturas')\

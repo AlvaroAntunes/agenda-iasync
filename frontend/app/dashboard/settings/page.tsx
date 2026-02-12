@@ -256,6 +256,14 @@ export default function SettingsPage() {
           }
         }, 100)
       }
+      else if (scrollTo === 'assinatura') {
+        setTimeout(() => {
+          const element = document.getElementById('assinatura-section')
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        }, 100)
+      }
     }
   }, [searchParams, loading])
 
@@ -941,7 +949,7 @@ export default function SettingsPage() {
                   id="ia_ativa"
                   checked={formData.ia_ativa ?? true}
                   onCheckedChange={(checked) => setFormData({ ...formData, ia_ativa: checked })}
-                  className="cursor-pointer"
+                  className="data-[state=checked]:bg-cyan-600 cursor-pointer"
                 />
               </div>
             </div>
@@ -1012,7 +1020,7 @@ export default function SettingsPage() {
         </div >
 
         {/* Seção de Plano Refatorada */}
-        < div className="bg-white rounded-3xl p-3 sm:p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden" >
+        <div id="assinatura-section" className="bg-white rounded-3xl p-3 sm:p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden" >
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500" />
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
@@ -1184,6 +1192,9 @@ export default function SettingsPage() {
                             </li>
                             <li>
                               <strong>Downgrade (Plano Inferior):</strong> A alteração será agendada e só entrará em vigor no final do ciclo atual da sua assinatura.
+                              <br />
+                              <br />
+                              <span className="text-red-600 font-semibold">Atenção: Ao mudar para um plano inferior, você terá direito a menos profissionais. No dia da renovação, os profissionais excedentes (os mais recentes) serão removidos automaticamente pelo sistema. Se preferir, remova manualmente agora.</span>
                             </li>
                           </ul>
                         </div>
@@ -1460,9 +1471,9 @@ export default function SettingsPage() {
         </div >
 
         {/* Doctors Management Card */}
-        < div className="bg-white rounded-3xl p-3 sm:p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden" >
+        <div id="profissionais-section" className="bg-white rounded-3xl p-3 sm:p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden" >
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-600 to-blue-600" />
-          <div id="profissionais-section" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 flex-shrink-0">
                 <Users className="h-5 w-5" />

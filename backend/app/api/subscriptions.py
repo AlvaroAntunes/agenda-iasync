@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from app.core.database import get_supabase
 from dateutil.relativedelta import relativedelta
 from app.services.payment_service import atualizar_vencimento_assinatura_asaas
+from app.services.plan_limit_service import enforce_professional_limit
 
 router = APIRouter()
 supabase = get_supabase()
@@ -131,6 +132,9 @@ def sync_subscription(clinic_id: str):
                     "data_fim": data_fim_nova.isoformat(),
                     "updated_at": dt.datetime.now().isoformat()
                 }
+
+                # --- DIMINUI A QUANTIDADE DE PROFISSIONAIS SE NECESSÁRIO ---
+                enforce_professional_limit(clinic_id, sessao['plan_id'])
                 
                 # VERIFICAÇÃO DE IDEMPOTÊNCIA DA ASSINATURA (Sem checkout_sessions.updated_at)
                 should_update_db = True
@@ -188,8 +192,65 @@ def sync_subscription(clinic_id: str):
             # Se for erro de conexão ou desconexão do servidor, tentamos novamente
             if "Server disconnected" in msg or "Connection refused" in msg or "RemoteProtocolError" in msg:
                 if attempt < MAX_RETRIES - 1:
+                    from app.core.database import SupabaseClient
+                    SupabaseClient.reset_client() # Reinicia o cliente para a próxima tentativa
                     time.sleep(retry_delay)
                     continue
             
             # Se não for erro de conexão ou última tentativa falhou, lança o erro
             raise HTTPException(status_code=500, detail=msg)
+
+@router.post("/subscriptions/check-expiration/{clinic_id}")
+def check_expiration(clinic_id: str):
+    """
+    Verifica se a assinatura expirou e atualiza o status se necessário.
+    Chamado pelo frontend quando detecta data_fim no passado.
+    """
+    try:
+        # 1. Buscar assinatura ativa
+        sub_query = supabase.table('assinaturas')\
+            .select('*')\
+            .eq('clinic_id', clinic_id)\
+            .eq('status', 'ativa')\
+            .maybe_single()\
+            .execute()
+            
+        if not sub_query.data:
+            return {"status": "no_active_sub"}
+            
+        sub = sub_query.data
+        
+        if not sub.get('data_fim'):
+            return {"status": "active_no_date"}
+            
+        # Parse data
+        try:
+            data_fim = dt.datetime.fromisoformat(sub['data_fim'].replace('Z', '+00:00'))
+        except ValueError:
+            data_fim = dt.datetime.fromisoformat(sub['data_fim'].split('.')[0])
+            
+        agora = dt.datetime.now(dt.timezone.utc) if data_fim.tzinfo else dt.datetime.now()
+        
+        # Margem de tolerância de algumas horas? Não, ser estrito.
+        if agora > data_fim:
+            print(f"🚫 Assinatura expirada detectada via API ({clinic_id}). Desativando...")
+            
+            # 1. Atualizar status da assinatura
+            supabase.table('assinaturas')\
+                .update({'status': 'inativa', 'updated_at': dt.datetime.now().isoformat()})\
+                .eq('id', sub['id'])\
+                .execute()
+                
+            # 2. Desativar IA
+            supabase.table('clinicas')\
+                .update({'ia_ativa': False})\
+                .eq('id', clinic_id)\
+                .execute()
+                
+            return {"status": "expired"}
+            
+        return {"status": "active"}
+
+    except Exception as e:
+        print(f"❌ Erro check-expiration: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

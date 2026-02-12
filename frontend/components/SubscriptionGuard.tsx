@@ -16,11 +16,8 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     checkSubscription()
-  }, [pathname]) 
+  }, [pathname])
 
-  function toDateOnly(date: Date) {
-    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  }
 
   const checkSubscription = async () => {
     try {
@@ -61,19 +58,55 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
 
       // LÓGICA CENTRALIZADA DE BLOQUEIO
       if (assinatura) {
-        const status = assinatura.status 
-        const planName = assinatura.planos?.nome || 'unknown'      
-        const hojeDateOnly = toDateOnly(new Date());
-        const dataFimDateOnly = toDateOnly(new Date(assinatura.data_fim));
+        const status = assinatura.status
+        const planName = assinatura.planos?.nome || 'unknown'
+        const hoje = new Date();
+        const dataFim = new Date(assinatura.data_fim);
+
+        // Se estiver ativa mas data_fim já passou
+        if (status === 'ativa' && dataFim && hoje > dataFim) {
+          setIsLoading(true) // Mostra loader enquanto resolve no backend
+
+          try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
+
+            // 1. Tenta sincronizar primeiro (Downgrade/Upgrade agendado)
+            const syncRes = await fetch(`${apiUrl}/subscriptions/sync/${profile.clinic_id}`, { method: 'POST' })
+            const syncData = await syncRes.json()
+
+            if (syncData.status === 'switched') {
+              // Se trocou de plano, recarrega para atualizar o estado da assinatura
+              window.location.reload()
+              return
+            }
+
+            // 2. Se não houve troca de plano, verifica se a assinatura atual expirou
+            // Isso só será executado se o 'if' acima for falso e não entrar no 'return'
+            const expRes = await fetch(`${apiUrl}/subscriptions/check-expiration/${profile.clinic_id}`, { method: 'POST' })
+            const expData = await expRes.json()
+
+            if (expData.status === 'expired') {
+              window.location.href = '/renovar-assinatura'
+              return
+            }
+          } catch (err) {
+            console.error("Erro ao processar expiração/sync:", err)
+          }
+
+          // Bloqueia preventivamente se nada acima resolveu mas continua expirado
+          router.push('/renovar-assinatura')
+          setIsLoading(false)
+          return
+        }
 
         // Lógica especial para cancelada: só bloqueia se hoje > data_fim
-        if (status === 'cancelada' && dataFimDateOnly) {
-          if (hojeDateOnly <= dataFimDateOnly) {
+        if (status === 'cancelada' && dataFim) {
+          if (hoje <= dataFim) {
             // Ainda dentro do prazo, permite acesso
             setIsAllowed(true)
             setIsLoading(false)
             return
-          } 
+          }
           else if (clinica?.ia_ativa) {
             supabase
               .from('clinicas')
@@ -106,13 +139,13 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
           } else {
             router.push('/pagamento-pendente') // Plano normal deu ruim -> resolver pendência
           }
-          return 
+          return
         }
       }
 
       // Se passou por tudo, está liberado
       setIsAllowed(true)
-      
+
     } catch (error) {
       logger.error("Erro ao verificar assinatura:", error)
     } finally {

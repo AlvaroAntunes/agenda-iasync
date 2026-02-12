@@ -251,7 +251,7 @@ export default function RenovarAssinaturaPage() {
                 whileTap={{ scale: 0.98 }}
               >
                 <Button
-                  onClick={() => router.push('/planos')}
+                  onClick={() => router.push('/dashboard/planos')}
                   className="w-full h-12 sm:h-14 bg-white text-cyan-900 hover:bg-cyan-50 font-semibold text-base sm:text-lg shadow-xl"
                   size="lg"
                 >

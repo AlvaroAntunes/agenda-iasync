@@ -16,12 +16,12 @@ TIMEZONE_STR = "America/Sao_Paulo"
 SLOT_CONSULTA = 5  # minutos
 
 class SupabaseClient:
-    """Singleton para cliente Supabase."""
+    """Manager para cliente Supabase."""
     _instance: Client = None
     
     @classmethod
-    def get_client(cls) -> Client:
-        if cls._instance is None:
+    def get_client(cls, force_new=False) -> Client:
+        if cls._instance is None or force_new:
             url = os.getenv("SUPABASE_URL")
             key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
             
@@ -32,6 +32,10 @@ class SupabaseClient:
         
         return cls._instance
 
+    @classmethod
+    def reset_client(cls):
+        cls._instance = None
+
 # Função helper para facilitar o uso
-def get_supabase() -> Client:
-    return SupabaseClient.get_client()
+def get_supabase(force_new=False) -> Client:
+    return SupabaseClient.get_client(force_new)

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, Clock, Crown } from 'lucide-react'
@@ -15,6 +15,7 @@ interface TrialBannerProps {
 
 export function TrialBanner({ clinicId, blockAccess = false }: TrialBannerProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const [trialStatus, setTrialStatus] = useState<TrialStatus | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -29,7 +30,7 @@ export function TrialBanner({ clinicId, blockAccess = false }: TrialBannerProps)
 
       // Se trial expirou e deve bloquear acesso
       if (blockAccess && status.isExpired) {
-        router.push('/upgrade')
+        router.push('/dashboard/planos')
       }
     } catch (error) {
       logger.error('Erro ao carregar status do trial:', error)
@@ -43,6 +44,8 @@ export function TrialBanner({ clinicId, blockAccess = false }: TrialBannerProps)
   // Não mostrar nada se não está em trial
   if (!trialStatus.isExpired && !trialStatus.showWarning) return null
 
+  const isPlanosPage = pathname === '/dashboard/planos'
+
   // Trial expirado
   if (trialStatus.isExpired) {
     return (
@@ -55,15 +58,18 @@ export function TrialBanner({ clinicId, blockAccess = false }: TrialBannerProps)
               Seu período de teste gratuito terminou. Faça upgrade para continuar usando todas as funcionalidades.
             </p>
           </div>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => router.push('/upgrade')}
-            className="w-full md:w-auto ml-0 md:ml-4 whitespace-nowrap"
-          >
-            <Crown className="h-4 w-4 mr-2" />
-            Fazer Upgrade
-          </Button>
+
+          {!isPlanosPage && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => router.push('/dashboard/planos')}
+              className="w-full md:w-auto ml-0 md:ml-4 whitespace-nowrap"
+            >
+              <Crown className="h-4 w-4 mr-2" />
+              Fazer Upgrade
+            </Button>
+          )}
         </AlertDescription>
       </Alert>
     )
@@ -85,15 +91,17 @@ export function TrialBanner({ clinicId, blockAccess = false }: TrialBannerProps)
               Faça upgrade agora e continue aproveitando todas as funcionalidades sem interrupção.
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push('/dashboard/planos')}
-            className="w-full md:w-auto ml-0 md:ml-4 border-amber-300 hover:bg-amber-100 whitespace-nowrap"
-          >
-            <Crown className="h-4 w-4 mr-2" />
-            Ver Planos
-          </Button>
+          {!isPlanosPage && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push('/dashboard/planos')}
+              className="w-full md:w-auto ml-0 md:ml-4 border-amber-300 hover:bg-amber-100 whitespace-nowrap"
+            >
+              <Crown className="h-4 w-4 mr-2" />
+              Ver Planos
+            </Button>
+          )}
         </AlertDescription>
       </Alert>
     )
