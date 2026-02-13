@@ -38,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { serverFetch } from "@/actions/api-proxy"
 
 type Conversation = {
   sessionId: string
@@ -796,12 +797,11 @@ export default function ConversasPage() {
 
       if (initialMessage.trim()) {
         const payload = { type: "text", number: phone, text: initialMessage.trim() }
-        const response = await fetch(apiUrl(`/uazapi/message/send/${clinicId}`), {
+        const response = await serverFetch(apiUrl(`/uazapi/message/send/${clinicId}`), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: payload,
         })
-        const data = await response.json().catch(() => ({}))
+        const data = response.data
         if (!response.ok) {
           throw new Error(data?.detail || "Erro ao enviar mensagem")
         }
@@ -961,14 +961,11 @@ export default function ConversasPage() {
       const payload = await getReplyPayload()
       if (!payload) return
       setReplySending(true)
-      const response = await fetch(apiUrl(`/uazapi/message/send/${clinicId}`), {
+      const response = await serverFetch(apiUrl(`/uazapi/message/send/${clinicId}`), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        body: payload,
       })
-      const data = await response.json().catch(() => ({}))
+      const data = response.data
       if (!response.ok) {
         throw new Error(data?.detail || "Erro ao enviar mensagem")
       }
@@ -1066,8 +1063,8 @@ export default function ConversasPage() {
 
   const fetchUazapiStatus = async (clinic: string) => {
     try {
-      const response = await fetch(apiUrl(`/uazapi/instance/status/${clinic}`))
-      const data = await response.json()
+      const response = await serverFetch(apiUrl(`/uazapi/instance/status/${clinic}`))
+      const data = response.data
       if (!response.ok) {
         throw new Error(data?.detail || "Erro ao consultar status")
       }
@@ -1285,21 +1282,18 @@ export default function ConversasPage() {
           let isDescending: boolean | null = null
           let pageGuard = 0
           while (true) {
-            const historyResponse = await fetch(apiUrl(`/uazapi/message/find/${clinicId}`), {
+            const historyResponse = await serverFetch(apiUrl(`/uazapi/message/find/${clinicId}`), {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
+              body: {
                 chatid: chatId,
                 limit: pageLimit,
                 offset,
-              }),
+              },
             })
-            const historyRaw = await historyResponse.text()
+            const historyRaw = historyResponse.data
             if (!historyResponse.ok) {
               logger.error("Uazapi history request error", {
-                status: historyResponse.status,
+                status: historyResponse.error,
                 body: historyRaw,
                 clinicId,
                 sessionId: targetSessionId,
@@ -1307,13 +1301,13 @@ export default function ConversasPage() {
             }
             let historyJson: any = null
             try {
-              historyJson = historyRaw ? JSON.parse(historyRaw) : null
+              historyJson = historyRaw ? historyRaw : null
             } catch (parseError) {
               logger.error("Uazapi history parse error", parseError)
             }
             if (historyJson?.status === "error" || historyJson?.detail || historyJson?.error) {
               logger.error("Uazapi history response error", {
-                status: historyResponse.status,
+                status: historyResponse.error,
                 response: historyJson,
                 clinicId,
                 sessionId: targetSessionId,
@@ -1336,7 +1330,7 @@ export default function ConversasPage() {
               }
             }
             logger.info("Uazapi history raw", {
-              status: historyResponse.status,
+              status: historyResponse.error,
               body: historyRaw,
               oldestTs,
               newestTs,
@@ -1488,10 +1482,10 @@ export default function ConversasPage() {
       if (!message.media?.messageId) return
       mediaLoadingRef.current.add(message.id)
       try {
-        const response = await fetch(
+        const response = await serverFetch(
           apiUrl(`/uazapi/message/download/${clinicId}?message_id=${message.media.messageId}`)
         )
-        const data = await response.json().catch(() => ({}))
+        const data = response.data
         if (!response.ok) {
           throw new Error(data?.detail || "Erro ao baixar mídia")
         }
@@ -1606,8 +1600,9 @@ export default function ConversasPage() {
                       setSelectedSessionId(conversation.sessionId)
                     }}
                     className={cn(
-                      "w-full rounded-lg border border-border/50 p-3 text-left transition hover:border-primary/40 hover:bg-muted/40",
-                      selectedSessionId === conversation.sessionId && "border-primary/60 bg-muted"
+                      "w-full rounded-lg border border-border/50 p-3 text-left transition cursor-pointer",
+                      selectedSessionId === conversation.sessionId && "border-primary/60 bg-muted",
+                      selectedSessionId !== conversation.sessionId && "hover:border-primary/40 hover:bg-muted/40"
                     )}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">

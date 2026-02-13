@@ -60,15 +60,18 @@ else:
         allow_headers=["*"],
     )
 
-app.include_router(auth_router, tags=["Autenticação"])
-app.include_router(webhook_router, tags=["Webhooks"])
-app.include_router(whatsapp_router, tags=["WhatsApp"])
-app.include_router(admin_auth_router, tags=["Admin - Autenticação"])
-app.include_router(admin_rate_limit_router, tags=["Admin - Rate Limiting"])
-app.include_router(payments_router, tags=["Pagamentos"])
-app.include_router(webhook_asaas_router, tags=["Pagamentos"])
-app.include_router(calendars_router, tags=["Calendários"])
-app.include_router(subscriptions_router, tags=["Assinaturas"])
+from app.core.security import verify_global_password
+from fastapi import Depends
+
+app.include_router(auth_router, tags=["Autenticação"], dependencies=[Depends(verify_global_password)])
+app.include_router(webhook_router, tags=["Webhooks"]) # Webhook precisa ser público (tem token próprio)
+app.include_router(whatsapp_router, tags=["WhatsApp"], dependencies=[Depends(verify_global_password)])
+app.include_router(admin_auth_router, tags=["Admin - Autenticação"], dependencies=[Depends(verify_global_password)])
+app.include_router(admin_rate_limit_router, tags=["Admin - Rate Limiting"], dependencies=[Depends(verify_global_password)])
+app.include_router(payments_router, tags=["Pagamentos"], dependencies=[Depends(verify_global_password)])
+app.include_router(webhook_asaas_router, tags=["Pagamentos"]) # Webhook Asaas precisa ser público
+app.include_router(calendars_router, tags=["Calendários"], dependencies=[Depends(verify_global_password)])
+app.include_router(subscriptions_router, tags=["Assinaturas"], dependencies=[Depends(verify_global_password)])
 
 @app.get("/")
 def root():

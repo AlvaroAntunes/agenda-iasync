@@ -13,6 +13,7 @@ import { ClinicHeader } from "@/components/Header"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { AlertTriangle } from "lucide-react"
+import { serverFetch } from "@/actions/api-proxy"
 
 type ClinicData = {
   id: string
@@ -70,7 +71,7 @@ export default function PlanosPage() {
       // --- SYNC SUBSCRIPTION (DELAYED DOWNGRADE) ---
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
-        await fetch(`${apiUrl}/subscriptions/sync/${profile.clinic_id}`, { method: 'POST' })
+        await serverFetch(`${apiUrl}/subscriptions/sync/${profile.clinic_id}`, { method: 'POST' })
       } catch (e) {
         logger.error("Sync error", e)
       }
@@ -132,8 +133,8 @@ export default function PlanosPage() {
 
       interval = setInterval(async () => {
         try {
-          const res = await fetch(`${apiUrl}/checkout/status/${clinic.id}`);
-          const data = await res.json();
+          const res = await serverFetch(`${apiUrl}/checkout/status/${clinic.id}`);
+          const data = res.data;
 
           // O endpoint /checkout/status retorna o status da última sessão
           // Se for 'pago' (Upgrade) ou 'esperando_troca' (Downgrade), redirecionamos
@@ -162,20 +163,17 @@ export default function PlanosPage() {
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
 
-      const response = await fetch(`${apiUrl}/checkout/create`, {
+      const response = await serverFetch(`${apiUrl}/checkout/create`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+        body: {
           plan_id: planId,
           periodo: billingPeriod,
           clinic_id: clinic.id,
           parcelas_cartao: parcelas_cartao
-        }),
+        },
       })
 
-      const data = await response.json()
+      const data = response.data
 
       if (!response.ok) {
         throw new Error(data.detail || "Erro ao gerar pagamento")

@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { Loader2 } from "lucide-react"
 import { logger } from "@/lib/logger"
+import { serverFetch } from "@/actions/api-proxy"
 
 
 export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
@@ -71,8 +72,8 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
 
             // 1. Tenta sincronizar primeiro (Downgrade/Upgrade agendado)
-            const syncRes = await fetch(`${apiUrl}/subscriptions/sync/${profile.clinic_id}`, { method: 'POST' })
-            const syncData = await syncRes.json()
+            const syncRes = await serverFetch(`${apiUrl}/subscriptions/sync/${profile.clinic_id}`, { method: 'POST' })
+            const syncData = syncRes.data
 
             if (syncData.status === 'switched') {
               // Se trocou de plano, recarrega para atualizar o estado da assinatura
@@ -82,10 +83,14 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
 
             // 2. Se não houve troca de plano, verifica se a assinatura atual expirou
             // Isso só será executado se o 'if' acima for falso e não entrar no 'return'
-            const expRes = await fetch(`${apiUrl}/subscriptions/check-expiration/${profile.clinic_id}`, { method: 'POST' })
-            const expData = await expRes.json()
+            const expRes = await serverFetch(`${apiUrl}/subscriptions/check-expiration/${profile.clinic_id}`, { method: 'POST' })
+            const expData = expRes.data
 
-            if (expData.status === 'expired') {
+            if (expData.status === 'expired' && planName !== 'trial') {
+              window.location.href = '/pagamento-pendente'
+              return
+            }
+            else if (expData.status === 'expired') {
               window.location.href = '/renovar-assinatura'
               return
             }

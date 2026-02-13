@@ -10,8 +10,9 @@ import os
 import requests
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Request, BackgroundTasks, HTTPException
+from fastapi import APIRouter, Request, BackgroundTasks, HTTPException, Depends
 from fastapi.responses import StreamingResponse
+from app.core.security import verify_global_password
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from app.services.tasks import processar_mensagem_ia
@@ -197,7 +198,7 @@ def configure_uazapi_webhook(token: str):
         print(f"⚠️ Erro ao configurar webhook: {e}")
     return False
 
-@router.get("/sse/clinics/{clinic_id}")
+@router.get("/sse/clinics/{clinic_id}", dependencies=[Depends(verify_global_password)])
 async def clinic_sse(clinic_id: str):
     queue = sse_manager.subscribe(clinic_id)
 
@@ -245,7 +246,7 @@ class SendMessageBody(BaseModel):
     file_name: Optional[str] = None
     caption: Optional[str] = None
 
-@router.post("/uazapi/instance/create/{clinic_id}")
+@router.post("/uazapi/instance/create/{clinic_id}", dependencies=[Depends(verify_global_password)])
 def create_uazapi_instance(clinic_id: str):
     admin_token = UAZAPI_ADMIN_TOKEN or UAZAPI_GLOBAL_TOKEN
     if not UAZAPI_URL or not admin_token:
@@ -313,7 +314,7 @@ def create_uazapi_instance(clinic_id: str):
 
     return {"status": "created", "token": token, "data": data}
 
-@router.post("/uazapi/instance/connect/{clinic_id}")
+@router.post("/uazapi/instance/connect/{clinic_id}", dependencies=[Depends(verify_global_password)])
 def connect_uazapi_instance(clinic_id: str, body: ConnectInstanceBody):
     if not UAZAPI_URL:
         raise HTTPException(status_code=500, detail="UAZAPI_URL não configurado")
@@ -336,7 +337,7 @@ def connect_uazapi_instance(clinic_id: str, body: ConnectInstanceBody):
     configure_uazapi_webhook(token)
     return data
 
-@router.post("/uazapi/message/find/{clinic_id}")
+@router.post("/uazapi/message/find/{clinic_id}", dependencies=[Depends(verify_global_password)])
 def find_uazapi_messages(clinic_id: str, body: MessageFindBody):
     if not UAZAPI_URL:
         raise HTTPException(status_code=500, detail="UAZAPI_URL não configurado")
@@ -356,7 +357,7 @@ def find_uazapi_messages(clinic_id: str, body: MessageFindBody):
     print("📦 Resposta Uazapi message/find:", json.dumps(data, indent=2))
     return data
 
-@router.post("/uazapi/message/send/{clinic_id}")
+@router.post("/uazapi/message/send/{clinic_id}", dependencies=[Depends(verify_global_password)])
 async def send_uazapi_message(clinic_id: str, body: SendMessageBody):
     if not UAZAPI_URL:
         raise HTTPException(status_code=500, detail="UAZAPI_URL não configurado")
@@ -483,7 +484,7 @@ async def send_uazapi_message(clinic_id: str, body: SendMessageBody):
     })
     return data
 
-@router.get("/uazapi/instance/status/{clinic_id}")
+@router.get("/uazapi/instance/status/{clinic_id}", dependencies=[Depends(verify_global_password)])
 def status_uazapi_instance(clinic_id: str):
     if not UAZAPI_URL:
         raise HTTPException(status_code=500, detail="UAZAPI_URL não configurado")
@@ -504,7 +505,7 @@ def status_uazapi_instance(clinic_id: str):
     print("📦 Resposta Uazapi status:", json.dumps(data, indent=2))
     return data
 
-@router.get("/uazapi/message/download/{clinic_id}")
+@router.get("/uazapi/message/download/{clinic_id}", dependencies=[Depends(verify_global_password)])
 def download_uazapi_message(clinic_id: str, message_id: str):
     if not UAZAPI_URL:
         raise HTTPException(status_code=500, detail="UAZAPI_URL não configurado")
@@ -544,7 +545,7 @@ def download_uazapi_message(clinic_id: str, message_id: str):
         "file_name": file_name,
     }
 
-@router.delete("/uazapi/instance/{clinic_id}")
+@router.delete("/uazapi/instance/{clinic_id}", dependencies=[Depends(verify_global_password)])
 def delete_uazapi_instance(clinic_id: str):
     if not UAZAPI_URL:
         raise HTTPException(status_code=500, detail="UAZAPI_URL não configurado")

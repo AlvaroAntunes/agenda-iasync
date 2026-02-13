@@ -34,6 +34,7 @@ import { logger } from '@/lib/logger'
 import { toast } from "sonner"
 import { ClinicHeader } from "@/components/Header"
 import { ClinicData, useClinic } from "@/app/contexts/ClinicContext"
+import { serverFetch } from "@/actions/api-proxy"
 
 type Appointment = {
   id: string
@@ -170,8 +171,8 @@ export default function ClinicDashboard() {
 
       interval = setInterval(async () => {
         try {
-          const res = await fetch(`${apiUrl}/checkout/tokens/status/${clinicData.id}`);
-          const data = await res.json();
+          const res = await serverFetch(`${apiUrl}/checkout/tokens/status/${clinicData.id}`)
+          const data = res.data
 
           // Se o status for 'pago', significa que o pagamento foi confirmado
           if (data.status === 'pago') {
@@ -196,23 +197,20 @@ export default function ClinicDashboard() {
     try {
       const amount_tokens = tokenAmount * 1000000
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/checkout/tokens`, {
+      const response = await serverFetch(`${process.env.NEXT_PUBLIC_API_URL}/checkout/tokens`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+        body: {
           clinic_id: clinicData.id,
           amount_tokens: amount_tokens
-        }),
+        },
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
+        const errorData = response.data
         throw new Error(errorData.detail || "Erro ao processar compra")
       }
 
-      const data = await response.json()
+      const data = response.data
       if (data.url) {
         window.open(data.url, '_blank')
         // setBuyTokensOpen(false) // Keep it open or close? Better to close and show waiting modal
@@ -477,11 +475,10 @@ export default function ClinicDashboard() {
 
   const fetchUazapiStatus = async (clinicId: string) => {
     try {
-      const response = await fetch(apiUrl(`/uazapi/instance/status/${clinicId}`))
-      const raw = await response.text()
-      const data = raw ? JSON.parse(raw) : {}
+      const response = await serverFetch(apiUrl(`/uazapi/instance/status/${clinicId}`))
+      const data = response.data
       if (!response.ok) {
-        throw new Error((data as any)?.detail || raw || "Erro ao consultar status")
+        throw new Error((data as any)?.detail || "Erro ao consultar status")
       }
       let status = resolveUazapiStatus(data)
       if (status === "not_configured" && hasInstanceToken) {
@@ -509,13 +506,12 @@ export default function ClinicDashboard() {
     setUazapiLoading(true)
     setUazapiStatus("connecting")
     try {
-      const response = await fetch(apiUrl(`/uazapi/instance/create/${clinicData.id}`), {
+      const response = await serverFetch(apiUrl(`/uazapi/instance/create/${clinicData.id}`), {
         method: "POST",
       })
-      const raw = await response.text()
-      const data = raw ? JSON.parse(raw) : {}
+      const data = response.data
       if (!response.ok) {
-        throw new Error((data as any)?.detail || raw || "Erro ao criar instância")
+        throw new Error((data as any)?.detail || "Erro ao criar instância")
       }
       toast.success("Instância criada")
       await fetchUazapiStatus(clinicData.id)
@@ -794,17 +790,13 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
     }
     setUazapiLoading(true)
     try {
-      const response = await fetch(apiUrl(`/uazapi/instance/connect/${clinicData.id}`), {
+      const response = await serverFetch(apiUrl(`/uazapi/instance/connect/${clinicData.id}`), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({}),
+        body: {},
       })
-      const raw = await response.text()
-      const data = raw ? JSON.parse(raw) : {}
+      const data = response.data
       if (!response.ok) {
-        throw new Error((data as any)?.detail || raw || "Erro ao gerar QR code")
+        throw new Error((data as any)?.detail || "Erro ao gerar QR code")
       }
       setUazapiStatus(resolveUazapiStatus(data))
       setUazapiQrCode(normalizeQrCode(resolveUazapiQr(data)))
@@ -835,13 +827,12 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
     }
     setUazapiLoading(true)
     try {
-      const response = await fetch(apiUrl(`/uazapi/instance/${clinicData.id}`), {
+      const response = await serverFetch(apiUrl(`/uazapi/instance/${clinicData.id}`), {
         method: "DELETE",
       })
-      const raw = await response.text()
-      const data = raw ? JSON.parse(raw) : {}
+      const data = response.data
       if (!response.ok) {
-        throw new Error((data as any)?.detail || raw || "Erro ao excluir instância")
+        throw new Error((data as any)?.detail || "Erro ao excluir instância")
       }
       setUazapiStatus("not_configured")
       setUazapiQrCode(null)

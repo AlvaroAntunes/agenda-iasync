@@ -30,6 +30,7 @@ import { useSubscriptionCheck } from "@/lib/use-subscription-check"
 
 import { logger } from '@/lib/logger'
 import { ClinicHeader } from "@/components/Header"
+import { serverFetch } from "@/actions/api-proxy"
 
 type ClinicData = {
   id: string
@@ -148,8 +149,8 @@ export default function SettingsPage() {
       // --- SYNC SUBSCRIPTION (DELAYED DOWNGRADE) ---
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL
-        const syncRes = await fetch(`${apiUrl}/subscriptions/sync/${profile.clinic_id}`, { method: 'POST' })
-        const syncData = await syncRes.json()
+        const syncRes = await serverFetch(`${apiUrl}/subscriptions/sync/${profile.clinic_id}`, { method: 'POST' })
+        const syncData = syncRes.data
 
         if (syncData.status === 'waiting' && syncData.switch_date) {
           setPendingSwitchDate(new Date(syncData.switch_date).toLocaleDateString('pt-BR'))
@@ -270,10 +271,10 @@ export default function SettingsPage() {
   const fetchCalendars = async (clinicId: string) => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      const response = await fetch(`${apiUrl}/calendars/list/${clinicId}`)
+      const response = await serverFetch(`${apiUrl}/calendars/list/${clinicId}`)
 
       if (response.ok) {
-        const data = await response.json()
+        const data = response.data
         setCalendars(data.calendars || [])
       }
     } catch (error) {
@@ -699,20 +700,17 @@ export default function SettingsPage() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL
 
-      const response = await fetch(`${apiUrl}/checkout/create`, {
+      const response = await serverFetch(`${apiUrl}/checkout/create`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+        body: {
           plan_id: clinicData.plan_id,
           periodo: 'anual',
           clinic_id: clinicData.id,
           parcelas_cartao: 1
-        }),
+        },
       })
 
-      const data = await response.json()
+      const data = response.data
 
       if (!response.ok) {
         throw new Error(data.detail || "Erro ao gerar pagamento")
@@ -743,19 +741,16 @@ export default function SettingsPage() {
 
     try {
       // 1. Chamada para o seu Backend Python
-      const response = await fetch(`${apiUrl}/cancel-subscription`, {
+      const response = await serverFetch(`${apiUrl}/cancel-subscription`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         // O corpo deve bater com o modelo 'CancelRequest' do Python (snake_case)
-        body: JSON.stringify({
+        body: {
           asaas_id: clinicData.asaas_id,
           clinic_id: clinicData.id
-        }),
+        },
       })
 
-      const data = await response.json()
+      const data = response.data
 
       // 2. Tratamento de Erros da API
       if (!response.ok) {

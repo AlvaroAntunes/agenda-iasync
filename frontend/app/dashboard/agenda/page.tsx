@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { logger } from "@/lib/logger"
+import { serverFetch } from "@/actions/api-proxy" 
 
 // Helper para formatar datas e gerar dias do mês
 const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate()
@@ -333,13 +334,13 @@ export default function CalendarPage() {
 
       const url = `${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData.id}?start=${startDate.toISOString()}&end=${endDate.toISOString()}`
 
-      const response = await fetch(url)
+      const response = await serverFetch(url)
       if (!response.ok) {
-        const err = await response.json()
+        const err = response.data
         throw new Error(err.detail || "Erro ao buscar eventos")
       }
 
-      const data = await response.json()
+      const data = response.data
       const fetchedEvents = data.events || []
       setEvents(fetchedEvents)
 
@@ -483,15 +484,14 @@ export default function CalendarPage() {
     try {
       setLoadingEvents(true)
       const calendarId = editingEvent.calendarId || 'primary'
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData.id}/${editingEvent.id}?calendar_id=${encodeURIComponent(calendarId)}`, {
+      const response = await serverFetch(`${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData.id}/${editingEvent.id}?calendar_id=${encodeURIComponent(calendarId)}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           summary: editingEvent.summary,
           description: editingEvent.description,
           start: editingEvent.start,
           end: editingEvent.end
-        })
+        }
       })
 
       if (!response.ok) throw new Error("Erro ao atualizar evento")
@@ -516,7 +516,7 @@ export default function CalendarPage() {
     try {
       setLoadingEvents(true)
       const calendarId = eventToDelete.calendarId || 'primary'
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData?.id}/${eventToDelete.id}?calendar_id=${encodeURIComponent(calendarId)}`, {
+      const response = await serverFetch(`${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData?.id}/${eventToDelete.id}?calendar_id=${encodeURIComponent(calendarId)}`, {
         method: "DELETE"
       })
 
@@ -555,14 +555,13 @@ export default function CalendarPage() {
       // Combina data e hora em formato ISO
       const startDateTime = `${newEvent.date}T${newEvent.time}:00`
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData.id}`, {
+      const response = await serverFetch(`${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData.id}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           summary: newEvent.summary,
           description: newEvent.description,
           start: startDateTime
-        })
+        }
       })
 
       if (!response.ok) throw new Error("Erro ao criar evento")

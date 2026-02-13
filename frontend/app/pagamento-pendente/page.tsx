@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { LogOut } from "lucide-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import { logger } from "@/lib/logger";
+import { serverFetch } from "@/actions/api-proxy";
 
 export default function PagamentoPendente() {
   const router = useRouter()
@@ -16,8 +17,7 @@ export default function PagamentoPendente() {
   const supabase = getSupabaseBrowserClient();
 
   useEffect(() => {
-    // Busca o link assim que a página carrega
-    const fetchPaymentLink = async () => {
+    const checkSubscriptionAndLoadLink = async () => {
       try {
         setLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
@@ -31,22 +31,46 @@ export default function PagamentoPendente() {
           .single();
 
         if (profile?.clinic_id) {
-          // 2. Chama seu Backend
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/checkout/pending/${profile.clinic_id}`);
-          const data = await res.json();
-          
+          // 2. Verificar se a assinatura já está ativa
+          const { data: subscription } = await supabase
+            .from('assinaturas')
+            .select('status, data_fim')
+            .eq('clinic_id', profile.clinic_id)
+            .single();
+
+          let isExpired = false;
+
+          if (subscription?.data_fim) {
+            const now = new Date();
+            const endDate = new Date(subscription.data_fim);
+            
+            if (now > endDate) {
+              isExpired = true;
+            }
+          }
+
+          // Se a assinatura está ativa E não expirou, redirecionar para o dashboard
+          if (subscription?.status === 'ativa' && !isExpired) {
+            router.push('/dashboard');
+            return;
+          }
+
+          // 3. Se realmente estiver pendente, chama o Backend para pegar o link
+          const res = await serverFetch(`${process.env.NEXT_PUBLIC_API_URL}/checkout/pending/${profile.clinic_id}`);
+          const data = res.data;
+
           if (data.url) {
             setPaymentUrl(data.url);
           }
         }
       } catch (error) {
-        logger.error("Erro ao buscar fatura:", error);
+        logger.error("Erro ao verificar assinatura ou buscar fatura:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPaymentLink();
+    checkSubscriptionAndLoadLink();
   }, []);
 
   const handleRegularizar = () => {
@@ -69,17 +93,17 @@ export default function PagamentoPendente() {
         <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
           <AlertCircle className="w-8 h-8 text-red-600" />
         </div>
-        
+
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
           Acesso Suspenso
         </h1>
-        
+
         <p className="text-gray-600 mb-8">
           Identificamos uma pendência na sua assinatura. Para continuar usando a plataforma, por favor regularize o pagamento.
         </p>
 
         <div className="space-y-3">
-          <button 
+          <button
             onClick={handleRegularizar}
             disabled={loading}
             className="w-full bg-red-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-red-700 transition-colors flex items-center justify-center gap-2 cursor-pointer"
@@ -97,21 +121,21 @@ export default function PagamentoPendente() {
       </div>
 
       {/* Footer */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
-          className="text-center"
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6, delay: 0.8 }}
+        className="text-center"
+      >
+        <Button
+          onClick={handleLogout}
+          variant="ghost"
+          className="text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50"
         >
-          <Button
-            onClick={handleLogout}
-            variant="ghost"
-            className="text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50"
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Sair da conta
-          </Button>
-        </motion.div>
+          <LogOut className="h-4 w-4 mr-2" />
+          Sair da conta
+        </Button>
+      </motion.div>
     </div>
   );
 }

@@ -31,3 +31,22 @@ def decrypt_token(encrypted_token: str) -> str:
     # Fernet espera bytes
     decrypted_bytes = cipher_suite.decrypt(encrypted_token.encode())
     return decrypted_bytes.decode()
+
+# --- GLOBAL PASSWORD PROTECTION ---
+from fastapi import Header, HTTPException, status
+
+API_GLOBAL_PASSWORD = os.getenv("API_GLOBAL_PASSWORD")
+
+async def verify_global_password(x_api_password: str = Header(None)):
+    """
+    Dependência Global: Verifica se o cabeçalho 'x-api-password' corresponde à senha definida no .env.
+    Se a senha não estiver configurada no .env, permite o acesso (modo inseguro ou dev).
+    """
+    if not API_GLOBAL_PASSWORD:
+        return # Sem senha definida, libera o acesso
+        
+    if x_api_password != API_GLOBAL_PASSWORD:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Global API Password"
+        )
