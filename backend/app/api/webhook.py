@@ -654,10 +654,6 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         uazapi_token = payload.get("token")
         message = _normalize_uazapi_message(payload)
         
-        print(f"🔍 Debug - Token: {uazapi_token}")
-        print(f"🔍 Debug - Message: {message}")
-        print(f"🔍 Debug - Message type: {type(message)}")
-        
         if not uazapi_token:
             return {"status": "no_instance_id"}
         if not message:
@@ -720,26 +716,17 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
 
         print(f"📩 Webhook Uazapi: Clínica {clinic_id} | Cliente: {telefone_cliente}")
 
-        # Debug adicional
-        print(f"🔍 Debug - Message ID: {message_id}")
-        print(f"🔍 Debug - LID: {lid}")
-
         # 5. Extração do Conteúdo (Texto ou Mídia)
         msg_type = _pick_first(message.get("messageType"), message.get("type"), payload.get("messageType"))
-        print(f"🔍 Debug - msg_type: {msg_type}")
         
         texto_usuario = ""
         texto_ia = ""
         
         content = _parse_json_if_string(message.get("content"))
-        print(f"🔍 Debug - content: {content}")
-        print(f"🔍 Debug - content type: {type(content)}")
         
         inner_message = message.get("message") if isinstance(message.get("message"), dict) else {}
-        print(f"🔍 Debug - inner_message: {inner_message}")
         
         nested_content_message = content.get("message") if isinstance(content, dict) else {}
-        print(f"🔍 Debug - nested_content_message: {nested_content_message}")
         content_dict = content if isinstance(content, dict) else {}
         content_text = None
         if isinstance(content, str):
@@ -748,26 +735,14 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
             content_text = _pick_first(content.get("text"), content.get("conversation"), content.get("message"))
         text_candidate = _pick_first(message.get("text"), message.get("conversation"), content_text)
         
-        print(f"🔍 Debug - Antes de inferir media_type")
-        print(f"🔍 Debug - content_dict: {content_dict}")
-        
         media_type = _infer_media_type(message, inner_message, content_dict, nested_content_message, payload)
-        print(f"🔍 Debug - media_type inferido: {media_type}")
-        
         raw_type = (msg_type or "").lower()
-        print(f"🔍 Debug - raw_type: {raw_type}")
-        
-        print(f"🔍 Debug - Iniciando processamento is_text_type")
         is_text_type = raw_type in {"conversation", "text", "extendedtextmessage"}
-        print(f"🔍 Debug - is_text_type: {is_text_type}")
-        
+
         if not media_type:
-            print(f"🔍 Debug - Inferindo media_type from string")
             media_type = _infer_media_type_from_string(raw_type)
-            print(f"🔍 Debug - media_type after string inference: {media_type}")
             
         if not media_type and raw_type:
-            print(f"🔍 Debug - Verificando raw_type específicos")
             if raw_type in {"audiomessage", "audio"}:
                 media_type = "audio"
             elif raw_type in {"imagemessage", "image"}:
@@ -776,11 +751,6 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                 media_type = "video"
             elif raw_type in {"documentmessage", "document", "file"}:
                 media_type = "file"
-            print(f"🔍 Debug - media_type after raw_type check: {media_type}")
-
-        print(f"🔍 Debug - Iniciando extração media_mime")
-
-        print(f"🔍 Debug - Iniciando extração media_mime")
         try:
             media_mime = _pick_first(
                 message.get("mimetype"),
@@ -792,40 +762,36 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                 message.get("content", {}).get("mimetype") if isinstance(message.get("content"), dict) else None,
                 message.get("content", {}).get("mimeType") if isinstance(message.get("content"), dict) else None,
             )
-            print(f"🔍 Debug - media_mime extraído com sucesso: {media_mime}")
         except Exception as mime_err:
-            print(f"❌ Erro na extração de media_mime (parte 1): {mime_err}")
             media_mime = None
 
-        print(f"🔍 Debug - Continuando extração media_mime (parte 2)")
         try:
             if media_mime is None:
                 media_mime = _pick_first(
                     message.get("message", {}).get("content", {}).get("mimetype") if isinstance(message.get("message"), dict) and isinstance(message.get("message", {}).get("content"), dict) else None,
                     message.get("message", {}).get("content", {}).get("mimeType") if isinstance(message.get("message"), dict) and isinstance(message.get("message", {}).get("content"), dict) else None,
                 )
-            print(f"🔍 Debug - media_mime após parte 2: {media_mime}")
         except Exception as mime_err2:
             print(f"❌ Erro na extração de media_mime (parte 2): {mime_err2}")
 
-        print(f"🔍 Debug - Continuando extração media_mime (parte 3)")
         try:
             if media_mime is None:
                 payload_body = payload.get("body")
+                
                 if isinstance(payload_body, dict):
                     body_message = payload_body.get("message")
+                    
                     if isinstance(body_message, dict):
                         body_content = body_message.get("content")
+                        
                         if isinstance(body_content, dict):
                             media_mime = _pick_first(
                                 body_content.get("mimetype"),
                                 body_content.get("mimeType"),
                             )
-            print(f"🔍 Debug - media_mime após parte 3: {media_mime}")
         except Exception as mime_err3:
             print(f"❌ Erro na extração de media_mime (parte 3): {mime_err3}")
 
-        print(f"🔍 Debug - Iniciando extração media_file_name")
         try:
             media_file_name = _pick_first(
                 message.get("fileName"),
@@ -838,18 +804,19 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                 inner_message.get("filename") if isinstance(inner_message, dict) else None,
                 inner_message.get("name") if isinstance(inner_message, dict) else None,
             )
-            print(f"🔍 Debug - media_file_name extraído: {media_file_name}")
         except Exception as filename_err:
             print(f"❌ Erro na extração de media_file_name: {filename_err}")
             media_file_name = None
             
-        print(f"🔍 Debug - Continuando com verificações de media_type")
         if not media_type:
             media_type = _infer_media_type_from_string(media_mime)
+            
         if not media_type:
             media_type = _infer_media_type_from_string(media_file_name)
+            
         if not media_type and media_mime:
             mime_main = str(media_mime).lower().split(";", 1)[0].strip()
+            
             if mime_main.startswith("audio/"):
                 media_type = "audio"
             elif mime_main.startswith("image/"):
@@ -858,6 +825,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                 media_type = "video"
             elif mime_main.startswith("application/"):
                 media_type = "file"
+                
         if not media_type:
             url_candidate = _pick_first(
                 content_dict.get("URL"),
@@ -867,26 +835,32 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                 inner_message.get("URL") if isinstance(inner_message, dict) else None,
                 inner_message.get("url") if isinstance(inner_message, dict) else None,
             )
+            
             if url_candidate:
                 media_type = "file"
+                
         media_caption = _pick_first(
             message.get("caption"),
             content_dict.get("caption"),
             inner_message.get("caption") if isinstance(inner_message, dict) else None,
         )
+        
         if not media_caption and media_type != "audio":
             media_caption = _pick_first(
                 message.get("text"),
                 content_dict.get("text"),
                 inner_message.get("text") if isinstance(inner_message, dict) else None,
             )
+            
         if media_type == "audio":
             media_caption = None
 
         if is_text_type and not media_type:
             texto_usuario = text_candidate or ""
+            
             if isinstance(texto_usuario, dict):
                 texto_usuario = texto_usuario.get("text", "Não entendi a mensagem.")
+                
             texto_ia = texto_usuario
         elif media_type:
             if media_type == "audio":
@@ -948,7 +922,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                         # Se a imagem for relevante, usa a análise para processamento da IA
                         texto_usuario = f"[Imagem enviada] {analise_imagem}"
                         texto_ia = f"Análise da imagem: {analise_imagem}"
-                        # Força o media_type como None para que seja processado como texto
+  
                         media_type = None
                         print(f"🎯 Imagem analisada com sucesso: {analise_imagem} - Convertendo para processamento de texto")
                         
@@ -982,6 +956,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                 HistoryService(clinic_id=clinic_id, session_id=telefone_cliente).add_user_message(conteudo_historico)
             except Exception as e:
                 print(f"⚠️ Erro ao salvar histórico (media): {e}")
+                
             await sse_manager.broadcast(clinic_id, {
                 "type": "message",
                 "message": {
@@ -1010,6 +985,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                 HistoryService(clinic_id=clinic_id, session_id=telefone_cliente).add_user_message(texto_usuario)
             except Exception as e:
                 print(f"⚠️ Erro ao salvar histórico (texto): {e}")
+                
             await sse_manager.broadcast(clinic_id, {
                 "type": "message",
                 "message": {
@@ -1024,6 +1000,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         # 6. Lead (rápido): checa status para IA e deixa criação completa em background
         lead_status_ia = True
         lead_needs_create = False
+        
         try:
             lead_resp = supabase.table('leads')\
                 .select('id, status_ia')\
@@ -1112,6 +1089,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
 
         # 7.5. RATE LIMITING (após salvar mensagem, só para IA)
         is_blocked, ttl = rate_limiter.is_clinic_blocked(clinic_id)
+        
         if is_blocked:
             print(f"🚫 [RateLimit] Requisição bloqueada - Clínica {clinic_id} (TTL: {ttl}s)")
             return {
@@ -1121,6 +1099,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
             }
         
         global_allowed, global_msg = rate_limiter.check_global_rate_limit()
+        
         if not global_allowed:
             print(f"🚨 [RateLimit] GLOBAL LIMIT - Requisição negada")
             return {
@@ -1129,6 +1108,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
             }
         
         allowed, msg = rate_limiter.check_rate_limit_per_clinic(clinic_id)
+        
         if not allowed:
             print(f"⚠️ [RateLimit] Rate limit excedido - Clínica {clinic_id}")
             return {
@@ -1137,6 +1117,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
             }
         
         burst_allowed, burst_msg = rate_limiter.check_burst_protection(clinic_id)
+        
         if not burst_allowed:
             print(f"⚠️ [RateLimit] Burst detectado - Clínica {clinic_id}")
             return {
@@ -1148,6 +1129,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         if texto_ia:
             buffer_service.add_message(clinic_id, telefone_cliente, texto_ia)
             devo_iniciar_timer = buffer_service.should_start_timer(clinic_id, telefone_cliente)
+            
             if devo_iniciar_timer:
                 background_tasks.add_task(
                     esperar_e_processar,
@@ -1157,6 +1139,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                     lid,
                 )
                 return {"status": "timer_started"}
+            
             return {"status": "accumulated"}
 
         if media_type:
