@@ -916,6 +916,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                         # Se transcreveu, usa o texto para processamento da IA
                         texto_usuario = texto_transcrito
                         texto_ia = texto_transcrito
+                        
                 except Exception as audio_err:
                     print(f"❌ Erro na transcrição de áudio: {audio_err}")
                     return {"status": "audio_transcription_error"}
