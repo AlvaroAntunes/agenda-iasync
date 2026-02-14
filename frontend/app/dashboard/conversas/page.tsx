@@ -120,6 +120,7 @@ export default function ConversasPage() {
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map())
   const [playingId, setPlayingId] = useState<string | null>(null)
   const messageCacheRef = useRef<Map<string, { messages: ChatMessage[]; updatedAt: number }>>(new Map())
+  const selectedSessionRef = useRef<string | null>(null)
   const hasInstanceToken = Boolean(clinicData?.uazapi_token)
   const displayUazapiStatus =
     uazapiStatus === "not_configured" && hasInstanceToken ? "disconnected" : uazapiStatus
@@ -364,6 +365,10 @@ export default function ConversasPage() {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
   }
+
+  useEffect(() => {
+    selectedSessionRef.current = selectedSessionId
+  }, [selectedSessionId])
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -1258,6 +1263,7 @@ export default function ConversasPage() {
           })
           const ordered = (data || []).slice().reverse().map((row: any) => normalizeStoredMessage(row))
           setMessages((prev) => {
+            if (selectedSessionRef.current !== selectedSessionId) return prev
             const map = new Map<string, ChatMessage>()
             for (const msg of ordered) map.set(msg.id, msg)
             for (const msg of prev) {
@@ -1269,7 +1275,7 @@ export default function ConversasPage() {
             messageCacheRef.current.set(selectedSessionId, { messages: recent, updatedAt: Date.now() })
             return recent
           })
-          if (!silent) setMessagesLoading(false)
+          if (!silent && selectedSessionRef.current === selectedSessionId) setMessagesLoading(false)
         }
 
         if (shouldFetchUazapi && !uazapiFresh) {
@@ -1431,8 +1437,10 @@ export default function ConversasPage() {
           if (allMessages.length) {
             allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
             const recent = allMessages.slice(-pageLimit)
-            setMessages(recent)
-            messageCacheRef.current.set(selectedSessionId, { messages: recent, updatedAt: Date.now() })
+            if (selectedSessionRef.current === selectedSessionId) {
+              setMessages(recent)
+              messageCacheRef.current.set(selectedSessionId, { messages: recent, updatedAt: Date.now() })
+            }
             const lastMessage = recent[recent.length - 1]
             if (lastMessage) {
               const displayContent = lastMessage.media
@@ -1596,6 +1604,8 @@ export default function ConversasPage() {
                       const cached = messageCacheRef.current.get(conversation.sessionId)
                       if (cached?.messages?.length) {
                         setMessages(cached.messages)
+                      } else {
+                        setMessages([])
                       }
                       setSelectedSessionId(conversation.sessionId)
                     }}
