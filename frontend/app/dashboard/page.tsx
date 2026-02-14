@@ -83,6 +83,7 @@ export default function ClinicDashboard() {
   // Prompt Setup State
   const [isPromptSetupOpen, setIsPromptSetupOpen] = useState(false)
   const [isProfessionalWarningOpen, setIsProfessionalWarningOpen] = useState(false)
+  const [isCalendarWarningOpen, setIsCalendarWarningOpen] = useState(false)
   const [promptFormData, setPromptFormData] = useState({
     nomeRecepcionista: '',
     nomeClinica: '',
@@ -775,6 +776,12 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
     // Check if prompt is configured
     if (!skipPromptCheck && (!clinicData.prompt_ia || clinicData.prompt_ia.trim() === '')) {
       setIsPromptSetupOpen(true)
+      return
+    }
+
+    // Check if calendar is connected first
+    if (!clinicData?.calendar_refresh_token) {
+      setIsCalendarWarningOpen(true)
       return
     }
 
@@ -1626,6 +1633,42 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
           </DialogContent>
         </Dialog>
 
+        {/* Warning Modal - Calendar Not Connected */}
+        <Dialog open={isCalendarWarningOpen} onOpenChange={setIsCalendarWarningOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-600">
+                <Calendar className="h-5 w-5" />
+                Conecte seu Google Calendar
+              </DialogTitle>
+              <DialogDescription className="pt-2">
+                Antes de se conectar ao WhatsApp, é necessário conectar sua conta do Google Calendar.
+                <br /><br />
+                Isso é importante para que a IA possa gerenciar os agendamentos automaticamente.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:justify-end mt-4">
+              <Button
+                variant="ghost"
+                onClick={() => setIsCalendarWarningOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  if (clinicData?.id) {
+                    window.location.href = `${process.env.NEXT_PUBLIC_URL_SITE!}/auth/login?clinic_id=${clinicData.id}`
+                  }
+                }}
+                className="bg-cyan-600 hover:bg-cyan-700 text-white gap-2"
+              >
+                Conectar Calendário
+                <Calendar className="h-4 w-4" />
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Warning Modal - No Professionals */}
         <Dialog open={isProfessionalWarningOpen} onOpenChange={setIsProfessionalWarningOpen}>
           <DialogContent className="sm:max-w-md">
@@ -1649,7 +1692,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
               </Button>
               <Button
                 onClick={() => router.push('/dashboard/settings?scrollTo=profissionais')}
-                className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                className="bg-cyan-600 hover:bg-cyan-700 text-white gap-2"
               >
                 Cadastrar Profissionais
                 <ChevronRight className="h-4 w-4" />

@@ -128,6 +128,9 @@ export default function CalendarPage() {
   const [bookingSuccessRate, setBookingSuccessRate] = useState(0)
   const [cancellationRate, setCancellationRate] = useState(0)
   const [avgAppointmentsPerDay, setAvgAppointmentsPerDay] = useState(0)
+  
+  // Estado para email do Google Calendar
+  const [googleCalendarEmail, setGoogleCalendarEmail] = useState<string | null>(null)
 
   // Estado para edição (movido para o topo para evitar erro de hook)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
@@ -184,6 +187,11 @@ export default function CalendarPage() {
           .eq('id', profile.clinic_id)
           .single()
 
+        if (!clinic?.calendar_refresh_token) {
+          router.push('/dashboard')
+          return <ClinicLoading />
+        }
+        
         setClinicData(clinic)
       }
     } catch (error) {
@@ -586,9 +594,16 @@ export default function CalendarPage() {
         <div className="flex items-center justify-between mb-4 sm:mb-8">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Agenda</h1>
-            <p className="text-muted-foreground mt-1 text-sm hidden sm:block">
-              Visualize seus agendamentos sincronizados com o Google Calendar.
-            </p>
+            <div className="mt-1">
+              <p className="text-muted-foreground text-sm hidden sm:block">
+                Visualize seus agendamentos sincronizados com o Google Calendar.
+              </p>
+              {googleCalendarEmail && (
+                <p className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md inline-block mt-1">
+                  📧 Google Calendar: {googleCalendarEmail}
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex gap-1 sm:gap-2">
             <Button

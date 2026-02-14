@@ -22,6 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useState } from "react"
+import { useClinic } from "@/app/contexts/ClinicContext"
 
 type Props = {
   clinicName?: string | null
@@ -32,8 +33,10 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
+  const { clinicData } = useClinic()
 
   const isActive = (path: string) => pathname === path || pathname?.startsWith(`${path}/`)
+  const hasCalendarConnected = Boolean(clinicData?.calendar_refresh_token)
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-xl">
@@ -86,15 +89,19 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
                 </Button>
               </Link>
 
-              <Link href="/dashboard/agenda">
-                <Button
-                  variant={isActive('/dashboard/agenda') ? "secondary" : "ghost"}
-                  className={`gap-2 ${isActive('/dashboard/agenda') ? 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100' : 'text-slate-600'}`}
-                >
-                  <CalendarDays className="h-4 w-4" />
-                  Agenda
-                </Button>
-              </Link>
+              {hasCalendarConnected && (
+                <Link href="/dashboard/agenda">
+                  <Button
+                    variant={isActive('/dashboard/agenda') ? "secondary" : "ghost"}
+                    className={`gap-2 ${isActive('/dashboard/agenda') ? 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100' : 'text-slate-600'} flex flex-col items-start p-3 h-auto`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4" />
+                      Agenda
+                    </div>
+                  </Button>
+                </Link>
+              )}
 
               <Link href="/dashboard/consultas">
                 <Button
@@ -215,15 +222,24 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
                       </Button>
                     </Link>
 
-                    <Link href="/dashboard/agenda">
-                      <Button
-                        variant={isActive('/dashboard/agenda') ? "secondary" : "ghost"}
-                        className={`w-full justify-start gap-2 h-12 ${isActive('/dashboard/agenda') ? 'bg-cyan-50 text-cyan-700' : ''}`}
-                      >
-                        <CalendarDays className="h-4 w-4" />
-                        Agenda
-                      </Button>
-                    </Link>
+                    {hasCalendarConnected && (
+                      <Link href="/dashboard/agenda">
+                        <Button
+                          variant={isActive('/dashboard/agenda') ? "secondary" : "ghost"}
+                          className={`w-full justify-start gap-2 h-16 ${isActive('/dashboard/agenda') ? 'bg-cyan-50 text-cyan-700' : ''} flex flex-col items-start p-3`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <CalendarDays className="h-4 w-4" />
+                            Agenda
+                          </div>
+                          {clinicData?.email && (
+                            <span className="text-xs text-slate-500 truncate max-w-48">
+                              {clinicData.email}
+                            </span>
+                          )}
+                        </Button>
+                      </Link>
+                    )}
 
                     <Link href="/dashboard/consultas">
                       <Button
