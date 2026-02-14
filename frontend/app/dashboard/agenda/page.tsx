@@ -156,6 +156,7 @@ export default function CalendarPage() {
     if (clinicData?.id) {
       fetchEvents()
       fetchAppointmentsStats()
+      fetchGoogleCalendarEmail()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentDate, clinicData?.id])
@@ -198,6 +199,20 @@ export default function CalendarPage() {
       logger.error('Erro ao carregar dados:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchGoogleCalendarEmail = async () => {
+    if (!clinicData?.id) return
+    
+    try {
+      const response = await serverFetch(`${process.env.NEXT_PUBLIC_API_URL}/calendars/user-email/${clinicData.id}`)
+
+      if (response.ok && response.data?.email) {
+        setGoogleCalendarEmail(response.data.email)
+      }
+    } catch (error) {
+      logger.error('Erro ao buscar email do Google Calendar:', error)
     }
   }
 
@@ -599,7 +614,7 @@ export default function CalendarPage() {
                 Visualize seus agendamentos sincronizados com o Google Calendar.
               </p>
               {googleCalendarEmail && (
-                <p className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md inline-block mt-1">
+                <p className="text-xs md:text-sm text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md inline-block mt-1">
                   📧 Google Calendar: {googleCalendarEmail}
                 </p>
               )}

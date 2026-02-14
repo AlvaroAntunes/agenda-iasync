@@ -17,7 +17,9 @@ load_dotenv()  # Carrega variáveis do .env
 
 SCOPES = [
     'https://www.googleapis.com/auth/calendar.events', 
-    'https://www.googleapis.com/auth/calendar.readonly'
+    'https://www.googleapis.com/auth/calendar.readonly',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'openid'
 ]
 REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI") 
 

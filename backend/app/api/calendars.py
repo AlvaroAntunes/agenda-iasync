@@ -229,3 +229,26 @@ def create_event(clinic_id: str, body: dict, calendar_id: str = "primary"):
     except Exception as e:
         print(f"❌ Erro ao criar evento: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/calendars/user-email/{clinic_id}")
+def get_calendar_user_email(clinic_id: str):
+    """
+    Obtém o email do usuário conectado ao Google Calendar.
+    """
+    try:
+        # Instancia o serviço correto (Google/Outlook)
+        calendar_service = get_calendar_service(clinic_id)
+        
+        # Obtém o email do usuário
+        email = calendar_service.obter_email_usuario()
+        
+        if not email:
+            raise HTTPException(status_code=404, detail="Não foi possível obter o email do usuário")
+        
+        return {"email": email}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Erro ao obter email do usuário: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

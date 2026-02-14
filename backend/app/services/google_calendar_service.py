@@ -17,7 +17,9 @@ load_dotenv()  # Carrega variáveis do .env
 class GoogleCalendarService(CalendarService):
     SCOPES = [
         'https://www.googleapis.com/auth/calendar.events', 
-        'https://www.googleapis.com/auth/calendar.readonly'
+        'https://www.googleapis.com/auth/calendar.readonly',
+        'https://www.googleapis.com/auth/userinfo.email',
+        'openid'
     ]
 
     def __init__(self, clinic_id: str):
@@ -33,6 +35,26 @@ class GoogleCalendarService(CalendarService):
         
         # Constrói o serviço
         self.service = build('calendar', 'v3', credentials=self.creds)
+        
+    def obter_email_usuario(self):
+        """
+        Obtém o email do usuário conectado ao Google Calendar.
+        """
+        try:
+            # Validar se o token tem os escopos necessários
+            if not self._validar_escopo_token(self.creds):
+                raise Exception("Token inválido ou com escopo incompatível. Por favor, reconecte sua conta Google.")
+            
+            # Usar o serviço OAuth2 para obter informações do usuário
+            oauth_service = build('oauth2', 'v2', credentials=self.creds)
+            user_info = oauth_service.userinfo().get().execute()
+            return user_info.get('email')
+        except Exception as e:
+            print(f"⚠️ Erro ao obter email do usuário: {e}")
+            # Se for erro de escopo, relança a exceção para o frontend saber que precisa reconectar
+            if 'escopo' in str(e).lower() or 'scope' in str(e).lower():
+                raise e
+            return None
         
     def _get_credentials_from_db(self):
         
@@ -80,6 +102,34 @@ class GoogleCalendarService(CalendarService):
         )
 
         return creds
+    
+    def _validar_escopo_token(self, creds):
+        """
+        Valida se o token tem os escopos necessários.
+        Se não tiver, invalida o token forçando nova autenticação.
+        """
+        try:
+            # Tenta fazer uma chamada simples para verificar se o token funciona
+            oauth_service = build('oauth2', 'v2', credentials=creds)
+            oauth_service.userinfo().get().execute()
+            return True
+        except Exception as e:
+            error_str = str(e).lower()
+            if 'scope' in error_str or 'invalid_scope' in error_str:
+                print(f"⚠️ Token com escopo inválido detectado: {e}")
+                print(f"🔄 Invalidando token para forçar nova autenticação...")
+                
+                # Remove o token do banco para forçar nova autenticação
+                try:
+                    self.supabase.table('clinicas').update({
+                        'calendar_refresh_token': None
+                    }).eq('id', self.clinic_id).execute()
+                    print(f"✅ Token invalidado com sucesso para clínica {self.clinic_id}")
+                except Exception as db_error:
+                    print(f"⚠️ Erro ao invalidar token no banco: {db_error}")
+                
+                return False
+            raise e
     
     def listar_calendarios(self):
         """
