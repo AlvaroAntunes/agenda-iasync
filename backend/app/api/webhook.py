@@ -647,7 +647,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
     try:       
         payload = await request.json()
         print("📥 Webhook Uazapi recebido:")
-        print(json.dumps(payload, indent=4))
+        # print(json.dumps(payload, indent=4))
 
         # 1. Extração de Dados Básicos
         uazapi_token = payload.get("token")
