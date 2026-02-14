@@ -181,20 +181,20 @@ def configure_uazapi_webhook(token: str):
         if webhook_resp.status_code in [200, 201]:
             print("✅ Webhook Uazapi configurado com sucesso.")
             return True
-        print(
-            "❌ Uazapi webhook erro:",
-            json.dumps(
-                {
-                    "status_code": webhook_resp.status_code,
-                    "error": webhook_resp.text,
-                    "request": {
-                        "url": webhook_url,
-                        "body": webhook_payload,
-                    },
-                },
-                indent=2,
-            ),
-        )
+        # print(
+        #     "❌ Uazapi webhook erro:",
+        #     json.dumps(
+        #         {
+        #             "status_code": webhook_resp.status_code,
+        #             "error": webhook_resp.text,
+        #             "request": {
+        #                 "url": webhook_url,
+        #                 "body": webhook_payload,
+        #             },
+        #         },
+        #         indent=2,
+        #     ),
+        # )
     except Exception as e:
         print(f"⚠️ Erro ao configurar webhook: {e}")
     return False
@@ -268,28 +268,28 @@ def create_uazapi_instance(clinic_id: str):
     response = requests.post(url, json=body, headers=headers)
     if response.status_code not in [200, 201]:
         error_text = response.text
-        print(
-            "❌ Uazapi create erro:",
-            json.dumps(
-                {
-                    "status_code": response.status_code,
-                    "error": error_text,
-                    "request": {
-                        "url": url,
-                        "body": body,
-                        "headers": headers,
-                    },
-                },
-                indent=2,
-            ),
-        )
+        # print(
+        #     "❌ Uazapi create erro:",
+        #     json.dumps(
+        #         {
+        #             "status_code": response.status_code,
+        #             "error": error_text,
+        #             "request": {
+        #                 "url": url,
+        #                 "body": body,
+        #                 "headers": headers,
+        #             },
+        #         },
+        #         indent=2,
+        #     ),
+        # )
         raise HTTPException(
             status_code=response.status_code,
             detail=error_text or "Erro ao criar instância na Uazapi"
         )
 
     data = response.json()
-    print("📦 Resposta Uazapi create:", json.dumps(data, indent=2))
+    # print("📦 Resposta Uazapi create:", json.dumps(data, indent=2))
     token = (
         data.get("token")
         or data.get("instance", {}).get("token")
@@ -334,7 +334,7 @@ def connect_uazapi_instance(clinic_id: str, body: ConnectInstanceBody):
         raise HTTPException(status_code=500, detail=response.text)
 
     data = response.json()
-    print("📦 Resposta Uazapi connect:", json.dumps(data, indent=2))
+    # print("📦 Resposta Uazapi connect:", json.dumps(data, indent=2))
     configure_uazapi_webhook(token)
     return data
 
@@ -355,7 +355,7 @@ def find_uazapi_messages(clinic_id: str, body: MessageFindBody):
         raise HTTPException(status_code=500, detail=response.text)
 
     data = response.json()
-    print("📦 Resposta Uazapi message/find:", json.dumps(data, indent=2))
+    # print("📦 Resposta Uazapi message/find:", json.dumps(data, indent=2))
     return data
 
 @router.post("/uazapi/message/send/{clinic_id}", dependencies=[Depends(verify_global_password)])
@@ -503,7 +503,7 @@ def status_uazapi_instance(clinic_id: str):
         raise HTTPException(status_code=500, detail=response.text)
 
     data = response.json()
-    print("📦 Resposta Uazapi status:", json.dumps(data, indent=2))
+    # print("📦 Resposta Uazapi status:", json.dumps(data, indent=2))
     return data
 
 @router.get("/uazapi/message/download/{clinic_id}", dependencies=[Depends(verify_global_password)])
