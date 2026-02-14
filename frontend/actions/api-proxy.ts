@@ -1,5 +1,8 @@
 "use server";
 
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
 const API_GLOBAL_PASSWORD = process.env.API_GLOBAL_PASSWORD; 
 
 type FetchOptions = {
@@ -33,5 +36,39 @@ export async function serverFetch(url: string, options: FetchOptions = {}) {
   } catch (error: any) {
     console.error("Erro no serverFetch:", error);
     return { ok: false, error: error.message };
+  }
+}
+
+// Função específica para construir URL SSE com autenticação
+export async function getSSEUrl(baseUrl: string, clinicId: string) {
+  try {
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value
+          },
+        },
+      }
+    )
+
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session?.access_token) {
+      throw new Error('Usuário não autenticado')
+    }
+
+    const url = new URL(baseUrl)
+    url.pathname = `/sse/clinics/${clinicId}`
+    url.searchParams.set('token', session.access_token)
+    
+    return { ok: true, url: url.toString() }
+    
+  } catch (error: any) {
+    console.error("Erro ao construir URL SSE:", error)
+    return { ok: false, error: error.message }
   }
 }

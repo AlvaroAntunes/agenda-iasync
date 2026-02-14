@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
-import { Loader2, RefreshCw, Pause, Play, Mic, Square, Plus } from "lucide-react"
+import { Loader2, RefreshCw, Pause, Play, Mic, Square, Plus, Send } from "lucide-react"
 import { ClinicLoading } from "@/components/ClinicLoading"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -113,6 +113,8 @@ export default function ConversasPage() {
   const [isRecording, setIsRecording] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordChunksRef = useRef<Blob[]>([])
+  const shouldProcessAudioRef = useRef(false)
+  const streamRef = useRef<MediaStream | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const lastMessageIdRef = useRef<string | null>(null)
   const [mediaCache, setMediaCache] = useState<Record<string, { url: string; mimeType?: string; fileName?: string }>>({})
@@ -486,11 +488,48 @@ export default function ConversasPage() {
 
           if (selectedSessionId === newMessage.session_id) {
             setMessages((prev) => {
+              // Verificar se já existe mensagem com mesmo ID
               if (prev.some((msg) => msg.id === newMessage.id)) return prev
+
               const normalizedMessage = normalizeStoredMessage(newMessage)
-              const next = [...prev, normalizedMessage]
-              next.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-              return next
+              const messageTime = new Date(newMessage.created_at).getTime()
+
+              // Procurar por mensagem otimista/confirmada correspondente para SUBSTITUIR
+              let foundOptimistic = false
+              const updated = prev.map(msg => {
+                // Se não é otimista/confirmada, manter como está
+                if (!msg.id.startsWith('optimistic-') && !msg.id.startsWith('confirmed-')) {
+                  return msg
+                }
+
+                // Verificar se é a mesma mensagem
+                const msgTime = new Date(msg.created_at).getTime()
+                const timeDiff = Math.abs(messageTime - msgTime)
+
+                const isSameMessage = (
+                  timeDiff < 30000 && // 30 segundos de janela
+                  msg.quem_enviou === newMessage.quem_enviou &&
+                  msg.session_id === newMessage.session_id &&
+                  msg.conteudo.trim() === newMessage.conteudo.trim()
+                )
+
+                if (isSameMessage && !foundOptimistic) {
+                  foundOptimistic = true
+                  // SUBSTITUIR mensagem otimista pela real
+                  return normalizedMessage
+                }
+
+                return msg
+              })
+
+              // Se não encontrou correspondente otimista, adicionar como nova
+              if (!foundOptimistic) {
+                updated.push(normalizedMessage)
+              }
+
+              // Ordenar por timestamp
+              updated.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+              return updated
             })
           }
 
@@ -959,62 +998,215 @@ export default function ConversasPage() {
     }
   }
 
-  const handleSendReply = async () => {
+  const sendMessage = async (fileToSend?: File) => {
     if (!clinicId || !selectedSessionId || replySending) return
+    
+    // Usar arquivo passado como parâmetro ou o arquivo do estado
+    const messageFile = fileToSend || replyFile
+    if (!replyText.trim() && !messageFile) return
+
     setReplyError(null)
+    const nowIso = new Date().toISOString()
+    const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+    // CAPTURAR DADOS ANTES DE LIMPAR OS CAMPOS
+    const messageText = replyText.trim()
+    // messageFile já foi definido acima
+
+    // 1. MOSTRAR MENSAGEM INSTANTANEAMENTE
+    let optimisticMessage: ChatMessage
+    let displayContent: string
+
+    if (messageFile) {
+      const fileType = messageFile.type.startsWith("image/")
+        ? "image"
+        : messageFile.type.startsWith("video/")
+          ? "video"
+          : messageFile.type.startsWith("audio/")
+            ? "audio"
+            : "file"
+      const label = mediaLabel(fileType as ChatMediaType)
+      displayContent = messageText || label
+
+      optimisticMessage = {
+        id: optimisticId,
+        session_id: selectedSessionId,
+        quem_enviou: "ai",
+        conteudo: displayContent,
+        created_at: nowIso,
+        media: {
+          type: fileType as ChatMediaType,
+          mimeType: messageFile.type,
+          fileName: messageFile.name,
+          caption: messageText,
+        },
+      }
+    } else {
+      displayContent = messageText
+      optimisticMessage = {
+        id: optimisticId,
+        session_id: selectedSessionId,
+        quem_enviou: "ai",
+        conteudo: messageText,
+        created_at: nowIso,
+      }
+    }
+
+    // ADICIONAR MENSAGEM IMEDIATAMENTE NO CHAT
+    setMessages((prev) => [...prev, optimisticMessage])
+
+    // LIMPAR CAMPOS IMEDIATAMENTE PARA FEEDBACK VISUAL (só se não for áudio direto)
+    if (!fileToSend) {
+      setReplyText("")
+      setReplyFile(null)
+    }
+
+    // ATUALIZAR LISTA DE CONVERSAS IMEDIATAMENTE
+    setConversations((prev) => {
+      const leadName = leadNameCacheRef.current.get(selectedSessionId) ?? null
+      const updated: Conversation = {
+        sessionId: selectedSessionId,
+        lastMessage: displayContent,
+        lastSender: "ai",
+        lastAt: nowIso,
+        leadName,
+      }
+      const next = prev.map((conversation) =>
+        conversation.sessionId === selectedSessionId ? updated : conversation
+      )
+      next.sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime())
+      return next
+    })
+
+    // SCROLL IMEDIATO
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+    }, 50)
+
+    // AGORA ENVIAR PARA SERVIDOR EM BACKGROUND
+    setReplySending(true)
+
     try {
-      const payload = await getReplyPayload()
-      if (!payload) return
-      setReplySending(true)
+      // Preparar payload (pode demorar com arquivos)
+      const payload = await (async () => {
+        if (messageFile) {
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => {
+              const result = reader.result as string
+              resolve(result.split(',')[1])
+            }
+            reader.onerror = reject
+            reader.readAsDataURL(messageFile)
+          })
+
+          const type = messageFile.type.startsWith("image/")
+            ? "image"
+            : messageFile.type.startsWith("video/")
+              ? "video"
+              : messageFile.type.startsWith("audio/")
+                ? "audio"
+                : "file"
+
+          return {
+            type,
+            number: selectedSessionId,
+            media_base64: base64,
+            mime_type: messageFile.type,
+            file_name: messageFile.name,
+            caption: messageText || undefined,
+          }
+        } else {
+          return {
+            type: "text",
+            number: selectedSessionId,
+            text: messageText,
+          }
+        }
+      })()
+
       const response = await serverFetch(apiUrl(`/uazapi/message/send/${clinicId}`), {
         method: "POST",
         body: payload,
       })
+
       const data = response.data
       if (!response.ok) {
+        // ERRO: REMOVER MENSAGEM OTIMISTA
+        setMessages((prev) => prev.filter(msg => msg.id !== optimisticId))
+        setConversations((prev) => prev) // Manter lista como estava
         throw new Error(data?.detail || "Erro ao enviar mensagem")
       }
-      const nowIso = new Date().toISOString()
-      if (payload.type === "text") {
-        const optimisticMessage: ChatMessage = {
-          id: `local-${nowIso}`,
-          session_id: selectedSessionId,
-          quem_enviou: "ai",
-          conteudo: payload.text || "",
-          created_at: nowIso,
-        }
-        setMessages((prev) => [...prev, optimisticMessage])
-      } else {
-        const label = mediaLabel(payload.type as ChatMediaType)
-        const optimisticMessage: ChatMessage = {
-          id: `local-${nowIso}`,
-          session_id: selectedSessionId,
-          quem_enviou: "ai",
-          conteudo: payload.caption || label,
-          created_at: nowIso,
-          media: {
-            type: payload.type as ChatMediaType,
-            mimeType: payload.mime_type,
-            fileName: payload.file_name,
-            caption: payload.caption,
-            dataUrl: payload.media_base64,
-          },
-        }
-        setMessages((prev) => [...prev, optimisticMessage])
-      }
-      setReplyText("")
-      setReplyFile(null)
+
+      // SUCESSO: Marcar mensagem como confirmada (sem limpeza automática)
+      setMessages((prev) => prev.map(msg =>
+        msg.id === optimisticId
+          ? { ...msg, id: `confirmed-${optimisticId}` }
+          : msg
+      ))
+
     } catch (err: any) {
       logger.error("Erro ao enviar resposta:", err)
-      setReplyError(err?.message || "Erro ao enviar resposta")
+      
+      // Traduzir mensagens técnicas para português amigável
+      let errorMessage = "Erro ao enviar resposta"
+      if (err?.message) {
+        const message = err.message.toLowerCase()
+        if (message.includes("body exceeded") && message.includes("mb limit")) {
+          errorMessage = "Arquivo muito grande. O limite é de 1MB. Tente um arquivo menor."
+        } else if (message.includes("network") || message.includes("fetch")) {
+          errorMessage = "Erro de conexão. Verifique sua internet e tente novamente."
+        } else if (message.includes("timeout")) {
+          errorMessage = "Tempo limite excedido. Tente novamente."
+        } else if (message.includes("unauthorized") || message.includes("401")) {
+          errorMessage = "Sessão expirada. Faça login novamente."
+        } else if (message.includes("forbidden") || message.includes("403")) {
+          errorMessage = "Sem permissão para realizar esta ação."
+        } else if (message.includes("not found") || message.includes("404")) {
+          errorMessage = "Recurso não encontrado. Tente novamente."
+        } else if (message.includes("server") || message.includes("500")) {
+          errorMessage = "Erro no servidor. Tente novamente em alguns minutos."
+        }
+      }
+      
+      setReplyError(errorMessage)
+
+      // REMOVER MENSAGEM OTIMISTA EM CASO DE ERRO
+      setMessages((prev) => prev.filter(msg => msg.id !== optimisticId))
     } finally {
       setReplySending(false)
+      // LIMPAR CAMPOS APENAS PARA ÁUDIO DIRETO (fileToSend existe)
+      if (fileToSend) {
+        setReplyText("")
+        setReplyFile(null)
+      }
     }
+  }
+
+  const handleSendReply = () => {
+    sendMessage()
   }
 
   const stopRecording = () => {
     const recorder = mediaRecorderRef.current
     if (recorder && recorder.state !== "inactive") {
+      shouldProcessAudioRef.current = false // Marcar para NÃO processar
+      recorder.stop()
+      // Limpar chunks para garantir que não há áudio
+      recordChunksRef.current = []
+    }
+    // Parar stream imediatamente
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+    setIsRecording(false)
+  }
+
+  const stopAndSendRecording = () => {
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== "inactive") {
+      shouldProcessAudioRef.current = true // Marcar para processar E enviar
       recorder.stop()
     }
   }
@@ -1024,24 +1216,41 @@ export default function ConversasPage() {
     setReplyError(null)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
       const recorder = new MediaRecorder(stream)
       recordChunksRef.current = []
+      shouldProcessAudioRef.current = false // Reset da flag
+      
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           recordChunksRef.current.push(event.data)
         }
       }
       recorder.onstop = () => {
-        const blob = new Blob(recordChunksRef.current, { type: recorder.mimeType || "audio/webm" })
-        const extension = blob.type.includes("ogg") ? "ogg" : "webm"
-        const file = new File([blob], `audio_${Date.now()}.${extension}`, { type: blob.type })
-        setReplyFile(file)
+        // Só processar se foi marcado para processar
+        if (shouldProcessAudioRef.current && recordChunksRef.current.length > 0) {
+          const blob = new Blob(recordChunksRef.current, { type: recorder.mimeType || "audio/webm" })
+          const extension = blob.type.includes("ogg") ? "ogg" : "webm"
+          const file = new File([blob], `audio_${Date.now()}.${extension}`, { type: blob.type })
+          
+          // Enviar diretamente com o arquivo, sem usar estado
+          sendMessage(file)
+        }
+        
+        // Sempre limpar estado
         setIsRecording(false)
-        stream.getTracks().forEach((track) => track.stop())
+        shouldProcessAudioRef.current = false
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop())
+          streamRef.current = null
+        }
       }
       recorder.onerror = () => {
         setIsRecording(false)
-        stream.getTracks().forEach((track) => track.stop())
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop())
+          streamRef.current = null
+        }
         setReplyError("Falha ao gravar áudio")
       }
       mediaRecorderRef.current = recorder
@@ -1112,104 +1321,105 @@ export default function ConversasPage() {
     loadSelectedLead()
   }, [loadSelectedLead])
 
-  useEffect(() => {
-    if (!clinicId) return
-    if (typeof window === "undefined") return
+  // SSE desabilitado - usando apenas Supabase Realtime
+  // useEffect(() => {
+  //   if (!clinicId) return
+  //   if (typeof window === "undefined") return
 
-    const baseUrl = apiBaseUrl || window.location.origin
-    let sseUrl = baseUrl
-    try {
-      const url = new URL(baseUrl)
-      url.pathname = `/sse/clinics/${clinicId}`
-      sseUrl = url.toString()
-    } catch (err) {
-      logger.error("Erro ao montar URL SSE:", err)
-      return
-    }
+  //   const baseUrl = apiBaseUrl || window.location.origin
+  //   let sseUrl = baseUrl
+  //   try {
+  //     const url = new URL(baseUrl)
+  //     url.pathname = `/sse/clinics/${clinicId}`
+  //     sseUrl = url.toString()
+  //   } catch (err) {
+  //     logger.error("Erro ao montar URL SSE:", err)
+  //     return
+  //   }
 
-    let eventSource: EventSource | null = null
-    let reconnectTimer: NodeJS.Timeout | null = null
+  //   let eventSource: EventSource | null = null
+  //   let reconnectTimer: NodeJS.Timeout | null = null
 
-    const connect = () => {
-      eventSource = new EventSource(sseUrl)
-      eventSource.onopen = () => {
-        logger.info("SSE conectado", { clinicId })
-      }
-      eventSource.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data)
-          if (payload?.type === "message" && payload.message) {
-            const incoming = payload.message as ChatMessage
-            const sessionId = incoming.session_id
-            setConversations((prev) => {
-              const existing = prev.find((conversation) => conversation.sessionId === sessionId)
-              const leadName = leadNameCacheRef.current.get(sessionId) ?? existing?.leadName ?? null
-              const updated: Conversation = {
-                sessionId,
-                lastMessage: incoming.conteudo,
-                lastSender: incoming.quem_enviou,
-                lastAt: incoming.created_at,
-                leadName,
-              }
-              const next = existing
-                ? prev.map((conversation) => (conversation.sessionId === sessionId ? updated : conversation))
-                : [updated, ...prev]
-              next.sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime())
-              return next
-            })
+  //   const connect = () => {
+  //     eventSource = new EventSource(sseUrl)
+  //     eventSource.onopen = () => {
+  //       logger.info("SSE conectado", { clinicId })
+  //     }
+  //     eventSource.onmessage = (event) => {
+  //       try {
+  //         const payload = JSON.parse(event.data)
+  //         if (payload?.type === "message" && payload.message) {
+  //           const incoming = payload.message as ChatMessage
+  //           const sessionId = incoming.session_id
+  //           setConversations((prev) => {
+  //             const existing = prev.find((conversation) => conversation.sessionId === sessionId)
+  //             const leadName = leadNameCacheRef.current.get(sessionId) ?? existing?.leadName ?? null
+  //             const updated: Conversation = {
+  //               sessionId,
+  //               lastMessage: incoming.conteudo,
+  //               lastSender: incoming.quem_enviou,
+  //               lastAt: incoming.created_at,
+  //               leadName,
+  //             }
+  //             const next = existing
+  //               ? prev.map((conversation) => (conversation.sessionId === sessionId ? updated : conversation))
+  //               : [updated, ...prev]
+  //             next.sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime())
+  //             return next
+  //           })
 
-            // Atualiza cache de mensagens por sessão para abrir instantâneo ao clicar.
-            setTimeout(() => {
-              const cached = messageCacheRef.current.get(sessionId)
-              const base = cached?.messages ? [...cached.messages] : []
-              const incomingKey = getMessageKey(incoming)
-              if (!base.some((msg) => getMessageKey(msg) === incomingKey)) {
-                base.push(incoming)
-                base.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-                const recent = base.slice(-50)
-                messageCacheRef.current.set(sessionId, { messages: recent, updatedAt: Date.now() })
-              }
-            }, 0)
+  //           // Atualiza cache de mensagens por sessão para abrir instantâneo ao clicar.
+  //           setTimeout(() => {
+  //             const cached = messageCacheRef.current.get(sessionId)
+  //             const base = cached?.messages ? [...cached.messages] : []
+  //             const incomingKey = getMessageKey(incoming)
+  //             if (!base.some((msg) => getMessageKey(msg) === incomingKey)) {
+  //               base.push(incoming)
+  //               base.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  //               const recent = base.slice(-50)
+  //               messageCacheRef.current.set(sessionId, { messages: recent, updatedAt: Date.now() })
+  //             }
+  //           }, 0)
 
-            if (selectedSessionId === sessionId) {
-              setMessages((prev) => {
-                const incomingKey = getMessageKey(incoming)
-                if (prev.some((msg) => getMessageKey(msg) === incomingKey)) return prev
-                const next = [...prev, incoming]
-                next.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-                return next
-              })
-              setMessagesLoading(false)
-            }
-          }
-          if (payload?.type === "lead" && payload.telefone) {
-            leadNameCacheRef.current.set(payload.telefone, payload.nome ?? null)
-            setConversations((prev) =>
-              prev.map((conversation) =>
-                conversation.sessionId === payload.telefone
-                  ? { ...conversation, leadName: payload.nome ?? null }
-                  : conversation
-              )
-            )
-          }
-        } catch (err) {
-          logger.error("Erro ao processar SSE payload:", err)
-        }
-      }
-      eventSource.onerror = (event) => {
-        logger.warn("SSE desconectado", { clinicId, event })
-        eventSource?.close()
-        reconnectTimer = setTimeout(connect, 3000)
-      }
-    }
+  //           if (selectedSessionId === sessionId) {
+  //             setMessages((prev) => {
+  //               const incomingKey = getMessageKey(incoming)
+  //               if (prev.some((msg) => getMessageKey(msg) === incomingKey)) return prev
+  //               const next = [...prev, incoming]
+  //               next.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  //               return next
+  //             })
+  //             setMessagesLoading(false)
+  //           }
+  //         }
+  //         if (payload?.type === "lead" && payload.telefone) {
+  //           leadNameCacheRef.current.set(payload.telefone, payload.nome ?? null)
+  //           setConversations((prev) =>
+  //             prev.map((conversation) =>
+  //               conversation.sessionId === payload.telefone
+  //                 ? { ...conversation, leadName: payload.nome ?? null }
+  //                 : conversation
+  //             )
+  //           )
+  //         }
+  //       } catch (err) {
+  //         logger.error("Erro ao processar SSE payload:", err)
+  //       }
+  //     }
+  //     eventSource.onerror = (event) => {
+  //       logger.warn("SSE desconectado", { clinicId, event })
+  //       eventSource?.close()
+  //       reconnectTimer = setTimeout(connect, 3000)
+  //     }
+  //   }
 
-    connect()
+  //   connect()
 
-    return () => {
-      if (reconnectTimer) clearTimeout(reconnectTimer)
-      eventSource?.close()
-    }
-  }, [clinicId, apiBaseUrl, selectedSessionId])
+  //   return () => {
+  //     if (reconnectTimer) clearTimeout(reconnectTimer)
+  //     eventSource?.close()
+  //   }
+  // }, [clinicId, apiBaseUrl, selectedSessionId])
 
   const messagesLoadingRef = useRef(false)
 
@@ -1230,7 +1440,18 @@ export default function ConversasPage() {
       const hasCache = Boolean(cacheEntry && cacheEntry.messages.length)
 
       if (hasCache) {
-        setMessages(cacheEntry!.messages)
+        setMessages((prev) => {
+          // Preservar mensagens otimistas/confirmadas ao carregar cache
+          const optimisticMessages = prev.filter(msg =>
+            msg.id.startsWith('optimistic-') || msg.id.startsWith('confirmed-')
+          )
+
+          // Combinar cache com mensagens otimistas
+          const combined = [...cacheEntry!.messages, ...optimisticMessages]
+          combined.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+          return combined
+        })
+
         if (!silent) setMessagesLoading(false)
         if (cacheFresh) {
           messagesLoadingRef.current = false
@@ -1264,15 +1485,33 @@ export default function ConversasPage() {
           const ordered = (data || []).slice().reverse().map((row: any) => normalizeStoredMessage(row))
           setMessages((prev) => {
             if (selectedSessionRef.current !== selectedSessionId) return prev
+
+            // Preservar mensagens otimistas/confirmadas
+            const optimisticMessages = prev.filter(msg =>
+              msg.id.startsWith('optimistic-') || msg.id.startsWith('confirmed-')
+            )
+
             const map = new Map<string, ChatMessage>()
+            // Adicionar mensagens do banco
             for (const msg of ordered) map.set(msg.id, msg)
+            // Adicionar mensagens existentes (incluindo otimistas)
             for (const msg of prev) {
               if (!map.has(msg.id)) map.set(msg.id, msg)
             }
+
             const merged = Array.from(map.values())
             merged.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
             const recent = merged.slice(-50)
-            messageCacheRef.current.set(selectedSessionId, { messages: recent, updatedAt: Date.now() })
+
+            // Salvar no cache apenas mensagens não-otimistas
+            const nonOptimistic = recent.filter(msg =>
+              !msg.id.startsWith('optimistic-') && !msg.id.startsWith('confirmed-')
+            )
+            messageCacheRef.current.set(selectedSessionId, {
+              messages: nonOptimistic,
+              updatedAt: Date.now()
+            })
+
             return recent
           })
           if (!silent && selectedSessionRef.current === selectedSessionId) setMessagesLoading(false)
@@ -1533,9 +1772,10 @@ export default function ConversasPage() {
 
   useEffect(() => {
     if (!clinicId || !selectedSessionId) return
+    // Reduzir frequência para não interferir com mensagens otimistas
     const interval = setInterval(() => {
       loadMessages({ silent: true })
-    }, 1000)
+    }, 5000) // Mudou de 1s para 5s
     return () => clearInterval(interval)
   }, [clinicId, selectedSessionId, loadMessages])
 
@@ -1818,17 +2058,44 @@ export default function ConversasPage() {
                         }}
                       />
                     </label>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={isRecording ? "destructive" : "outline"}
-                      onClick={isRecording ? stopRecording : startRecording}
-                      disabled={replySending || !selectedSessionId}
-                      className="gap-2"
-                    >
-                      {isRecording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                      {isRecording ? "Parar" : "Gravar"}
-                    </Button>
+                    {isRecording ? (
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={stopRecording}
+                          disabled={replySending}
+                          className="gap-2"
+                        >
+                          <Square className="h-4 w-4" />
+                          Cancelar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="default"
+                          onClick={stopAndSendRecording}
+                          disabled={replySending}
+                          className="gap-2"
+                        >
+                          <Send className="h-4 w-4" />
+                          Enviar
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={startRecording}
+                        disabled={replySending || !selectedSessionId}
+                        className="gap-2 hover:text-black"
+                      >
+                        <Mic className="h-4 w-4" />
+                        Gravar
+                      </Button>
+                    )}
                     <div className="flex-1">
                       <input
                         className="w-full rounded-lg border border-border/70 bg-background px-3 py-2 text-sm outline-none transition focus:border-primary/60"
