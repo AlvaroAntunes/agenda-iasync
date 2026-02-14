@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
-import { Loader2, RefreshCw, Pause, Play, Mic, Square, Plus, Send } from "lucide-react"
+import { Loader2, RefreshCw, Pause, Play, Mic, Square, Plus, Send, Paperclip } from "lucide-react"
 import { ClinicLoading } from "@/components/ClinicLoading"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -1801,7 +1801,7 @@ export default function ConversasPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Conversas</CardTitle>
               <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-                <Button size="sm" onClick={() => setNewConversationOpen(true)} className="w-full sm:w-auto">
+                <Button size="sm" onClick={() => setNewConversationOpen(true)} className="w-full sm:w-auto bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all hover:scale-[1.02]">
                   <Plus className="mr-2 h-4 w-4" />
                   Nova conversa
                 </Button>
@@ -1889,7 +1889,7 @@ export default function ConversasPage() {
                   {selectedConversation?.leadName || selectedConversation?.sessionId || "Selecione"}
                 </div>
               </div>
-              <Badge variant={displayUazapiStatus === "connected" ? "default" : "secondary"}>
+              <Badge className="bg-cyan-600" variant={displayUazapiStatus === "connected" ? "default" : "secondary"}>
                 {displayUazapiStatus === "connected"
                   ? "Conectado"
                   : displayUazapiStatus === "connecting"
@@ -2039,13 +2039,109 @@ export default function ConversasPage() {
               )}
               {uazapiStatus === "connected" && (
                 <div className="mt-4 border-t border-border/70 pt-3">
-                  <div className="flex items-center gap-2">
+                  {/* LAYOUT MOBILE (< sm) - 2 linhas */}
+                  <div className="sm:hidden">
+                    {/* LINHA 1: INPUT PRINCIPAL */}
+                    <div className="mb-3">
+                      <input
+                        className="w-full rounded-lg border border-border/70 bg-background px-3 py-2 text-sm outline-none transition focus:border-primary/60"
+                        placeholder="Digite uma mensagem..."
+                        value={replyText}
+                        onChange={(event) => setReplyText(event.target.value)}
+                        disabled={replySending || !selectedSessionId}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && !event.shiftKey) {
+                            event.preventDefault()
+                            handleSendReply()
+                          }
+                        }}
+                      />
+                    </div>
+                    
+                    {/* LINHA 2: BOTÕES DE AÇÃO */}
+                    <div className="flex items-center gap-2">
+                      {/* Botão Anexo */}
+                      <label
+                        className={cn(
+                          "rounded-lg border border-border/70 px-3 py-2 text-xs text-muted-foreground transition flex-shrink-0",
+                          replySending || isRecording ? "opacity-60" : "cursor-pointer hover:border-primary/60"
+                        )}
+                      >
+                        <Paperclip className="h-4 w-4" />
+                        <input
+                          type="file"
+                          accept="image/*,video/*,audio/*"
+                          className="hidden"
+                          disabled={replySending || isRecording}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] || null
+                            setReplyFile(file)
+                          }}
+                        />
+                      </label>
+
+                      {/* Botões de Gravação */}
+                      {isRecording ? (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            onClick={stopRecording}
+                            disabled={replySending}
+                            className="flex-shrink-0"
+                          >
+                            <Square className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="default"
+                            onClick={stopAndSendRecording}
+                            disabled={replySending}
+                            className="flex-shrink-0"
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={startRecording}
+                          disabled={replySending || !selectedSessionId}
+                          className="flex-shrink-0"
+                        >
+                          <Mic className="h-4 w-4" />
+                        </Button>
+                      )}
+
+                      {/* Botão Enviar Principal */}
+                      <Button
+                        size="sm"
+                        onClick={handleSendReply}
+                        disabled={replySending || !selectedSessionId || (!replyText.trim() && !replyFile)}
+                        className="ml-auto flex-shrink-0"
+                      >
+                        {replySending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* LAYOUT DESKTOP (>= sm) - Layout original em linha única */}
+                  <div className="hidden sm:flex items-center gap-2">
                     <label
                       className={cn(
-                        "rounded-lg border border-border/70 px-3 py-2 text-xs text-muted-foreground transition",
+                        "flex items-center gap-2 rounded-lg border border-border/70 px-3 py-2 text-xs text-muted-foreground transition",
                         replySending || isRecording ? "opacity-60" : "cursor-pointer hover:border-primary/60"
                       )}
                     >
+                      <Paperclip className="h-3 w-3" />
                       Anexo
                       <input
                         type="file"
@@ -2069,7 +2165,7 @@ export default function ConversasPage() {
                           className="gap-2"
                         >
                           <Square className="h-4 w-4" />
-                          Cancelar
+                          Parar
                         </Button>
                         <Button
                           type="button"
@@ -2090,7 +2186,7 @@ export default function ConversasPage() {
                         variant="outline"
                         onClick={startRecording}
                         disabled={replySending || !selectedSessionId}
-                        className="gap-2 hover:text-black"
+                        className="gap-2"
                       >
                         <Mic className="h-4 w-4" />
                         Gravar
@@ -2162,7 +2258,7 @@ export default function ConversasPage() {
                       </div>
                     </div>
                     <Switch
-                      className="cursor-pointer"
+                      className="data-[state=checked]:bg-cyan-600 cursor-pointer"
                       checked={Boolean(selectedLead?.status_ia)}
                       onCheckedChange={(checked) => handleToggleLeadIA(checked)}
                       disabled={!selectedLead || leadIaUpdating || leadInfoLoading}
@@ -2243,12 +2339,12 @@ export default function ConversasPage() {
                     setNewConversationMode(value as "lead" | "number")
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="cursor-pointer">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="lead">Lead</SelectItem>
-                    <SelectItem value="number">Número</SelectItem>
+                    <SelectItem className="cursor-pointer" value="lead">Lead</SelectItem>
+                    <SelectItem className="cursor-pointer" value="number">Número</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2257,12 +2353,12 @@ export default function ConversasPage() {
                 <div className="grid gap-2">
                   <span className="text-sm text-muted-foreground">Selecione o lead</span>
                   <Select value={selectedLeadId} onValueChange={setSelectedLeadId}>
-                    <SelectTrigger>
+                    <SelectTrigger className="cursor-pointer">
                       <SelectValue placeholder="Escolha um lead" />
                     </SelectTrigger>
                     <SelectContent>
                       {leadOptions.map((lead) => (
-                        <SelectItem key={lead.id} value={lead.id}>
+                        <SelectItem className="cursor-pointer" key={lead.id} value={lead.id}>
                           {lead.nome || "Sem nome"} • {lead.telefone}
                         </SelectItem>
                       ))}
@@ -2300,10 +2396,11 @@ export default function ConversasPage() {
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setNewConversationOpen(false)}>
+              <Button className="border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-500 transition-colors" variant="outline" onClick={() => setNewConversationOpen(false)}>
                 Cancelar
               </Button>
               <Button
+                className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 font-semibold"
                 onClick={startNewConversation}
                 disabled={
                   startingConversation ||
