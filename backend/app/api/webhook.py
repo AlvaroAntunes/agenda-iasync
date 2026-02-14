@@ -725,11 +725,20 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
 
         # 5. Extração do Conteúdo (Texto ou Mídia)
         msg_type = _pick_first(message.get("messageType"), message.get("type"), payload.get("messageType"))
+        print(f"🔍 Debug - msg_type: {msg_type}")
+        
         texto_usuario = ""
         texto_ia = ""
+        
         content = _parse_json_if_string(message.get("content"))
+        print(f"🔍 Debug - content: {content}")
+        print(f"🔍 Debug - content type: {type(content)}")
+        
         inner_message = message.get("message") if isinstance(message.get("message"), dict) else {}
+        print(f"🔍 Debug - inner_message: {inner_message}")
+        
         nested_content_message = content.get("message") if isinstance(content, dict) else {}
+        print(f"🔍 Debug - nested_content_message: {nested_content_message}")
         content_dict = content if isinstance(content, dict) else {}
         content_text = None
         if isinstance(content, str):
@@ -737,8 +746,15 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         elif isinstance(content, dict):
             content_text = _pick_first(content.get("text"), content.get("conversation"), content.get("message"))
         text_candidate = _pick_first(message.get("text"), message.get("conversation"), content_text)
+        
+        print(f"🔍 Debug - Antes de inferir media_type")
+        print(f"🔍 Debug - content_dict: {content_dict}")
+        
         media_type = _infer_media_type(message, inner_message, content_dict, nested_content_message, payload)
+        print(f"🔍 Debug - media_type inferido: {media_type}")
+        
         raw_type = (msg_type or "").lower()
+        print(f"🔍 Debug - raw_type: {raw_type}")
         is_text_type = raw_type in {"conversation", "text", "extendedtextmessage"}
         if not media_type:
             media_type = _infer_media_type_from_string(raw_type)
