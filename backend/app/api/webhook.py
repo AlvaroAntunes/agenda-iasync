@@ -653,6 +653,10 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         uazapi_token = payload.get("token")
         message = _normalize_uazapi_message(payload)
         
+        print(f"🔍 Debug - Token: {uazapi_token}")
+        print(f"🔍 Debug - Message: {message}")
+        print(f"🔍 Debug - Message type: {type(message)}")
+        
         if not uazapi_token:
             return {"status": "no_instance_id"}
         if not message:
@@ -714,6 +718,10 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         lid = _pick_first(message.get("sender"), message.get("from"), raw_chatid)
 
         print(f"📩 Webhook Uazapi: Clínica {clinic_id} | Cliente: {telefone_cliente}")
+
+        # Debug adicional
+        print(f"🔍 Debug - Message ID: {message_id}")
+        print(f"🔍 Debug - LID: {lid}")
 
         # 5. Extração do Conteúdo (Texto ou Mídia)
         msg_type = _pick_first(message.get("messageType"), message.get("type"), payload.get("messageType"))
@@ -836,25 +844,34 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
             if media_type == "audio":
                 print("🎧 Áudio detectado (Uazapi)...")
                 
-                # Transcrever o áudio
-                audio_service = AudioService()
-                texto_transcrito = audio_service.transcrever_audio_uazapi(
-                    uazapi_token,  # Token da Instância
-                    message_id     # ID da Mensagem
-                )
+                # Verificar se temos message_id necessário para transcrição
+                if not message_id:
+                    print("⚠️ Message ID não encontrado para transcrição de áudio")
+                    return {"status": "audio_no_message_id"}
                 
-                if not texto_transcrito:
-                    # Se não conseguiu transcrever, envia mensagem de erro e para por aqui
-                    enviar_mensagem_whatsapp(
-                        uazapi_token, 
-                        telefone_cliente, 
-                        "Não consegui entender o áudio. Pode escrever, por favor?"
+                # Transcrever o áudio
+                try:
+                    audio_service = AudioService()
+                    texto_transcrito = audio_service.transcrever_audio_uazapi(
+                        uazapi_token,  # Token da Instância
+                        message_id     # ID da Mensagem
                     )
-                    return {"status": "audio_error"}
-                else:
-                    # Se transcreveu, usa o texto para processamento da IA
-                    texto_usuario = texto_transcrito
-                    texto_ia = texto_transcrito
+                    
+                    if not texto_transcrito:
+                        # Se não conseguiu transcrever, envia mensagem de erro e para por aqui
+                        enviar_mensagem_whatsapp(
+                            uazapi_token, 
+                            telefone_cliente, 
+                            "Não consegui entender o áudio. Pode escrever, por favor?"
+                        )
+                        return {"status": "audio_error"}
+                    else:
+                        # Se transcreveu, usa o texto para processamento da IA
+                        texto_usuario = texto_transcrito
+                        texto_ia = texto_transcrito
+                except Exception as audio_err:
+                    print(f"❌ Erro na transcrição de áudio: {audio_err}")
+                    return {"status": "audio_transcription_error"}
             else:
                 # Outras mídias (imagem, vídeo, arquivo) apenas logar
                 texto_usuario = ""
