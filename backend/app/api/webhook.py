@@ -19,6 +19,7 @@ from app.services.tasks import processar_mensagem_ia
 from app.services.history_service import HistoryService
 from app.services.buffer_service import BufferService
 from app.services.audio_service import AudioService
+from app.services.image_service import ImageService
 from app.core.database import get_supabase
 from app.core.rate_limiter import rate_limiter
 
@@ -923,8 +924,39 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                 except Exception as audio_err:
                     print(f"❌ Erro na transcrição de áudio: {audio_err}")
                     return {"status": "audio_transcription_error"}
+            elif media_type == "image":
+                print("🖼️ Imagem detectada (Uazapi)...")
+                
+                # Verificar se temos message_id necessário para análise da imagem
+                if not message_id:
+                    print("⚠️ Message ID não encontrado para análise de imagem")
+                    return {"status": "image_no_message_id"}
+                
+                # Analisar a imagem
+                try:
+                    image_service = ImageService()
+                    analise_imagem = image_service.analisar_imagem_uazapi(
+                        uazapi_token,  # Token da Instância
+                        message_id     # ID da Mensagem
+                    )
+                    
+                    if not analise_imagem:
+                        # Se a imagem não for relacionada ao contexto de clínicas, ignora
+                        print("🚫 Imagem fora do contexto de clínicas - ignorando")
+                        return {"status": "image_ignored"}
+                    else:
+                        # Se a imagem for relevante, usa a análise para processamento da IA
+                        texto_usuario = f"[Imagem enviada] {analise_imagem}"
+                        texto_ia = f"Análise da imagem: {analise_imagem}"
+                        # Força o media_type como None para que seja processado como texto
+                        media_type = None
+                        print(f"🎯 Imagem analisada com sucesso: {analise_imagem} - Convertendo para processamento de texto")
+                        
+                except Exception as image_err:
+                    print(f"❌ Erro na análise da imagem: {image_err}")
+                    return {"status": "image_analysis_error"}
             else:
-                # Outras mídias (imagem, vídeo, arquivo) apenas logar
+                # Outras mídias (vídeo, arquivo) apenas logar
                 texto_usuario = ""
                 texto_ia = ""
         elif text_candidate:
