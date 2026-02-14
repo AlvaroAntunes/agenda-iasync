@@ -161,7 +161,7 @@ export default function CalendarPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        router.push('/login/clinic')
+        router.push('/login')
         return
       }
 
@@ -174,7 +174,7 @@ export default function CalendarPage() {
           .single()
 
         if (!profile || !profile.clinic_id) {
-          router.push('/login/clinic')
+          router.push('/login')
           return
         }
 
@@ -472,7 +472,7 @@ export default function CalendarPage() {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     setClinicData(null)
-    router.push('/login/clinic')
+    router.push('/login')
   }
 
 
@@ -969,7 +969,7 @@ export default function CalendarPage() {
           </p>
           <div className="flex justify-end gap-2 mt-4">
             <Button className="rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-500 transition-colors" onClick={() => setEventToDelete(null)} disabled={loadingEvents}>Cancelar</Button>
-            <Button variant="destructive" onClick={confirmDelete} disabled={loadingEvents}>
+            <Button className="!bg-red-600 hover:!bg-red-700 text-white" variant="destructive" onClick={confirmDelete} disabled={loadingEvents}>
               {loadingEvents ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -130,7 +130,7 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
-        router.push('/login/clinic')
+        router.push('/login')
         return
       }
 

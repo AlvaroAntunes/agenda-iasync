@@ -230,7 +230,7 @@ export default function ClinicDashboard() {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
-        router.push('/login/clinic')
+        router.push('/login')
         return
       }
 
@@ -241,7 +241,7 @@ export default function ClinicDashboard() {
         .single()
 
       if (!profile || !profile.clinic_id || profile.role !== 'clinic_admin') {
-        router.push('/login/clinic')
+        router.push('/login')
         return
       }
 
@@ -279,7 +279,7 @@ export default function ClinicDashboard() {
       await loadAppointments(profile.clinic_id)
     } catch (error) {
       logger.error('Erro ao carregar dados:', error)
-      router.push('/login/clinic')
+      router.push('/login')
     } finally {
       setLoading(false)
     }

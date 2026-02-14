@@ -146,7 +146,7 @@ export default function AdminLoginPage() {
         <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground">
             Acesso para clínicas?{" "}
-            <Link href="/login/clinic" className="text-primary hover:underline font-medium">
+            <Link href="/login" className="text-primary hover:underline font-medium">
               Clique aqui
             </Link>
           </p>

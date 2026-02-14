@@ -69,7 +69,7 @@ export default function ConsultasPage() {
         try {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) {
-                router.push('/login/clinic')
+                router.push('/login')
                 return
             }
 
@@ -81,7 +81,7 @@ export default function ConsultasPage() {
                     .single()
 
                 if (!profile || !profile.clinic_id) {
-                    router.push('/login/clinic')
+                    router.push('/login')
                     return
                 }
 
@@ -186,7 +186,7 @@ export default function ConsultasPage() {
     const handleSignOut = async () => {
         await supabase.auth.signOut()
         setClinicData(null)
-        router.push('/login/clinic')
+        router.push('/login')
     }
 
     // Helper function to remove accents for search

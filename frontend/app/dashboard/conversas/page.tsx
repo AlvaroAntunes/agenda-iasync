@@ -373,7 +373,7 @@ export default function ConversasPage() {
         } = await supabase.auth.getUser()
 
         if (!user) {
-          router.push("/login/clinic")
+          router.push("/login")
           return
         }
 
@@ -384,7 +384,7 @@ export default function ConversasPage() {
           .single()
 
         if (error || !profile || profile.role !== "clinic_admin" || !profile.clinic_id) {
-          router.push("/login/clinic")
+          router.push("/login")
           return
         }
 
@@ -404,7 +404,7 @@ export default function ConversasPage() {
         }
       } catch (err) {
         logger.error("Erro ao validar sessão:", err)
-        router.push("/login/clinic")
+        router.push("/login")
       } finally {
         setAuthLoading(false)
       }
