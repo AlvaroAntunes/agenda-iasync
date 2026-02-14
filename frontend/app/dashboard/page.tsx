@@ -1043,7 +1043,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <Button onClick={() => router.push("/dashboard/conversas")} className="gap-2">
+                <Button onClick={() => router.push("/dashboard/conversas")} className="gap-2 bg-cyan-600 text-white hover:bg-cyan-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all">
                   Ir para conversas
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -1059,7 +1059,8 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                   </Button>
                 ) : (
                   <Button
-                    variant="secondary"
+                    className="hover:text-black"
+                    variant="outline"
                     onClick={() => {
                       if (clinicData?.id) {
                         window.location.href = `${process.env.NEXT_PUBLIC_URL_SITE!}/auth/login?clinic_id=${clinicData.id}`
@@ -1117,7 +1118,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                   </p>
                 </div>
                 <Switch
-                  className="cursor-pointer"
+                  className="data-[state=checked]:bg-cyan-600 cursor-pointer"
                   checked={clinicData?.ia_ativa ?? false}
                   onCheckedChange={handleToggleIA}
                 />
@@ -1126,6 +1127,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">WhatsApp</p>
                   <Badge
+                    className="bg-cyan-600 text-white"
                     variant={(uazapiStatus === "connected") ? "default" : "secondary"}
                   >
                     {uazapiStatus === "connected"
@@ -1151,7 +1153,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                 variant="ghost"
                 onClick={handleRefreshUazapiStatus}
                 disabled={uazapiLoading}
-                className="w-full justify-center gap-2 [&:hover]:!bg-primary/40"
+                className="w-full justify-center gap-2 [&:hover]:!bg-cyan-600"
               >
                 <RefreshCw className={uazapiLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
                 Atualizar status
@@ -1185,7 +1187,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                   {uazapiStatus === "connected" ? null : (
                     <>
                       <Button
-                        className="[&:disabled:hover]:!bg-primary [&:disabled:hover]:!opacity-50"  
+                        className="bg-cyan-600 text-white [&:not(disabled):hover]:!bg-cyan-700 [&:disabled]:!bg-primary [&:disabled:hover]:!bg-primary [&:disabled:hover]:!opacity-50"  
                         onClick={handleCreateUazapiInstance}
                         disabled={
                           uazapiLoading ||
@@ -1198,7 +1200,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                       </Button>
                       <Button
                         variant="ghost"
-                        className="bg-black text-white [&:not(disabled):hover]:!bg-primary/40 [&:disabled:hover]:!bg-black [&:disabled:hover]:!opacity-50"
+                        className="bg-cyan-600 text-white [&:not(disabled):hover]:!bg-cyan-700 [&:disabled]:!bg-primary [&:disabled:hover]:!bg-primary [&:disabled:hover]:!opacity-50"
                         onClick={() => handleConnectUazapi()}
                         disabled={uazapiLoading || uazapiStatus === "not_configured"}
                       >
@@ -1208,7 +1210,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                     </>
                   )}
                   <Button
-                    className="[&:not(disabled):hover]:!bg-primary/40 [&:disabled:hover]:!bg-transparent [&:disabled:hover]:!text-primary"
+                    className="[&:not(disabled):hover]:!bg-cyan-600 [&:disabled:hover]:!bg-transparent [&:disabled:hover]:!text-primary"
                     variant="ghost"
                     onClick={handleDeleteUazapiInstance}
                     disabled={uazapiLoading || uazapiStatus === "not_configured"}
@@ -1233,7 +1235,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                   {newConversationsLoading ? "..." : newConversationsCount}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Novas conversas iniciadas hoje</p>
-                <Button className="mt-3" onClick={() => router.push("/dashboard/conversas")}>
+                <Button className="mt-3 bg-cyan-600 text-white hover:bg-cyan-700 shadow-lg shadow-cyan-500/20 font-semibold transition-all" onClick={() => router.push("/dashboard/conversas")}>
                   Ir para conversas
                 </Button>
               </div>

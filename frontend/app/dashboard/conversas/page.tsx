@@ -1889,7 +1889,7 @@ export default function ConversasPage() {
                   {selectedConversation?.leadName || selectedConversation?.sessionId || "Selecione"}
                 </div>
               </div>
-              <Badge className="bg-cyan-600" variant={displayUazapiStatus === "connected" ? "default" : "secondary"}>
+              <Badge className="bg-cyan-600 text-white" variant={displayUazapiStatus === "connected" ? "default" : "secondary"}>
                 {displayUazapiStatus === "connected"
                   ? "Conectado"
                   : displayUazapiStatus === "connecting"
