@@ -755,10 +755,18 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         
         raw_type = (msg_type or "").lower()
         print(f"🔍 Debug - raw_type: {raw_type}")
+        
+        print(f"🔍 Debug - Iniciando processamento is_text_type")
         is_text_type = raw_type in {"conversation", "text", "extendedtextmessage"}
+        print(f"🔍 Debug - is_text_type: {is_text_type}")
+        
         if not media_type:
+            print(f"🔍 Debug - Inferindo media_type from string")
             media_type = _infer_media_type_from_string(raw_type)
+            print(f"🔍 Debug - media_type after string inference: {media_type}")
+            
         if not media_type and raw_type:
+            print(f"🔍 Debug - Verificando raw_type específicos")
             if raw_type in {"audiomessage", "audio"}:
                 media_type = "audio"
             elif raw_type in {"imagemessage", "image"}:
@@ -767,51 +775,74 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                 media_type = "video"
             elif raw_type in {"documentmessage", "document", "file"}:
                 media_type = "file"
+            print(f"🔍 Debug - media_type after raw_type check: {media_type}")
 
-        media_mime = _pick_first(
-            message.get("mimetype"),
-            message.get("mimeType"),
-            message.get("contentType"),
-            content_dict.get("mimetype"),
-            content_dict.get("mimeType"),
-            content_dict.get("contentType"),
-            message.get("content", {}).get("mimetype") if isinstance(message.get("content"), dict) else None,
-            message.get("content", {}).get("mimeType") if isinstance(message.get("content"), dict) else None,
-            message.get("message", {}).get("content", {}).get("mimetype") if isinstance(message.get("message"), dict) and isinstance(message.get("message", {}).get("content"), dict) else None,
-            message.get("message", {}).get("content", {}).get("mimeType") if isinstance(message.get("message"), dict) and isinstance(message.get("message", {}).get("content"), dict) else None,
-            payload.get("body", {}).get("message", {}).get("content", {}).get("mimetype")
-            if isinstance(payload.get("body"), dict)
-            else None,
-            payload.get("body", {}).get("message", {}).get("content", {}).get("mimeType")
-            if isinstance(payload.get("body"), dict)
-            else None,
-            content_dict.get("audioMessage", {}).get("mimetype") if isinstance(content_dict.get("audioMessage"), dict) else None,
-            content_dict.get("imageMessage", {}).get("mimetype") if isinstance(content_dict.get("imageMessage"), dict) else None,
-            content_dict.get("videoMessage", {}).get("mimetype") if isinstance(content_dict.get("videoMessage"), dict) else None,
-            content_dict.get("documentMessage", {}).get("mimetype") if isinstance(content_dict.get("documentMessage"), dict) else None,
-            inner_message.get("mimetype") if isinstance(inner_message, dict) else None,
-            inner_message.get("mimeType") if isinstance(inner_message, dict) else None,
-            inner_message.get("contentType") if isinstance(inner_message, dict) else None,
-            inner_message.get("audioMessage", {}).get("mimetype") if isinstance(inner_message.get("audioMessage"), dict) else None,
-            inner_message.get("imageMessage", {}).get("mimetype") if isinstance(inner_message.get("imageMessage"), dict) else None,
-            inner_message.get("videoMessage", {}).get("mimetype") if isinstance(inner_message.get("videoMessage"), dict) else None,
-            inner_message.get("documentMessage", {}).get("mimetype") if isinstance(inner_message.get("documentMessage"), dict) else None,
-            nested_content_message.get("audioMessage", {}).get("mimetype") if isinstance(nested_content_message.get("audioMessage"), dict) else None,
-            nested_content_message.get("imageMessage", {}).get("mimetype") if isinstance(nested_content_message.get("imageMessage"), dict) else None,
-            nested_content_message.get("videoMessage", {}).get("mimetype") if isinstance(nested_content_message.get("videoMessage"), dict) else None,
-            nested_content_message.get("documentMessage", {}).get("mimetype") if isinstance(nested_content_message.get("documentMessage"), dict) else None,
-        )
-        media_file_name = _pick_first(
-            message.get("fileName"),
-            message.get("filename"),
-            message.get("name"),
-            content_dict.get("fileName"),
-            content_dict.get("filename"),
-            content_dict.get("name"),
-            inner_message.get("fileName") if isinstance(inner_message, dict) else None,
-            inner_message.get("filename") if isinstance(inner_message, dict) else None,
-            inner_message.get("name") if isinstance(inner_message, dict) else None,
-        )
+        print(f"🔍 Debug - Iniciando extração media_mime")
+
+        print(f"🔍 Debug - Iniciando extração media_mime")
+        try:
+            media_mime = _pick_first(
+                message.get("mimetype"),
+                message.get("mimeType"),
+                message.get("contentType"),
+                content_dict.get("mimetype"),
+                content_dict.get("mimeType"),
+                content_dict.get("contentType"),
+                message.get("content", {}).get("mimetype") if isinstance(message.get("content"), dict) else None,
+                message.get("content", {}).get("mimeType") if isinstance(message.get("content"), dict) else None,
+            )
+            print(f"🔍 Debug - media_mime extraído com sucesso: {media_mime}")
+        except Exception as mime_err:
+            print(f"❌ Erro na extração de media_mime (parte 1): {mime_err}")
+            media_mime = None
+
+        print(f"🔍 Debug - Continuando extração media_mime (parte 2)")
+        try:
+            if media_mime is None:
+                media_mime = _pick_first(
+                    message.get("message", {}).get("content", {}).get("mimetype") if isinstance(message.get("message"), dict) and isinstance(message.get("message", {}).get("content"), dict) else None,
+                    message.get("message", {}).get("content", {}).get("mimeType") if isinstance(message.get("message"), dict) and isinstance(message.get("message", {}).get("content"), dict) else None,
+                )
+            print(f"🔍 Debug - media_mime após parte 2: {media_mime}")
+        except Exception as mime_err2:
+            print(f"❌ Erro na extração de media_mime (parte 2): {mime_err2}")
+
+        print(f"🔍 Debug - Continuando extração media_mime (parte 3)")
+        try:
+            if media_mime is None:
+                payload_body = payload.get("body")
+                if isinstance(payload_body, dict):
+                    body_message = payload_body.get("message")
+                    if isinstance(body_message, dict):
+                        body_content = body_message.get("content")
+                        if isinstance(body_content, dict):
+                            media_mime = _pick_first(
+                                body_content.get("mimetype"),
+                                body_content.get("mimeType"),
+                            )
+            print(f"🔍 Debug - media_mime após parte 3: {media_mime}")
+        except Exception as mime_err3:
+            print(f"❌ Erro na extração de media_mime (parte 3): {mime_err3}")
+
+        print(f"🔍 Debug - Iniciando extração media_file_name")
+        try:
+            media_file_name = _pick_first(
+                message.get("fileName"),
+                message.get("filename"),
+                message.get("name"),
+                content_dict.get("fileName"),
+                content_dict.get("filename"),
+                content_dict.get("name"),
+                inner_message.get("fileName") if isinstance(inner_message, dict) else None,
+                inner_message.get("filename") if isinstance(inner_message, dict) else None,
+                inner_message.get("name") if isinstance(inner_message, dict) else None,
+            )
+            print(f"🔍 Debug - media_file_name extraído: {media_file_name}")
+        except Exception as filename_err:
+            print(f"❌ Erro na extração de media_file_name: {filename_err}")
+            media_file_name = None
+            
+        print(f"🔍 Debug - Continuando com verificações de media_type")
         if not media_type:
             media_type = _infer_media_type_from_string(media_mime)
         if not media_type:
