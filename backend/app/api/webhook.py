@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from app.services.tasks import processar_mensagem_ia
 from app.services.history_service import HistoryService
 from app.services.buffer_service import BufferService
+from app.services.audio_service import AudioService
 from app.core.database import get_supabase
 from app.core.rate_limiter import rate_limiter
 
@@ -569,6 +570,24 @@ def delete_uazapi_instance(clinic_id: str):
 
     return {"status": "deleted"}
 
+def enviar_mensagem_whatsapp(token: str, number: str, text: str):
+    """Função auxiliar para enviar mensagem de texto via Uazapi"""
+    try:
+        url = f"{UAZAPI_URL}/send/text"
+        payload = {
+            "number": number,
+            "text": text,
+            "readmessages": True,
+            "delay": 0,
+            "presence": "composing",
+            "linkPreview": False,
+        }
+        response = requests.post(url, json=payload, headers=get_uazapi_headers(token))
+        return response.status_code in [200, 201]
+    except Exception as e:
+        print(f"❌ Erro ao enviar mensagem WhatsApp: {e}")
+        return False
+
 async def esperar_e_processar(clinic_id: str, telefone_cliente: str, token_instancia: str, lid: str):
     """
     Função assíncrona que aguarda o tempo do buffer e depois dispara o processamento.
@@ -816,8 +835,30 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
         elif media_type:
             if media_type == "audio":
                 print("🎧 Áudio detectado (Uazapi)...")
-            texto_usuario = ""
-            texto_ia = ""
+                
+                # Transcrever o áudio
+                audio_service = AudioService()
+                texto_transcrito = audio_service.transcrever_audio_uazapi(
+                    uazapi_token,  # Token da Instância
+                    message_id     # ID da Mensagem
+                )
+                
+                if not texto_transcrito:
+                    # Se não conseguiu transcrever, envia mensagem de erro e para por aqui
+                    enviar_mensagem_whatsapp(
+                        uazapi_token, 
+                        telefone_cliente, 
+                        "Não consegui entender o áudio. Pode escrever, por favor?"
+                    )
+                    return {"status": "audio_error"}
+                else:
+                    # Se transcreveu, usa o texto para processamento da IA
+                    texto_usuario = texto_transcrito
+                    texto_ia = texto_transcrito
+            else:
+                # Outras mídias (imagem, vídeo, arquivo) apenas logar
+                texto_usuario = ""
+                texto_ia = ""
         elif text_candidate:
             texto_usuario = text_candidate
             texto_ia = texto_usuario
