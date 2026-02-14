@@ -917,6 +917,9 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks):
                         texto_usuario = texto_transcrito
                         texto_ia = texto_transcrito
                         
+                        media_type = None
+                        print(f"🎯 Áudio transcrito com sucesso: {texto_transcrito} - Convertendo para processamento de texto")
+                        
                 except Exception as audio_err:
                     print(f"❌ Erro na transcrição de áudio: {audio_err}")
                     return {"status": "audio_transcription_error"}
