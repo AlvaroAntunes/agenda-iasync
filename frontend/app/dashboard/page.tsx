@@ -756,6 +756,11 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
       setIsPromptSetupOpen(false)
       toast.success('Prompt configurado com sucesso!')
 
+      if (!clinicData?.calendar_refresh_token) {
+        setIsCalendarWarningOpen(true)
+        return
+      }
+
       // Check if there are professionals registered
       if (!clinicData.profissionais || clinicData.profissionais.length === 0) {
         setIsProfessionalWarningOpen(true)
@@ -1594,16 +1599,23 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                           placeholder="Valor (Ex: 120,00)"
                           value={proc.valor}
                           onChange={(e) => {
+                            // Permite apenas números, vírgula e ponto
+                            const value = e.target.value.replace(/[^0-9,\.]/g, '')
                             const newProcs = [...promptFormData.procedimentos]
-                            newProcs[index].valor = e.target.value
+                            newProcs[index].valor = value
                             setPromptFormData({ ...promptFormData, procedimentos: newProcs })
                           }}
                           onBlur={(e) => {
                             const value = e.target.value.trim()
-                            if (value && !value.includes(',')) {
-                              // Se o valor não tem vírgula, adiciona ,00
+                            if (value && !value.includes(',') && !value.includes('.')) {
+                              // Se o valor não tem vírgula nem ponto, adiciona ,00
                               const newProcs = [...promptFormData.procedimentos]
                               newProcs[index].valor = value + ',00'
+                              setPromptFormData({ ...promptFormData, procedimentos: newProcs })
+                            } else if (value && value.includes('.')) {
+                              // Se tem ponto, converte para vírgula (formato brasileiro)
+                              const newProcs = [...promptFormData.procedimentos]
+                              newProcs[index].valor = value.replace('.', ',')
                               setPromptFormData({ ...promptFormData, procedimentos: newProcs })
                             }
                           }}
@@ -1613,12 +1625,12 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                         <div className="flex">
                           <Input
                             placeholder="Duração (Ex: 30)"
-                            type="number"
-                            min="1"
                             value={proc.duracao}
                             onChange={(e) => {
+                              // Permite apenas números inteiros
+                              const value = e.target.value.replace(/[^0-9]/g, '')
                               const newProcs = [...promptFormData.procedimentos]
-                              newProcs[index].duracao = e.target.value
+                              newProcs[index].duracao = value
                               setPromptFormData({ ...promptFormData, procedimentos: newProcs })
                             }}
                             className="rounded-r-none"

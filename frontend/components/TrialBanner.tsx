@@ -96,7 +96,7 @@ export function TrialBanner({ clinicId, blockAccess = false }: TrialBannerProps)
               variant="outline"
               size="sm"
               onClick={() => router.push('/dashboard/planos')}
-              className="w-full md:w-auto ml-0 md:ml-4 border-amber-300 hover:bg-amber-100 whitespace-nowrap"
+              className="w-full md:w-auto ml-0 md:ml-4 border-amber-300 hover:bg-amber-100 whitespace-nowrap hover:text-cyan-600"
             >
               <Crown className="h-4 w-4 mr-2" />
               Ver Planos
