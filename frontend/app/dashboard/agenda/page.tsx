@@ -236,7 +236,7 @@ export default function CalendarPage() {
     const next7Days = new Date(today)
     next7Days.setDate(next7Days.getDate() + 7)
 
-    // Filter events for today
+    // Filter events for today (all events of today, for display purposes)
     const todayEvts = allEvents.filter(e => {
       const d = new Date(e.start.dateTime)
       return d >= today && d < tomorrow
@@ -248,16 +248,15 @@ export default function CalendarPage() {
       return d >= tomorrow && d < dayAfterTomorrow
     })
 
-    // Filter events for next 7 days
+    // Filter events for next 7 days (starting from now, not from today's beginning)
     const next7DaysEvts = allEvents.filter(e => {
       const d = new Date(e.start.dateTime)
-      return d >= today && d < next7Days
+      return d >= now && d < next7Days
     })
 
-    // Calculate occupancy rate (assuming 8-hour workday, 30min slots = 16 slots/day * 7 days)
-    const totalSlots = 16 * 7
-    const occupiedSlots = next7DaysEvts.length
-    const rate = Math.min(100, Math.round((occupiedSlots / totalSlots) * 100))
+    // Calculate total appointments in next 7 days (from current moment)
+    const totalNext7Days = next7DaysEvts.length
+    const rate = totalNext7Days
 
     setTodayEvents(todayEvts)
     setTomorrowEvents(tomorrowEvts)
@@ -649,11 +648,11 @@ export default function CalendarPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <CalendarIcon className="h-4 w-4" />
-                Taxa de Ocupação (7 dias)
+                Próximos Agendamentos
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-foreground">{occupancyRate}%</div>
+              <div className="text-2xl font-bold text-foreground">{occupancyRate}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 Próximos 7 dias
               </p>
