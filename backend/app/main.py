@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 from app.api.auth import router as auth_router
 from app.api.webhook import router as webhook_router
 from app.api.webhook_asaas import router as webhook_asaas_router
-from app.api.whatsapp import router as whatsapp_router
 from app.api.admin_rate_limit import router as admin_rate_limit_router
 from app.api.admin_auth import router as admin_auth_router
 from app.api.payments import router as payments_router
@@ -65,7 +64,6 @@ from fastapi import Depends
 
 app.include_router(auth_router, tags=["Autenticação"])
 app.include_router(webhook_router, tags=["Webhooks"]) # Webhook precisa ser público (tem token próprio)
-app.include_router(whatsapp_router, tags=["WhatsApp"], dependencies=[Depends(verify_global_password)])
 app.include_router(admin_auth_router, tags=["Admin - Autenticação"], dependencies=[Depends(verify_global_password)])
 app.include_router(admin_rate_limit_router, tags=["Admin - Rate Limiting"], dependencies=[Depends(verify_global_password)])
 app.include_router(payments_router, tags=["Pagamentos"], dependencies=[Depends(verify_global_password)])
