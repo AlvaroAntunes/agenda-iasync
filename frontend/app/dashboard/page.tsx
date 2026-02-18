@@ -93,7 +93,7 @@ export default function ClinicDashboard() {
     enderecoCompleto: '',
     informacoesEstacionamento: '',
     diferenciaisClinica: '',
-    procedimentos: [{ nome: '', valor: '' }],
+    procedimentos: [{ nome: '', valor: '', duracao: '' }],
     horariosFuncionamento: [
       { dia: 'Segunda-feira', ativo: true, abertura: '08:00', fechamento: '18:00' },
       { dia: 'Terça-feira', ativo: true, abertura: '08:00', fechamento: '18:00' },
@@ -552,7 +552,7 @@ Seu lema: "[SLOGAN_CLINICA]"
 # CONTEXTO DA CLÍNICA
 - **Localização:** [ENDEREÇO_COMPLETO_COM_NUMERO_BAIRRO_CIDADE_ESTADO].
 - **Estacionamento:** [INFORMAÇÕES_ESTACIONAMENTO].
-- **Horário de Funcionamento:** [DIAS_SEMANA], das [HORA_ABERTURA] às [HORA_FECHAMENTO]. (Não funciona feriados/fins de semana).
+- **Horário de Funcionamento:** [DIAS_SEMANA], das [HORA_ABERTURA] às [HORA_FECHAMENTO]. (Não funciona feriados).
 - **Diferenciais:** [DIFERENCIAIS_CLINICA].
 - **Tabela Base (Estimativa):**
 [PROCEDIMENTOS_LISTA]
@@ -694,7 +694,7 @@ User: 9h.
 Prontinho! Remarquei para amanhã às 9h. Até lá!`
 
     const procedimentosText = data.procedimentos
-      .map(p => `  - ${p.nome}: R$ ${p.valor}.`)
+      .map(p => `  - ${p.nome}: R$ ${p.valor} ${p.duracao ? `(${p.duracao} min)` : ''}.`)
       .join('\n')
 
     const horariosText = data.horariosFuncionamento
@@ -1568,7 +1568,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                     size="sm"
                     onClick={() => setPromptFormData({
                       ...promptFormData,
-                      procedimentos: [...promptFormData.procedimentos, { nome: '', valor: '' }]
+                      procedimentos: [...promptFormData.procedimentos, { nome: '', valor: '', duracao: '' }]
                     })}
                   >
                     + Adicionar
@@ -1576,8 +1576,8 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                 </div>
 
                 {promptFormData.procedimentos.map((proc, index) => (
-                  <div key={index} className="flex flex-col sm:flex-row gap-2 items-start bg-slate-50 p-2 rounded-lg sm:bg-transparent sm:p-0">
-                    <div className="w-full sm:flex-1">
+                  <div key={index} className="flex flex-col gap-3 bg-slate-50 p-3 rounded-lg">
+                    <div className="w-full">
                       <Input
                         placeholder="Procedimento (Ex: Avaliação)"
                         value={proc.nome}
@@ -1588,8 +1588,8 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                         }}
                       />
                     </div>
-                    <div className="flex w-full sm:w-auto gap-2">
-                      <div className="flex-1 sm:w-32">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="flex-1">
                         <Input
                           placeholder="Valor (Ex: 150,00)"
                           value={proc.valor}
@@ -1598,12 +1598,40 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                             newProcs[index].valor = e.target.value
                             setPromptFormData({ ...promptFormData, procedimentos: newProcs })
                           }}
+                          onBlur={(e) => {
+                            const value = e.target.value.trim()
+                            if (value && !value.includes(',')) {
+                              // Se o valor não tem vírgula, adiciona ,00
+                              const newProcs = [...promptFormData.procedimentos]
+                              newProcs[index].valor = value + ',00'
+                              setPromptFormData({ ...promptFormData, procedimentos: newProcs })
+                            }
+                          }}
                         />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex">
+                          <Input
+                            placeholder="Duração (Ex: 30)"
+                            type="number"
+                            min="1"
+                            value={proc.duracao}
+                            onChange={(e) => {
+                              const newProcs = [...promptFormData.procedimentos]
+                              newProcs[index].duracao = e.target.value
+                              setPromptFormData({ ...promptFormData, procedimentos: newProcs })
+                            }}
+                            className="rounded-r-none"
+                          />
+                          <div className="flex items-center px-3 bg-gray-50 border border-l-0 rounded-r-md text-sm text-gray-600">
+                            min
+                          </div>
+                        </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="text-red-500 hover:bg-red-50 flex-shrink-0"
+                        className="text-red-500 hover:bg-red-50 flex-shrink-0 self-start"
                         onClick={() => {
                           const newProcs = promptFormData.procedimentos.filter((_, i) => i !== index)
                           setPromptFormData({ ...promptFormData, procedimentos: newProcs })
@@ -1628,13 +1656,13 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                   !promptFormData.sloganClinica.trim() ||
                   !promptFormData.descricaoClinica.trim() ||
                   !promptFormData.diferenciaisClinica.trim() ||
-                  !promptFormData.procedimentos.some((p) => p.nome.trim() !== '' && p.valor.trim() !== '')
+                  !promptFormData.procedimentos.some((p) => p.nome.trim() !== '' && p.valor.trim() !== '' && p.duracao.trim() !== '')
                 }
                 className={`bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700 shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] ${(!promptFormData.nomeRecepcionista.trim() ||
                   !promptFormData.sloganClinica.trim() ||
                   !promptFormData.descricaoClinica.trim() ||
                   !promptFormData.diferenciaisClinica.trim() ||
-                  !promptFormData.procedimentos.some((p) => p.nome.trim() !== '' && p.valor.trim() !== ''))
+                  !promptFormData.procedimentos.some((p) => p.nome.trim() !== '' && p.valor.trim() !== '' && p.duracao.trim() !== ''))
                   ? 'opacity-50 cursor-not-allowed grayscale'
                   : ''
                   }`}

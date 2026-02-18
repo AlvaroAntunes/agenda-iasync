@@ -98,6 +98,7 @@ class RealizaAgendamento(BaseModel):
     nome_paciente: str = Field(description="Nome completo do paciente")
     data_hora: str = Field(description="Data e hora ISO (ex: 2024-11-25T14:30:00)")
     nome_profissional: str = Field(description="Nome do médico. Envie APENAS o nome (ex: 'Roberto'), SEM títulos como Dr. ou Dra.")
+    duracao_minutos: int = Field(description="Duração da consulta em minutos (ex: 30, 60, 90)")
     
 class VerificaConsultasExistentes(BaseModel):
     data: str = Field(description="Data para verificar no formato DD/MM/AAAA")
@@ -330,10 +331,11 @@ class AgenteClinica:
 
         return f"Horários OCUPADOS em {data}:\n" + "\n".join(lista_ocupada)
     
-    def _calcular_slots_livres(self, eventos, data_base: dt.date, eventos_ignorar: List[str] = []):
+    def _calcular_slots_livres(self, eventos, data_base: dt.date, duracao_consulta_minutos: int = 60, eventos_ignorar: List[str] = []):
         """
         Recebe a lista de eventos ocupados e retorna a lista de horários livres (slots de 5min).
         Considera horário comercial 08:00 às 18:00.
+        duracao_consulta_minutos: Duração da consulta em minutos (padrão 60).
         """
         # Configuração da Clínica 
         # Mapeamento de dias da semana (0=Segunda, 6=Domingo) para os nomes no JSON
@@ -378,7 +380,7 @@ class AgenteClinica:
             return []
 
         # DEFINIÇÕES DE TEMPO
-        duracao_consulta = dt.timedelta(hours=1)      # Duração do bloco ocupado
+        duracao_consulta = dt.timedelta(minutes=duracao_consulta_minutos)  # Duração dinâmica do bloco ocupado
         intervalo_step = dt.timedelta(minutes=SLOT_CONSULTA)     # Pulo visual (08:00, 08:05, 08:10...)
         
         # Fuso Horário
@@ -579,8 +581,8 @@ class AgenteClinica:
                     # Cache MISS: Busca no Google Calendar
                     eventos = self.calendar_service.listar_eventos(data=dt_inicio_busca, calendar_id=cal['id']) or []
                     
-                    # Calcula slots livres
-                    slots_livres = self._calcular_slots_livres(eventos, data_base, eventos_ignorar=ids_para_ignorar)
+                    # Calcula slots livres (assume duração padrão de 60 minutos para verificação)
+                    slots_livres = self._calcular_slots_livres(eventos, data_base, duracao_consulta_minutos=60, eventos_ignorar=ids_para_ignorar)
                     
                     # Armazena no cache (TTL: 5 minutos)
                     if prof_id:
@@ -619,13 +621,14 @@ class AgenteClinica:
 
         return cabecalho + "\n".join(relatorio_final) + instrucao
 
-    def _logic_realizar_agendamento(self, nome_paciente: str, data_hora: str, nome_profissional: str):
+    def _logic_realizar_agendamento(self, nome_paciente: str, data_hora: str, nome_profissional: str, duracao_minutos: int):
         """
         Realiza o agendamento final.
         Input:
         - nome_paciente: Nome completo.
         - data_hora: Data e hora ISO (ex: 2024-11-25T14:30:00).
         - nome_profissional: Nome do médico/especialista.
+        - duracao_minutos: Duração da consulta em minutos.
         """
         
         telefone = self.session_id
@@ -709,7 +712,8 @@ class AgenteClinica:
                 calendar_id=prof_data['external_calendar_id'],
                 resumo=f"Consulta: {nome_paciente} ({telefone})",
                 inicio_dt=dt_evento_calendar,
-                descricao=descricao_formatada
+                descricao=descricao_formatada,
+                duracao_minutos=duracao_minutos
             )
         except Exception as e:
             return f"Erro ao conectar com o Calendar: {str(e)}"
@@ -1169,7 +1173,7 @@ class AgenteClinica:
             StructuredTool.from_function(
                 func=self._logic_realizar_agendamento,
                 name="realizar_agendamento",
-                description="Realiza o agendamento final da consulta no calendário.",
+                description="Realiza o agendamento final da consulta no calendário com duração específica.",
                 args_schema=RealizaAgendamento
             ),
             StructuredTool.from_function(

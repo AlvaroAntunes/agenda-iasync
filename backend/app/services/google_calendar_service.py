@@ -203,9 +203,9 @@ class GoogleCalendarService(CalendarService):
         
         return events_result.get('items', [])
 
-    def criar_evento(self, calendar_id, resumo, inicio_dt: dt.datetime, descricao: str = None):
+    def criar_evento(self, calendar_id, resumo, inicio_dt: dt.datetime, descricao: str = None, duracao_minutos: int = 60):
         # inicio_dt deve ser um objeto datetime
-        fim_dt = inicio_dt + dt.timedelta(hours=1)
+        fim_dt = inicio_dt + dt.timedelta(minutes=duracao_minutos)
         texto_descricao = descricao if descricao else ""
                 
         evento = {

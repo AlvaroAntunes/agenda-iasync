@@ -24,7 +24,7 @@ class CalendarService(ABC):
         pass
 
     @abstractmethod
-    def criar_evento(self, calendar_id: str, resumo: str, inicio_dt: dt.datetime, descricao: str) -> Dict[str, Any]:
+    def criar_evento(self, calendar_id: str, resumo: str, inicio_dt: dt.datetime, descricao: str, duracao_minutos: int) -> Dict[str, Any]:
         """
         Deve criar um evento e retornar os dados dele (link, id).
         """
