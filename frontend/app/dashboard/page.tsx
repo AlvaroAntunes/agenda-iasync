@@ -552,7 +552,7 @@ Seu lema: "[SLOGAN_CLINICA]"
 # CONTEXTO DA CLÍNICA
 - **Localização:** [ENDEREÇO_COMPLETO_COM_NUMERO_BAIRRO_CIDADE_ESTADO].
 - **Estacionamento:** [INFORMAÇÕES_ESTACIONAMENTO].
-- **Horário de Funcionamento:** [DIAS_SEMANA], das [HORA_ABERTURA] às [HORA_FECHAMENTO]. (Não funciona feriados).
+- **Horário de Funcionamento:** [DIAS_SEMANA].
 - **Diferenciais:** [DIFERENCIAIS_CLINICA].
 - **Tabela Base (Estimativa):**
 [PROCEDIMENTOS_LISTA]
@@ -1462,7 +1462,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                 <div className="space-y-2">
                   <Label>Nome da Recepcionista *</Label>
                   <Input
-                    placeholder="Ex: Luanna"
+                    placeholder="Ex: Ana, Carolina, Roberto"
                     value={promptFormData.nomeRecepcionista}
                     onChange={(e) => setPromptFormData({ ...promptFormData, nomeRecepcionista: e.target.value })}
                   />
@@ -1471,7 +1471,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                 <div className="space-y-2">
                   <Label>Slogan da Clínica *</Label>
                   <Input
-                    placeholder="Ex: Sua saúde em primeiro lugar"
+                    placeholder="Ex: Cuidando da sua saúde com excelência"
                     value={promptFormData.sloganClinica}
                     onChange={(e) => setPromptFormData({ ...promptFormData, sloganClinica: e.target.value })}
                   />
@@ -1481,7 +1481,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
               <div className="space-y-2">
                 <Label>Descrição da Clínica *</Label>
                 <Textarea
-                  placeholder="Ex: clínica referência em sorrisos há 12 anos..."
+                  placeholder="Ex: clínica especializada em atendimento humanizado há mais de 10 anos, oferecendo tratamentos modernos e personalizados..."
                   value={promptFormData.descricaoClinica}
                   onChange={(e) => setPromptFormData({ ...promptFormData, descricaoClinica: e.target.value })}
                 />
@@ -1490,7 +1490,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
               <div className="space-y-2">
                 <Label>Diferenciais da Clínica *</Label>
                 <Textarea
-                  placeholder="Ex: Scanner 3D, anestesia computadorizada, sala de relaxamento..."
+                  placeholder="Ex: Equipamentos de última geração, ambiente climatizado, atendimento personalizado, consultórios modernos..."
                   value={promptFormData.diferenciaisClinica}
                   onChange={(e) => setPromptFormData({ ...promptFormData, diferenciaisClinica: e.target.value })}
                 />
@@ -1553,7 +1553,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
               <div className="space-y-2">
                 <Label>Informações de Estacionamento (Opcional)</Label>
                 <Input
-                  placeholder="Ex: Estacionamento gratuito no local"
+                  placeholder="Ex: Estacionamento gratuito, conveniado ou na rua"
                   value={promptFormData.informacoesEstacionamento}
                   onChange={(e) => setPromptFormData({ ...promptFormData, informacoesEstacionamento: e.target.value })}
                 />
@@ -1579,7 +1579,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                   <div key={index} className="flex flex-col gap-3 bg-slate-50 p-3 rounded-lg">
                     <div className="w-full">
                       <Input
-                        placeholder="Procedimento (Ex: Avaliação)"
+                        placeholder="Procedimento (Ex: Consulta, Avaliação, Exame)"
                         value={proc.nome}
                         onChange={(e) => {
                           const newProcs = [...promptFormData.procedimentos]
@@ -1591,7 +1591,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                     <div className="flex flex-col sm:flex-row gap-2">
                       <div className="flex-1">
                         <Input
-                          placeholder="Valor (Ex: 150,00)"
+                          placeholder="Valor (Ex: 120,00)"
                           value={proc.valor}
                           onChange={(e) => {
                             const newProcs = [...promptFormData.procedimentos]
