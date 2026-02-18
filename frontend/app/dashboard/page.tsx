@@ -864,8 +864,9 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
     return <ClinicLoading />
   }
 
-  const confirmedCount = todayAppointments.filter((a) => a.status === "confirmed").length
-  const pendingCount = todayAppointments.filter((a) => a.status === "pending").length
+  const scheduledTodayCount = todayAppointments.filter((a) => a.status === "AGENDADA").length
+  const attendedTodayCount = todayAppointments.filter((a) => a.status === "COMPARECEU").length
+  const missedTodayCount = todayAppointments.filter((a) => a.status === "FALTOU").length
   const maxWeekly = weeklyConversations.reduce((max, item) => Math.max(max, item.count), 1)
   const weeklyTotal = weeklyConversations.reduce((sum, item) => sum + item.count, 0)
   const weeklyAvg = weeklyConversations.length ? Math.round(weeklyTotal / weeklyConversations.length) : 0
@@ -887,11 +888,17 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
     .join(" ")
 
   const getStatusBadge = (status: string) => {
-    if (status === "confirmed") {
-      return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Confirmado</Badge>
+    if (status === "COMPARECEU") {
+      return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Compareceu</Badge>
     }
-    if (status === "pending") {
-      return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">Pendente</Badge>
+    if (status === "AGENDADA") {
+      return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">Agendada</Badge>
+    }
+    if (status === "FALTOU") {
+      return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Faltou</Badge>
+    }
+    if (status === "CANCELADO") {
+      return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">Cancelado</Badge>
     }
     return <Badge variant="secondary">{status}</Badge>
   }
@@ -1028,17 +1035,22 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                     </p>
                   </div>
                 )}
-                <div className="rounded-xl border border-border/60 bg-emerald-50/60 px-4 py-3">
-                  <p className="text-xs text-emerald-700">Consultas hoje</p>
-                  <p className="mt-1 text-2xl font-semibold text-emerald-900">
-                    {todayAppointments.length}
+                <div className="rounded-xl border border-border/60 bg-blue-50/60 px-4 py-3">
+                  <p className="text-xs text-blue-700">Agendadas hoje</p>
+                  <p className="mt-1 text-2xl font-semibold text-blue-900">
+                    {scheduledTodayCount}
                   </p>
-                  <p className="text-xs text-emerald-700/70">{confirmedCount} confirmadas</p>
+                  <p className="text-xs text-blue-700/70">Ainda não atendidas</p>
                 </div>
-                <div className="rounded-xl border border-border/60 bg-sky-50/70 px-4 py-3">
-                  <p className="text-xs text-sky-700">Pendentes</p>
-                  <p className="mt-1 text-2xl font-semibold text-sky-900">{pendingCount}</p>
-                  <p className="text-xs text-sky-700/70">Aguardando confirmação</p>
+                <div className="rounded-xl border border-border/60 bg-emerald-50/70 px-4 py-3">
+                  <p className="text-xs text-emerald-700">Compareceram</p>
+                  <p className="mt-1 text-2xl font-semibold text-emerald-900">{attendedTodayCount}</p>
+                  <p className="text-xs text-emerald-700/70">Hoje</p>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-red-50/70 px-4 py-3">
+                  <p className="text-xs text-red-700">Faltaram</p>
+                  <p className="mt-1 text-2xl font-semibold text-red-900">{missedTodayCount}</p>
+                  <p className="text-xs text-red-700/70">Hoje</p>
                 </div>
                 <div className="rounded-xl border border-border/60 bg-amber-50/70 px-4 py-3">
                   <p className="text-xs text-amber-700">Próximas</p>
