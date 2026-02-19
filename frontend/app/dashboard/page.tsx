@@ -522,6 +522,8 @@ export default function ClinicDashboard() {
     } finally {
       setUazapiLoading(false)
     }
+
+    
   }
 
   // Prompt Template Logic
@@ -846,9 +848,16 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
       if (!response.ok) {
         throw new Error((data as any)?.detail || "Erro ao excluir instância")
       }
+      
+      // Atualizar estado local
       setUazapiStatus("not_configured")
       setUazapiQrCode(null)
       setUazapiPairingCode(null)
+      setClinicData({
+        ...clinicData,
+        uazapi_token: null
+      })
+      
       toast.success("Instância excluída")
     } catch (err: any) {
       toast.error(err?.message || "Erro ao excluir instância")
@@ -1161,10 +1170,10 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                         : uazapiStatus === "connecting"
                           ? "Conectando"
                           : uazapiStatus === "not_configured"
-                            ? (hasInstanceToken ? "Criado" : "Sem instância")
+                            ? (hasInstanceToken ? "Criado" : "Sem conexão")
                             : uazapiStatus === "error"
                               ? "Erro"
-                              : "Desconhecido"}
+                              : "Conexão criada"}
                   </Badge>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -1184,7 +1193,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
               </Button>
 
               <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-3">
-                <p className="text-xs text-muted-foreground">Conexão da instância</p>
+                <p className="text-xs text-muted-foreground">Conexão com o WhatsApp</p>
                 {uazapiQrCode ? (
                   <div className="mt-3 rounded-lg border border-dashed border-border p-4 text-center">
                     <img src={uazapiQrCode} alt="QR Code da instância" className="mx-auto h-36 w-36" />
@@ -1199,11 +1208,11 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                   </div>
                 ) : uazapiStatus === "connected" ? (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Instância conectada e ativa.
+                    Conexão criada e ativa.
                   </p>
                 ) : (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Gere um QR Code ou código de pareamento para conectar.
+                    Gere um QR Code para conectar.
                   </p>
                 )}
 
@@ -1220,7 +1229,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                         }
                       >
                         <Link2 className="mr-2 h-4 w-4" />
-                        Criar instância
+                        Criar conexão
                       </Button>
                       <Button
                         variant="ghost"
@@ -1240,7 +1249,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                     disabled={uazapiLoading || uazapiStatus === "not_configured"}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Excluir instância
+                    Excluir conexão
                   </Button>
                 </div>
               </div>
