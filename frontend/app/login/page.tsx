@@ -13,10 +13,12 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { logger } from '@/lib/logger'
+import { saveLoginData, loadLoginData, clearLoginData } from "@/actions/login-actions"
 
 export default function ClinicLoginPage() {
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
+  
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
@@ -27,47 +29,143 @@ export default function ClinicLoginPage() {
   const [resetEmail, setResetEmail] = useState("")
   const [resetSuccess, setResetSuccess] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
+  
+  // Estados para gerenciar chaves criptografadas
+  const [savedKeys, setSavedKeys] = useState<{
+    emailKey?: string
+    passwordKey?: string
+    rememberKey?: string
+  }>({})
 
   // Verificar se há sessão ativa ao carregar
   useEffect(() => {
     const checkSession = async () => {
       // Verificar se era uma sessão temporária (não marcou "lembrar de mim")
-      // sessionStorage é limpo quando o navegador fecha, então se não existir
-      // e havia uma sessão, significa que o navegador foi fechado
       const wasTempSession = sessionStorage.getItem("clinic_temp_session")
       const { data: { session } } = await supabase.auth.getSession()
 
       if (session && !wasTempSession) {
-        // Havia uma sessão mas não tem o flag de sessão temporária
-        // Isso significa que o navegador foi fechado e reaberto
-        // Verificar se o usuário tinha marcado "lembrar de mim"
-        const shouldRemember = localStorage.getItem("clinic_remember") === "true"
-
-        if (!shouldRemember) {
-          // Não marcou "lembrar de mim", fazer logout
-          await supabase.auth.signOut()
-          localStorage.removeItem("clinic-auth")
-        } else {
-          // Tinha marcado "lembrar de mim", manter sessão e redirecionar
-          router.push("/dashboard")
+        // Verificar dados salvos para determinar se deve manter sessão
+        const allKeys = Object.keys(localStorage)
+        const cryptoKeys = allKeys.filter(key => key.length > 50)
+        
+        let rememberValue = ''
+        
+        // Procurar pela chave remember descriptografando
+        const { getSecureData } = await import('@/actions/crypto-utils')
+        
+        for (const key of cryptoKeys) {
+          try {
+            const decryptedKey = await getSecureData(key)
+            if (decryptedKey.includes('clinic_remember_')) {
+              rememberValue = localStorage.getItem(key) || ''
+              break
+            }
+          } catch {
+            continue
+          }
         }
+        
+        if (rememberValue) {
+          const result = await loadLoginData('', '', rememberValue)
+          
+          if (result.success && result.data.remember) {
+            // Tinha marcado "lembrar de mim", manter sessão
+            router.push("/dashboard")
+            return
+          }
+        }
+        
+        // Não marcou "lembrar de mim", fazer logout
+        await supabase.auth.signOut()
+        // Limpar todos os dados criptografados
+        cryptoKeys.forEach(key => localStorage.removeItem(key))
       } else if (session && wasTempSession) {
-        // Sessão temporária ainda ativa (navegador não foi fechado)
+        // Sessão temporária ainda ativa
         router.push("/dashboard")
       } else {
-        // Não há sessão, apenas carregar email salvo se houver
-        const savedEmail = localStorage.getItem("clinic_email")
-        const shouldRemember = localStorage.getItem("clinic_remember") === "true"
-
-        if (savedEmail && shouldRemember) {
-          setEmail(savedEmail)
-          setRememberMe(true)
-        }
+        // Não há sessão, tentar carregar dados salvos
+        await loadSavedLoginData()
       }
     }
 
     checkSession()
   }, [supabase, router])
+  
+  // Função para carregar dados salvos
+  const loadSavedLoginData = async () => {
+    try {
+      const allKeys = Object.keys(localStorage)
+      const cryptoKeys = allKeys.filter(key => key.length > 50) // Chaves criptografadas são longas
+      
+      let emailKey = '', passwordKey = '', rememberKey = ''
+      let emailValue = '', passwordValue = '', rememberValue = ''
+      
+      // Importar função para descriptografar chaves
+      const { getSecureData } = await import('@/actions/crypto-utils')
+      
+      // Identificar chaves descriptografando-as
+      for (const key of cryptoKeys) {
+        try {
+          const decryptedKey = await getSecureData(key)
+          
+          if (decryptedKey.includes('clinic_email_')) {
+            emailKey = key
+            emailValue = localStorage.getItem(key) || ''
+          } else if (decryptedKey.includes('clinic_password_')) {
+            passwordKey = key
+            passwordValue = localStorage.getItem(key) || ''
+          } else if (decryptedKey.includes('clinic_remember_')) {
+            rememberKey = key
+            rememberValue = localStorage.getItem(key) || ''
+          }
+        } catch {
+          // Se não conseguir descriptografar, pode ser uma chave inválida
+          continue
+        }
+      }
+      
+      if (emailKey && passwordKey && rememberKey && emailValue && passwordValue && rememberValue) {
+        const result = await loadLoginData(emailValue, passwordValue, rememberValue)
+        
+        if (result.success && result.data.remember) {
+          setEmail(result.data.email)
+          setPassword(result.data.password)
+          setRememberMe(true)
+          
+          setSavedKeys({
+            emailKey,
+            passwordKey,
+            rememberKey
+          })
+        }
+      }
+    } catch (error) {
+      logger.error('Erro ao carregar dados salvos:', error)
+      // Limpar dados corrompidos
+      const allKeys = Object.keys(localStorage)
+      const cryptoKeys = allKeys.filter(key => key.length > 50)
+      cryptoKeys.forEach(key => localStorage.removeItem(key))
+    }
+  }
+
+  // Limpar dados se necessário ao desmontar componente
+  useEffect(() => {
+    return () => {
+      // Limpar dados se não marcou 'lembrar de mim'
+      if (!rememberMe && (savedKeys.emailKey || savedKeys.passwordKey || savedKeys.rememberKey)) {
+        clearLoginData(
+          savedKeys.emailKey,
+          savedKeys.passwordKey,
+          savedKeys.rememberKey
+        ).then(result => {
+          if (result.success) {
+            result.keysToRemove.forEach(key => localStorage.removeItem(key))
+          }
+        })
+      }
+    }
+  }, [rememberMe, savedKeys])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -118,17 +216,38 @@ export default function ClinicLoginPage() {
 
       // Gerenciar persistência da sessão
       if (!rememberMe) {
-        // Se não marcou "lembrar de mim", remover a sessão do localStorage
-        // A sessão ainda estará ativa no navegador atual, mas será perdida ao fechar
-        localStorage.removeItem("clinic_email")
-        localStorage.removeItem("clinic_remember")
+        // Se não marcou "lembrar de mim", limpar dados salvos
+        if (savedKeys.emailKey || savedKeys.passwordKey || savedKeys.rememberKey) {
+          const clearResult = await clearLoginData(
+            savedKeys.emailKey,
+            savedKeys.passwordKey, 
+            savedKeys.rememberKey
+          )
+          
+          if (clearResult.success) {
+            clearResult.keysToRemove.forEach(key => localStorage.removeItem(key))
+          }
+        }
 
         // Salvar um flag para fazer logout ao fechar o navegador
         sessionStorage.setItem("clinic_temp_session", "true")
       } else {
-        // Salvar email para próximo acesso
-        localStorage.setItem("clinic_email", email)
-        localStorage.setItem("clinic_remember", "true")
+        // Salvar dados criptografados usando server action
+        const saveResult = await saveLoginData(email, password, true)
+        
+        if (saveResult.success && saveResult.data) {
+          // Salvar apenas os dados criptografados no localStorage
+          localStorage.setItem(saveResult.data.emailData.key, saveResult.data.emailData.value)
+          localStorage.setItem(saveResult.data.passwordData.key, saveResult.data.passwordData.value)
+          localStorage.setItem(saveResult.data.rememberData.key, saveResult.data.rememberData.value)
+          
+          setSavedKeys({
+            emailKey: saveResult.data.emailData.key,
+            passwordKey: saveResult.data.passwordData.key,
+            rememberKey: saveResult.data.rememberData.key
+          })
+        }
+        
         sessionStorage.removeItem("clinic_temp_session")
       }
 
@@ -335,7 +454,24 @@ export default function ClinicLoginPage() {
                   <input
                     type="checkbox"
                     checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
+                    onChange={async (e) => {
+                      const checked = e.target.checked
+                      setRememberMe(checked)
+                      
+                      // Se desmarcou 'lembrar de mim', limpar dados salvos
+                      if (!checked && (savedKeys.emailKey || savedKeys.passwordKey || savedKeys.rememberKey)) {
+                        const clearResult = await clearLoginData(
+                          savedKeys.emailKey,
+                          savedKeys.passwordKey,
+                          savedKeys.rememberKey
+                        )
+                        
+                        if (clearResult.success) {
+                          clearResult.keysToRemove.forEach(key => localStorage.removeItem(key))
+                          setSavedKeys({})
+                        }
+                      }
+                    }}
                     className="rounded border-cyan-300 text-cyan-600 focus:ring-cyan-500"
                     disabled={isLoading}
                   />
