@@ -40,57 +40,41 @@ export default function ClinicLoginPage() {
   // Verificar se há sessão ativa ao carregar
   useEffect(() => {
     const checkSession = async () => {
-      // Verificar se era uma sessão temporária (não marcou "lembrar de mim")
-      const wasTempSession = sessionStorage.getItem("clinic_temp_session")
       const { data: { session } } = await supabase.auth.getSession()
-
-      if (session && !wasTempSession) {
-        // Verificar dados salvos para determinar se deve manter sessão
-        const allKeys = Object.keys(localStorage)
-        const cryptoKeys = allKeys.filter(key => key.length > 50)
+      
+      if (session) {
+        // Verificar se era uma sessão temporária (não marcou "lembrar de mim")
+        const wasTempSession = sessionStorage.getItem("clinic_temp_session")
         
-        let rememberValue = ''
-        
-        // Procurar pela chave remember descriptografando
-        const { getSecureData } = await import('@/actions/crypto-utils')
-        
-        for (const key of cryptoKeys) {
-          try {
-            const decryptedKey = await getSecureData(key)
-            if (decryptedKey.includes('clinic_remember_')) {
-              rememberValue = localStorage.getItem(key) || ''
-              break
-            }
-          } catch {
-            continue
-          }
+        if (wasTempSession) {
+          // Era uma sessão temporária, mas ainda está ativa (página não foi fechada)
+          router.push("/dashboard")
+          return
         }
         
-        if (rememberValue) {
-          const result = await loadLoginData('', '', rememberValue)
-          
-          if (result.success && result.data.remember) {
-            // Tinha marcado "lembrar de mim", manter sessão
-            router.push("/dashboard")
-            return
-          }
-        }
+        // Não há flag de sessão temporária, então pode ser:
+        // 1. Uma sessão persistente (usuário marcou "lembrar de mim")
+        // 2. Uma sessão temporária que sobreviveu ao fechamento do navegador (erro)
         
-        // Não marcou "lembrar de mim", fazer logout
-        await supabase.auth.signOut()
-        // Limpar todos os dados criptografados
-        cryptoKeys.forEach(key => localStorage.removeItem(key))
-      } else if (session && wasTempSession) {
-        // Sessão temporária ainda ativa
+        // Vamos assumir que é válida e deixar o usuário logado
+        // O comportamento padrão do Supabase é manter sessões persistentes
         router.push("/dashboard")
-      } else {
-        // Não há sessão, tentar carregar dados salvos
-        await loadSavedLoginData()
+        return
       }
+
+      // Não há sessão, tentar carregar dados salvos
+      await loadSavedLoginData()
     }
 
     checkSession()
   }, [supabase, router])
+  
+  // Função helper para limpar todas as chaves criptografadas
+  const clearAllCryptoKeys = () => {
+    const allKeys = Object.keys(localStorage)
+    const cryptoKeys = allKeys.filter(key => key.length > 50) // Chaves criptografadas são longas
+    cryptoKeys.forEach(key => localStorage.removeItem(key))
+  }
   
   // Função para carregar dados salvos
   const loadSavedLoginData = async () => {
@@ -142,10 +126,8 @@ export default function ClinicLoginPage() {
       }
     } catch (error) {
       logger.error('Erro ao carregar dados salvos:', error)
-      // Limpar dados corrompidos
-      const allKeys = Object.keys(localStorage)
-      const cryptoKeys = allKeys.filter(key => key.length > 50)
-      cryptoKeys.forEach(key => localStorage.removeItem(key))
+      // Limpar dados corrompidos usando função helper
+      clearAllCryptoKeys()
     }
   }
 
@@ -216,22 +198,16 @@ export default function ClinicLoginPage() {
 
       // Gerenciar persistência da sessão
       if (!rememberMe) {
-        // Se não marcou "lembrar de mim", limpar dados salvos
-        if (savedKeys.emailKey || savedKeys.passwordKey || savedKeys.rememberKey) {
-          const clearResult = await clearLoginData(
-            savedKeys.emailKey,
-            savedKeys.passwordKey, 
-            savedKeys.rememberKey
-          )
-          
-          if (clearResult.success) {
-            clearResult.keysToRemove.forEach(key => localStorage.removeItem(key))
-          }
-        }
+        // Se não marcou "lembrar de mim", limpar TODOS os dados salvos criptografados
+        clearAllCryptoKeys()
 
-        // Salvar um flag para fazer logout ao fechar o navegador
+        // Marcar como sessão temporária
         sessionStorage.setItem("clinic_temp_session", "true")
+        localStorage.setItem("clinic_was_temporary", "true")
       } else {
+        // Limpar dados criptografados antigos antes de salvar novos
+        clearAllCryptoKeys()
+        
         // Salvar dados criptografados usando server action
         const saveResult = await saveLoginData(email, password, true)
         
@@ -248,7 +224,9 @@ export default function ClinicLoginPage() {
           })
         }
         
+        // Limpar flags de sessão temporária
         sessionStorage.removeItem("clinic_temp_session")
+        localStorage.removeItem("clinic_was_temporary")
       }
 
       // Redirecionar para o dashboard da clínica

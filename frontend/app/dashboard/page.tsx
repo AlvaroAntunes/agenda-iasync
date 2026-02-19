@@ -106,7 +106,59 @@ export default function ClinicDashboard() {
   })
 
   useEffect(() => {
-    checkAuthAndLoadClinic()
+    // Verificar se é uma sessão temporária órfã
+    const checkTemporarySession = async () => {
+      const isTemporarySession = sessionStorage.getItem("clinic_temp_session")
+      const wasMarkedAsTemporary = localStorage.getItem("clinic_was_temporary")
+      
+      // Se foi marcada como temporária mas não há mais o flag no sessionStorage,
+      // provavelmente o navegador foi fechado e reaberto
+      if (wasMarkedAsTemporary && !isTemporarySession) {
+        localStorage.removeItem("clinic_was_temporary")
+        
+        // Verificar se há dados de "lembrar de mim" salvos
+        const allKeys = Object.keys(localStorage)
+        const cryptoKeys = allKeys.filter(key => key.length > 50)
+        let hasRememberData = false
+        
+        if (cryptoKeys.length > 0) {
+          try {
+            const { getSecureData } = await import('@/actions/crypto-utils')
+            const { loadLoginData } = await import('@/actions/login-actions')
+            
+            for (const key of cryptoKeys) {
+              try {
+                const decryptedKey = await getSecureData(key)
+                if (decryptedKey.includes('clinic_remember_')) {
+                  const rememberValue = localStorage.getItem(key) || ''
+                  const result = await loadLoginData('', '', rememberValue)
+                  
+                  if (result.success && result.data.remember) {
+                    hasRememberData = true
+                    break
+                  }
+                }
+              } catch {
+                continue
+              }
+            }
+          } catch (error) {
+            console.error('Erro ao verificar dados salvos:', error)
+          }
+        }
+        
+        // Se não há dados de "lembrar de mim", fazer logout
+        if (!hasRememberData) {
+          await supabase.auth.signOut()
+          router.push('/login')
+          return
+        }
+      }
+    }
+    
+    checkTemporarySession().then(() => {
+      checkAuthAndLoadClinic()
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
