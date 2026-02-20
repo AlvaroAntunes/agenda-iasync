@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Sparkles, Target, Users, Heart, Award, TrendingUp, Shield } from "lucide-react";
+import { Sparkles, Target, Users, Heart, Award, TrendingUp, Shield, User } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
@@ -221,33 +221,25 @@ const SobreNosPage = () => {
               className="text-center mb-12"
             >
               <p className="text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
-                A IASync foi fundada por um time de <strong>4 empreendedores</strong> com visão de
+                A IASync foi fundada por um time de <strong>3 empreendedores</strong> com visão de
                 transformar o mercado através da Inteligência Artificial. Nossa força está na
                 diversidade de conhecimentos e experiências que cada fundador traz para a empresa.
               </p>
             </motion.div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
               {[
                 {
                   name: "Álvaro Antunes",
-                  role: "Engenharia de Computação",
-                  image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alvaro&backgroundColor=b6e3f4"
+                  role: "Engenharia de Computação"
                 },
                 {
                   name: "Pedro Fabres",
-                  role: "Engenharia de Computação",
-                  image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Joao&backgroundColor=c0aede"
+                  role: "Engenharia de Computação"
                 },
                 {
                   name: "Emanuel Delpupo",
-                  role: "Gestão Financeira e Segurança",
-                  image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Maria&backgroundColor=ffd5dc"
-                },
-                {
-                  name: "Augusto Rocha",
-                  role: "Desenvolvedor Sênior",
-                  image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Pedro&backgroundColor=d1d4f9"
+                  role: "Gestão Financeira e Segurança"
                 }
               ].map((founder, index) => (
                 <motion.div
@@ -258,12 +250,8 @@ const SobreNosPage = () => {
                   transition={{ duration: 0.6, delay: index * 0.1 }}
                   className="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 hover:border-cyan-200 transition-all hover:shadow-xl"
                 >
-                  <div className="w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden bg-gradient-to-br from-cyan-50 to-blue-50 border-4 border-white shadow-md">
-                    <img
-                      src={founder.image}
-                      alt={founder.name}
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="w-32 h-32 mx-auto mb-4 rounded-full bg-gradient-to-br from-cyan-50 to-blue-50 border-4 border-white shadow-md flex items-center justify-center">
+                    <User className="w-16 h-16 text-cyan-600" strokeWidth={1.5} />
                   </div>
                   <h3 className="text-lg font-bold text-slate-900 text-center mb-2">
                     {founder.name}
@@ -289,9 +277,6 @@ const SobreNosPage = () => {
                   soluções baseadas em IA, garantindo robustez técnica em cada projeto. Contamos também
                   com expertise em <strong>gestão financeira, estratégia de negócios e segurança de dados</strong>,
                   fundamental para entender as necessidades do mercado e garantir proteção total das informações.
-                  Completando o time, temos um <strong>desenvolvedor sênior</strong> com vasta experiência
-                  de mercado, que traz maturidade técnica e visão prática para transformar ideias em
-                  produtos reais e escaláveis.
                 </p>
 
                 <p className="pt-4">
