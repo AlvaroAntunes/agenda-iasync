@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Check, X, Ban, Search, Calendar } from "lucide-react"
 import { toast } from "sonner"
 import { logger } from "@/lib/logger"
@@ -19,9 +20,14 @@ type Appointment = {
     horario_consulta: string
     status: 'AGENDADA' | 'COMPARECEU' | 'FALTOU' | 'CANCELADO'
     origem_agendamento: 'IA' | 'MANUAL'
+    profissional_id?: string
     leads: {
         nome: string
         telefone: string
+    }
+    profissional?: {
+        nome: string
+        especialidade: string
     }
 }
 
@@ -52,6 +58,8 @@ export default function ConsultasPage() {
     const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('today')
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
     const [updatingId, setUpdatingId] = useState<string | null>(null)
+    const [selectedProfessional, setSelectedProfessional] = useState<string>('todos')
+    const [professionals, setProfessionals] = useState<Array<{id: string, nome: string, especialidade: string}>>([])
 
     useEffect(() => {
         checkAuthAndLoadClinic()
@@ -61,9 +69,10 @@ export default function ConsultasPage() {
     useEffect(() => {
         if (clinicData?.id) {
             fetchAppointments()
+            fetchProfessionals()
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [clinicData?.id, dateFilter, selectedYear])
+    }, [clinicData?.id, dateFilter, selectedYear, selectedProfessional])
 
     const checkAuthAndLoadClinic = async () => {
         try {
@@ -112,12 +121,22 @@ export default function ConsultasPage() {
           horario_consulta,
           status,
           origem_agendamento,
+          profissional_id,
           leads:paciente_id (
             nome,
             telefone
+          ),
+          profissional:profissional_id (
+            nome,
+            especialidade
           )
         `)
                 .eq('clinic_id', clinicData.id)
+
+            // Filtro por profissional
+            if (selectedProfessional !== 'todos') {
+                query = query.eq('profissional_id', selectedProfessional)
+            }
 
             if (dateFilter !== 'all') {
                 const now = new Date()
@@ -156,6 +175,23 @@ export default function ConsultasPage() {
             toast.error('Erro ao carregar consultas')
         } finally {
             setLoading(false)
+        }
+    }
+
+    const fetchProfessionals = async () => {
+        if (!clinicData?.id) return
+
+        try {
+            const { data, error } = await supabase
+                .from('profissionais')
+                .select('id, nome, especialidade')
+                .eq('clinic_id', clinicData.id)
+                .order('nome')
+
+            if (error) throw error
+            setProfessionals(data || [])
+        } catch (error) {
+            logger.error('Erro ao buscar profissionais:', error)
         }
     }
 
@@ -269,6 +305,7 @@ export default function ConsultasPage() {
                                         className="pl-10 h-10"
                                     />
                                 </div>
+
                                 {dateFilter === 'year' && (
                                     <div className="w-24">
                                         <Input
@@ -281,6 +318,27 @@ export default function ConsultasPage() {
                                         />
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                        
+                        {/* Professional Selector Row */}
+                        <div className="flex flex-col sm:flex-row gap-2 sm:items-center pt-4">
+                            <label className="text-md font-medium text-black min-w-fit">
+                                Profissional:
+                            </label>
+                            <div className="w-full sm:flex-1 sm:max-w-xs">
+                                <Select value={selectedProfessional} onValueChange={setSelectedProfessional}>
+                                    <SelectTrigger className="h-10 cursor-pointer">
+                                        <SelectValue placeholder="Todos profissionais" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem className="cursor-pointer" value="todos">Todos profissionais</SelectItem>
+                                        {professionals.map((professional) => (
+                                            <SelectItem key={professional.id} className="cursor-pointer" value={professional.id}>
+                                                {professional.nome} - {professional.especialidade}
+                                            </SelectItem>
+                                        ))}</SelectContent>
+                                </Select>
                             </div>
                         </div>
                     </CardContent>
@@ -319,6 +377,11 @@ export default function ConsultasPage() {
                                                 </div>
                                                 <p className="text-lg font-semibold">{apt.leads?.nome || 'Nome não disponível'}</p>
                                                 <p className="text-sm text-muted-foreground">{apt.leads?.telefone || 'Telefone não disponível'}</p>
+                                                {apt.profissional && (
+                                                    <p className="text-sm text-blue-600 font-medium">
+                                                        {apt.profissional.nome} - {apt.profissional.especialidade}
+                                                    </p>
+                                                )}
                                                 <div className="mt-2">
                                                     <StatusBadge status={apt.status} />
                                                 </div>
