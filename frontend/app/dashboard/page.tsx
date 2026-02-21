@@ -1410,7 +1410,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
 
                 <Slider
                   defaultValue={[1]}
-                  max={50}
+                  max={100}
                   min={1}
                   step={1}
                   value={[tokenAmount]}
@@ -1470,7 +1470,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
 
                 <Slider
                   defaultValue={[1]}
-                  max={50}
+                  max={100}
                   min={1}
                   step={1}
                   value={[tokenAmount]}

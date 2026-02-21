@@ -270,22 +270,42 @@ def create_token_checkout(dados: TokenPurchaseInput):
         milhoes = dados.amount_tokens / 1000000
         valor = milhoes * 5.00
         
-        # 2. Buscar Cliente Asaas
-        clinica = supabase.table('clinicas').select('asaas_customer_id, nome').eq('id', dados.clinic_id).single().execute()
+        # 2. Buscar dados da Clínica
+        clinica = supabase.table('clinicas').select('*').eq('id', dados.clinic_id).single().execute()
         
-        if not clinica.data or not clinica.data.get('asaas_customer_id'):
-            raise HTTPException(status_code=404, detail="Clínica não configurada para pagamentos.")
-             
-        asaas_customer_id = clinica.data['asaas_customer_id']
-        descricao = f"Compra de {int(milhoes)} Milhões de Tokens IA"
+        if not clinica.data:
+            raise HTTPException(status_code=404, detail="Clínica não encontrada")
         
-        # 3. Criar Cobrança
+        dados_clinica = clinica.data
+        asaas_customer_id = dados_clinica.get('asaas_customer_id')
+
+        # 3. Se não tem ID no Asaas, cria o cliente agora
+        if not asaas_customer_id:
+            print("🆕 Criando cliente no Asaas para compra de tokens...")
+            
+            cnpj = dados_clinica.get('cnpj')
+            asaas_customer_id = criar_cliente_asaas(
+                nome=dados_clinica['nome'],
+                email=dados_clinica['email'],
+                cpf_cnpj=cnpj,
+                telefone=dados_clinica['telefone']
+            )
+            
+            if not asaas_customer_id:
+                raise HTTPException(status_code=500, detail="Falha ao criar cliente no Asaas.")
+            
+            supabase.table('clinicas').update({'asaas_customer_id': asaas_customer_id}).eq('id', dados.clinic_id).execute()
+        
+        termo = "Milhão" if milhoes == 1 else "Milhões"
+        descricao = f"Compra de {int(milhoes)} {termo} de Tokens IA"
+        
+        # 4. Criar Cobrança
         cobranca = criar_cobranca_avulsa(asaas_customer_id, valor, descricao)
         
         if not cobranca:
-             raise HTTPException(status_code=500, detail="Erro ao gerar cobrança no Asaas.")
+            raise HTTPException(status_code=500, detail="Erro ao gerar cobrança no Asaas.")
              
-        # 4. Salvar Intenção de Compra
+        # 5. Salvar Intenção de Compra
         try:
             supabase.table('compra_tokens').insert({
                 "clinic_id": dados.clinic_id,
