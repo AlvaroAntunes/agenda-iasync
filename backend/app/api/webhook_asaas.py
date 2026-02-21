@@ -235,30 +235,33 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
         # 3. Lógica de Problemas (Inadimplência/Cancelamento)
         elif event in ["PAYMENT_OVERDUE", "PAYMENT_REFUNDED"]:
             print(f"⚠️ Pagamento com problemas: {event}")
-
-            # --- OVERDUE SWAP GUARD: Cancelar assinatura pendente se não for paga ---
-            # Se for uma tentativa de troca de plano (Swap) que venceu, cancelamos para não cobrar.
-            sessao_pendente = supabase.table('checkout_sessions')\
-                .select('*')\
+            
+            # Verificar se é uma compra de tokens
+            token_purchase = supabase.table('compra_tokens')\
+                .select('id')\
                 .eq('asaas_id', asaas_id_referencia)\
                 .eq('status', 'pendente')\
                 .maybe_single()\
                 .execute()
 
-            if sessao_pendente and sessao_pendente.data:
-                print(f"🚫 Swap Overdue: Cancelando assinatura pendente {asaas_id_referencia} por falta de pagamento.")
-                cancelar_assinatura_asaas(asaas_id_referencia)
-                supabase.table('checkout_sessions').update({'status': 'cancelado'}).eq('id', sessao_pendente.data['id']).execute()
-            
-            # --- Lógica Existente: Desativar IA se for a assinatura ATIVA ---
-            # Buscar clinic_id da assinatura para desativar IA
+            if token_purchase and token_purchase.data:
+                purchase = token_purchase.data
+                
+                print(f"🪙 Pagamento de Tokens não foi recebido")
+                supabase.table('compra_tokens').update({'status': 'cancelado'}).eq('id', purchase['id']).execute()
+                
+                return {"status": "processed_token_purchase_issue"}
+
+            # PRIORIDADE 1: Verificar se é uma assinatura ATIVA atual (mais importante)
             assinatura_data = supabase.table('assinaturas')\
-                .select('clinic_id')\
+                .select('clinic_id, status')\
                 .eq('asaas_id', asaas_id_referencia)\
+                .eq('status', 'ativa')\
                 .maybe_single()\
                 .execute()
             
             if assinatura_data and assinatura_data.data:
+                # É a assinatura ativa atual que ficou inadimplente
                 clinic_id = assinatura_data.data['clinic_id']
                 # Atualizar status da assinatura
                 supabase.table('assinaturas')\
@@ -270,7 +273,27 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
                     .update({'ia_ativa': False})\
                     .eq('id', clinic_id)\
                     .execute()
-                print(f"🔒 IA desativada para clínica {clinic_id}")
+                print(f"🔒 Assinatura ativa inadimplente - IA desativada para clínica {clinic_id}")
+                return {"status": "processed_active_subscription_overdue"}
+
+            # PRIORIDADE 2: Se não é assinatura ativa, verificar se é tentativa de troca de plano
+            sessao_pendente = supabase.table('checkout_sessions')\
+                .select('*')\
+                .eq('asaas_id', asaas_id_referencia)\
+                .eq('status', 'pendente')\
+                .maybe_single()\
+                .execute()
+
+            if sessao_pendente and sessao_pendente.data:
+                # É uma tentativa de upgrade/troca que não foi paga - apenas cancelar a sessão
+                print(f"🚫 Tentativa de troca de plano não paga: Cancelando sessão {asaas_id_referencia}")
+                cancelar_assinatura_asaas(asaas_id_referencia)
+                supabase.table('checkout_sessions').update({'status': 'cancelado'}).eq('id', sessao_pendente.data['id']).execute()
+                print(f"✅ Sessão cancelada. Assinatura atual mantida ativa.")
+                return {"status": "processed_failed_plan_change"}
+            
+            # Se não é nem assinatura ativa nem sessão pendente, pode ser assinatura já inativa
+            print(f"⚠️ Pagamento {asaas_id_referencia} com problema, mas não afeta assinatura ativa")
                 
         elif event == "SUBSCRIPTION_DELETED":
             print(f"🛑 Assinatura cancelada no Asaas.")
