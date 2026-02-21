@@ -190,8 +190,8 @@ def create_event(clinic_id: str, body: dict, calendar_id: str = "primary"):
     Body deve conter:
         - summary: Título do evento (obrigatório)
         - start: Data/hora inicial no formato ISO (obrigatório)
+        - end: Data/hora final no formato ISO (obrigatório)
         - description: Descrição do evento (opcional)
-        - duration_hours: Duração em horas (opcional, padrão: 1)
     """
     try:
         from datetime import datetime
@@ -203,23 +203,38 @@ def create_event(clinic_id: str, body: dict, calendar_id: str = "primary"):
         if "start" not in body or not body["start"]:
             raise HTTPException(status_code=400, detail="Campo 'start' é obrigatório")
         
-        # Converte data de início
+        if "end" not in body or not body["end"]:
+            raise HTTPException(status_code=400, detail="Campo 'end' é obrigatório")
+        
+        # Converte datas de início e fim
         try:
             start_dt = datetime.fromisoformat(body["start"].replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(body["end"].replace("Z", "+00:00"))
         except ValueError as ve:
             raise HTTPException(
                 status_code=400,
-                detail=f"Formato de data inválido em 'start': {str(ve)}"
+                detail=f"Formato de data inválido: {str(ve)}"
             )
+        
+        # Valida se end > start
+        if end_dt <= start_dt:
+            raise HTTPException(
+                status_code=400,
+                detail="Data de fim deve ser posterior à data de início"
+            )
+        
+        # Calcula duração em minutos
+        duracao_minutos = int((end_dt - start_dt).total_seconds() / 60)
         
         service = get_calendar_service(clinic_id)
         
-        # Cria o evento
+        # Cria o evento com duração calculada
         new_event = service.criar_evento(
             calendar_id=calendar_id,
             resumo=body["summary"],
             inicio_dt=start_dt,
-            descricao=body.get("description", "")
+            descricao=body.get("description", ""),
+            duracao_minutos=duracao_minutos
         )
         
         return new_event
