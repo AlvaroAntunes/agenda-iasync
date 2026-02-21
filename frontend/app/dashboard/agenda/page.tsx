@@ -131,6 +131,10 @@ export default function CalendarPage() {
   
   // Estado para email do Google Calendar
   const [googleCalendarEmail, setGoogleCalendarEmail] = useState<string | null>(null)
+  
+  // Estados para filtro de profissionais
+  const [selectedProfessional, setSelectedProfessional] = useState<string>('todos')
+  const [professionals, setProfessionals] = useState<Array<{id: string, nome: string, especialidade: string, external_calendar_id?: string}>>([])
 
   // Estado para edição (movido para o topo para evitar erro de hook)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
@@ -144,7 +148,9 @@ export default function CalendarPage() {
     summary: "",
     description: "",
     date: "",
-    time: ""
+    time: "",
+    endTime: "",
+    calendarId: "primary"
   })
 
   useEffect(() => {
@@ -155,11 +161,20 @@ export default function CalendarPage() {
   useEffect(() => {
     if (clinicData?.id) {
       fetchEvents()
-      fetchAppointmentsStats()
-      fetchGoogleCalendarEmail()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentDate, clinicData?.id])
+  }, [currentDate, clinicData?.id, selectedProfessional])
+
+  // KPIs devem ser atualizadas apenas quando clínica ou profissional mudam, não quando o mês muda
+  useEffect(() => {
+    if (clinicData?.id) {
+      fetchAppointmentsStats()
+      fetchGoogleCalendarEmail()
+      fetchProfessionals()
+      fetchCalendarKPIs() // Nova função para KPIs do calendário baseadas em "hoje"
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clinicData?.id, selectedProfessional])
 
   const checkAuthAndLoadClinic = async () => {
     try {
@@ -199,6 +214,23 @@ export default function CalendarPage() {
       logger.error('Erro ao carregar dados:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchProfessionals = async () => {
+    if (!clinicData?.id) return
+
+    try {
+      const { data, error } = await supabase
+        .from('profissionais')
+        .select('id, nome, especialidade, external_calendar_id')
+        .eq('clinic_id', clinicData.id)
+        .order('nome')
+
+      if (error) throw error
+      setProfessionals(data || [])
+    } catch (error) {
+      logger.error('Erro ao buscar profissionais:', error)
     }
   }
 
@@ -263,6 +295,36 @@ export default function CalendarPage() {
     setOccupancyRate(rate)
   }
 
+  const fetchCalendarKPIs = async () => {
+    if (!clinicData?.id) return
+
+    try {
+      // Buscar eventos apenas para KPIs (sempre baseado na data atual)
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const next7Days = new Date(today)
+      next7Days.setDate(next7Days.getDate() + 7)
+
+      let url = `${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData.id}?start=${today.toISOString()}&end=${next7Days.toISOString()}`
+      
+      // Adicionar filtro de calendário específico do profissional se selecionado
+      if (selectedProfessional !== 'todos') {
+        const selectedProf = professionals.find(p => p.id === selectedProfessional)
+        if (selectedProf?.external_calendar_id) {
+          url += `&calendar_id=${encodeURIComponent(selectedProf.external_calendar_id)}`
+        }
+      }
+
+      const response = await serverFetch(url)
+      if (response.ok && response.data) {
+        const kpiEvents = response.data.events || []
+        calculateStats(kpiEvents) // Calcular KPIs apenas com eventos dos próximos 7 dias
+      }
+    } catch (error) {
+      logger.error("Erro ao buscar KPIs do calendário:", error)
+    }
+  }
+
   const fetchAppointmentsStats = async () => {
     if (!clinicData?.id) return
 
@@ -271,11 +333,18 @@ export default function CalendarPage() {
       const thirtyDaysAgo = new Date()
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-      const { data: appointments, error } = await supabase
+      let query = supabase
         .from('consultas')
         .select('id, status, horario_consulta')
         .eq('clinic_id', clinicData.id)
         .gte('horario_consulta', thirtyDaysAgo.toISOString())
+      
+      // Filtrar por profissional se selecionado
+      if (selectedProfessional !== 'todos') {
+        query = query.eq('profissional_id', selectedProfessional)
+      }
+
+      const { data: appointments, error } = await query
 
       if (error) throw error
 
@@ -293,11 +362,35 @@ export default function CalendarPage() {
       setAvgAppointmentsPerDay(parseFloat(avgPerDay))
 
       // Calculate booking success rate
-      // Get all leads with tags
-      const { data: leadTags, error: leadTagsError } = await supabase
+      // Get all leads with tags, filtrado por profissional se necessário
+      let leadTagsQuery = supabase
         .from('lead_tags')
         .select('lead_id, tag_id, tags(name)')
         .eq('clinic_id', clinicData.id)
+
+      // Se profissional específico selecionado, filtrar apenas leads que têm consultas com esse profissional
+      if (selectedProfessional !== 'todos') {
+        // Primeiro buscar todos os lead_ids que têm consultas com este profissional
+        const { data: consultasProf, error: consultasProfError } = await supabase
+          .from('consultas')
+          .select('paciente_id')
+          .eq('clinic_id', clinicData.id)
+          .eq('profissional_id', selectedProfessional)
+
+        if (consultasProfError) throw consultasProfError
+
+        const leadIdsWithProf = [...new Set(consultasProf?.map((c: any) => c.paciente_id) || [])]
+        
+        if (leadIdsWithProf.length > 0) {
+          leadTagsQuery = leadTagsQuery.in('lead_id', leadIdsWithProf)
+        } else {
+          // Se não há consultas com esse profissional, taxa é 0%
+          setBookingSuccessRate(0)
+          return
+        }
+      }
+
+      const { data: leadTags, error: leadTagsError } = await leadTagsQuery
 
       if (leadTagsError) throw leadTagsError
 
@@ -354,7 +447,15 @@ export default function CalendarPage() {
       const endDate = new Date(year, month + 1, 0, 23, 59, 59)
       endDate.setDate(endDate.getDate() + 7) // Pega início do mês seguinte
 
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData.id}?start=${startDate.toISOString()}&end=${endDate.toISOString()}`
+      let url = `${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData.id}?start=${startDate.toISOString()}&end=${endDate.toISOString()}`
+      
+      // Adicionar filtro de calendário específico do profissional se selecionado
+      if (selectedProfessional !== 'todos') {
+        const selectedProf = professionals.find(p => p.id === selectedProfessional)
+        if (selectedProf?.external_calendar_id) {
+          url += `&calendar_id=${encodeURIComponent(selectedProf.external_calendar_id)}`
+        }
+      }
 
       const response = await serverFetch(url)
       if (!response.ok) {
@@ -366,8 +467,7 @@ export default function CalendarPage() {
       const fetchedEvents = data.events || []
       setEvents(fetchedEvents)
 
-      // Calculate statistics with all events (not just current month)
-      calculateStats(fetchedEvents)
+      // KPIs são calculadas separadamente na função fetchCalendarKPIs()
 
     } catch (error) {
       logger.error("Erro ao buscar eventos do calendário:", error)
@@ -566,8 +666,14 @@ export default function CalendarPage() {
       return
     }
 
-    if (!newEvent.date || !newEvent.time) {
-      toast.error("Data e hora são obrigatórios")
+    if (!newEvent.date || !newEvent.time || !newEvent.endTime) {
+      toast.error("Data, hora de início e fim são obrigatórios")
+      return
+    }
+
+    // Validar se hora de fim é posterior à de início
+    if (newEvent.endTime <= newEvent.time) {
+      toast.error("Horário de fim deve ser posterior ao horário de início")
       return
     }
 
@@ -576,13 +682,21 @@ export default function CalendarPage() {
 
       // Combina data e hora em formato ISO
       const startDateTime = `${newEvent.date}T${newEvent.time}:00`
+      const endDateTime = `${newEvent.date}T${newEvent.endTime}:00`
 
-      const response = await serverFetch(`${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData.id}`, {
+      // Construir URL com calendar_id se não for o padrão
+      let url = `${process.env.NEXT_PUBLIC_API_URL}/calendars/events/${clinicData.id}`
+      if (newEvent.calendarId !== 'primary') {
+        url += `?calendar_id=${encodeURIComponent(newEvent.calendarId)}`
+      }
+
+      const response = await serverFetch(url, {
         method: "POST",
         body: {
           summary: newEvent.summary,
           description: newEvent.description,
-          start: startDateTime
+          start: startDateTime,
+          end: endDateTime
         }
       })
 
@@ -590,8 +704,9 @@ export default function CalendarPage() {
 
       toast.success("Evento criado com sucesso")
       setIsCreateDialogOpen(false)
-      setNewEvent({ summary: "", description: "", date: "", time: "" })
+      setNewEvent({ summary: "", description: "", date: "", time: "", endTime: "", calendarId: "primary" })
       fetchEvents()
+      fetchCalendarKPIs() // Atualizar KPIs
     } catch (err) {
       toast.error("Erro ao criar evento")
       logger.error(err)
@@ -626,7 +741,9 @@ export default function CalendarPage() {
                 const today = new Date()
                 const dateStr = today.toISOString().split('T')[0]
                 const timeStr = today.toTimeString().slice(0, 5)
-                setNewEvent({ summary: "", description: "", date: dateStr, time: timeStr })
+                // Calcular 1 hora depois como horário de fim padrão
+                const endTime = new Date(today.getTime() + 60 * 60 * 1000).toTimeString().slice(0, 5)
+                setNewEvent({ summary: "", description: "", date: dateStr, time: timeStr, endTime, calendarId: "primary" })
                 setIsCreateDialogOpen(true)
               }}
             >
@@ -641,6 +758,32 @@ export default function CalendarPage() {
             </Button>
           </div>
         </div>
+
+        {/* Professional Selector */}
+        <Card className="mb-6">
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <label className="text-sm font-medium text-black min-w-fit">
+                Profissional:
+              </label>
+              <div className="w-full sm:flex-1 sm:max-w-xs">
+                <Select value={selectedProfessional} onValueChange={setSelectedProfessional}>
+                  <SelectTrigger className="h-10 cursor-pointer">
+                    <SelectValue placeholder="Todos profissionais" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem className="cursor-pointer" value="todos">Todos profissionais</SelectItem>
+                    {professionals.map((professional) => (
+                      <SelectItem key={professional.id} className="cursor-pointer" value={professional.id}>
+                        {professional.nome} - {professional.especialidade}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Quick Stats */}
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1037,6 +1180,23 @@ export default function CalendarPage() {
               />
             </div>
 
+            <div>
+              <label className="text-sm font-medium">Calendário *</label>
+              <Select value={newEvent.calendarId} onValueChange={(value) => setNewEvent({ ...newEvent, calendarId: value })}>
+                <SelectTrigger className="w-full mt-1 cursor-pointer">
+                  <SelectValue placeholder="Selecionar calendário" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem className="cursor-pointer" value="primary">Calendário Principal</SelectItem>
+                  {professionals.map((professional) => (
+                    <SelectItem key={professional.id} className="cursor-pointer" value={professional.external_calendar_id || professional.id}>
+                      {professional.nome} - {professional.especialidade}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium">Data *</label>
@@ -1048,15 +1208,27 @@ export default function CalendarPage() {
                   required
                 />
               </div>
-              <div>
-                <label className="text-sm font-medium">Hora *</label>
-                <input
-                  type="time"
-                  className="w-full mt-1 p-2 border rounded-md"
-                  value={newEvent.time}
-                  onChange={e => setNewEvent({ ...newEvent, time: e.target.value })}
-                  required
-                />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-sm font-medium">Início *</label>
+                  <input
+                    type="time"
+                    className="w-full mt-1 p-2 border rounded-md"
+                    value={newEvent.time}
+                    onChange={e => setNewEvent({ ...newEvent, time: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Fim *</label>
+                  <input
+                    type="time"
+                    className="w-full mt-1 p-2 border rounded-md"
+                    value={newEvent.endTime}
+                    onChange={e => setNewEvent({ ...newEvent, endTime: e.target.value })}
+                    required
+                  />
+                </div>
               </div>
             </div>
 

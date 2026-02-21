@@ -232,11 +232,6 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
                             <CalendarDays className="h-4 w-4" />
                             Agenda
                           </div>
-                          {clinicData?.email && (
-                            <span className="text-xs text-slate-500 truncate max-w-48">
-                              {clinicData.email}
-                            </span>
-                          )}
                         </Button>
                       </Link>
                     )}
