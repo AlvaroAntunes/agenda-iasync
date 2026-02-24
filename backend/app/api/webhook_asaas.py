@@ -294,6 +294,7 @@ def asaas_webhook(payload: dict = Body(...), asaas_access_token: str = Header(No
             
             # Se não é nem assinatura ativa nem sessão pendente, pode ser assinatura já inativa
             print(f"⚠️ Pagamento {asaas_id_referencia} com problema, mas não afeta assinatura ativa")
+            cancelar_assinatura_asaas(asaas_id_referencia)
                 
         elif event == "SUBSCRIPTION_DELETED":
             print(f"🛑 Assinatura cancelada no Asaas.")
