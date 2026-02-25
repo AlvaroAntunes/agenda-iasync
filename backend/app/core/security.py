@@ -42,8 +42,6 @@ async def verify_global_password(x_api_password: str = Header(None)):
     Dependência Global: Verifica se o cabeçalho 'x-api-password' corresponde à senha definida no .env.
     Se a senha não estiver configurada no .env, permite o acesso (modo inseguro ou dev).
     """
-    if not API_GLOBAL_PASSWORD:
-        return # Sem senha definida, libera o acesso
         
     if x_api_password != API_GLOBAL_PASSWORD:
         raise HTTPException(
