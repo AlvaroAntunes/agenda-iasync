@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Building2, Settings, Users, MessageSquare, CalendarDays, CreditCard, Menu, LogOut, LayoutDashboard, ClipboardList } from "lucide-react"
+import { Building2, Settings, Users, MessageSquare, CalendarDays, CreditCard, Menu, LogOut, LayoutDashboard, ClipboardList, BookOpen } from "lucide-react"
 import {
   Sheet,
   SheetContent,
@@ -120,6 +120,16 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
                 >
                   <CreditCard className="h-4 w-4" />
                   Planos
+                </Button>
+              </Link>
+
+              <Link href="/dashboard/tutorial">
+                <Button
+                  variant={isActive('/dashboard/tutorial') ? "secondary" : "ghost"}
+                  className={`gap-2 ${isActive('/dashboard/tutorial') ? 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100' : 'text-slate-600'}`}
+                >
+                  <BookOpen className="h-4 w-4" />
+                  Tutorial
                 </Button>
               </Link>
             </nav>
@@ -253,6 +263,16 @@ export function ClinicHeader({ clinicName, onSignOut }: Props) {
                       >
                         <CreditCard className="h-4 w-4" />
                         Planos
+                      </Button>
+                    </Link>
+
+                    <Link href="/dashboard/tutorial">
+                      <Button
+                        variant={isActive('/dashboard/tutorial') ? "secondary" : "ghost"}
+                        className={`w-full justify-start gap-2 h-12 ${isActive('/dashboard/tutorial') ? 'bg-cyan-50 text-cyan-700' : ''}`}
+                      >
+                        <BookOpen className="h-4 w-4" />
+                        Tutorial
                       </Button>
                     </Link>
 
