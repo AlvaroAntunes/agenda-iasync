@@ -36,6 +36,7 @@ export type ClinicData = {
     abertura: string
     fechamento: string
   }[] | null
+  convenios?: string[] | null
 }
 
 type ClinicContextType = {

@@ -94,6 +94,7 @@ export default function ClinicDashboard() {
     informacoesEstacionamento: '',
     diferenciaisClinica: '',
     procedimentos: [{ nome: '', valor: '', duracao: '' }],
+    convenios: [''],
     horariosFuncionamento: [
       { dia: 'Segunda-feira', ativo: true, abertura: '08:00', fechamento: '18:00' },
       { dia: 'Terça-feira', ativo: true, abertura: '08:00', fechamento: '18:00' },
@@ -610,6 +611,8 @@ Seu lema: "[SLOGAN_CLINICA]"
 - **Diferenciais:** [DIFERENCIAIS_CLINICA].
 - **Tabela Base (Estimativa):**
 [PROCEDIMENTOS_LISTA]
+- **Convênios Aceitos:**
+[CONVENIOS_LISTA]
 
 ---
 
@@ -751,6 +754,11 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
       .map(p => `  - ${p.nome}: R$ ${p.valor} ${p.duracao ? `(${p.duracao} min)` : ''}.`)
       .join('\n')
 
+    const conveniosText = data.convenios
+      .filter(c => c.trim() !== '')
+      .map(c => `  - ${c.trim()}`)
+      .join('\n')
+
     const horariosText = data.horariosFuncionamento
       .filter(h => h.ativo)
       .map(h => `${h.dia}: ${h.abertura} às ${h.fechamento}`)
@@ -770,6 +778,7 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
       .replace(/\[INFORMAÇÕES_ESTACIONAMENTO\]/g, data.informacoesEstacionamento || 'Estacionamento na rua')
       .replace(/\[DIFERENCIAIS_CLINICA\]/g, data.diferenciaisClinica)
       .replace(/\[PROCEDIMENTOS_LISTA\]/g, procedimentosText)
+      .replace(/\[CONVENIOS_LISTA\]/g, conveniosText || 'Consulte nossa recepção para informações sobre convênios.')
       .replace(/\[DIAS_SEMANA\]/g, horariosText)
   }
 
@@ -796,7 +805,8 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
           prompt_ia: generatedPrompt,
           hora_abertura: horaAberturaInt,
           hora_fechamento: horaFechamentoInt,
-          horario_funcionamento: promptFormData.horariosFuncionamento
+          horario_funcionamento: promptFormData.horariosFuncionamento,
+          convenios: promptFormData.convenios.filter(c => c.trim() !== '')
         })
         .eq('id', clinicData.id)
 
@@ -1623,6 +1633,48 @@ Prontinho! Remarquei para amanhã às 9h. Até lá!`
                   value={promptFormData.informacoesEstacionamento}
                   onChange={(e) => setPromptFormData({ ...promptFormData, informacoesEstacionamento: e.target.value })}
                 />
+              </div>
+
+              <div className="space-y-4 rounded-lg border p-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base">Convênios Aceitos (Opcional)</Label>
+                  <Button
+                    className="hover:text-black"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPromptFormData({
+                      ...promptFormData,
+                      convenios: [...promptFormData.convenios, '']
+                    })}
+                  >
+                    + Adicionar
+                  </Button>
+                </div>
+
+                {promptFormData.convenios.map((convenio, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      placeholder="Ex: Unimed, Bradesco Saúde, SulAmérica"
+                      value={convenio}
+                      onChange={(e) => {
+                        const newConvenios = [...promptFormData.convenios]
+                        newConvenios[index] = e.target.value
+                        setPromptFormData({ ...promptFormData, convenios: newConvenios })
+                      }}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-red-500 hover:bg-red-50 flex-shrink-0"
+                      onClick={() => {
+                        const newConvenios = promptFormData.convenios.filter((_, i) => i !== index)
+                        setPromptFormData({ ...promptFormData, convenios: newConvenios })
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
 
               <div className="space-y-4 rounded-lg border p-4">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Calendar, CreditCard, AlertTriangle, XCircle, CheckCircle } from "lucide-react"
+import { Calendar, CreditCard, AlertTriangle, XCircle, CheckCircle, Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -56,6 +56,7 @@ type ClinicData = {
     abertura: string
     fechamento: string
   }> | null
+  convenios?: string[] | null
   max_profissionais?: number
 }
 
@@ -120,6 +121,13 @@ export default function SettingsPage() {
   const [editClosedDayDescription, setEditClosedDayDescription] = useState('')
 
   const [horarioFuncionamento, setHorarioFuncionamento] = useState<any[]>([])
+  const [convenios, setConvenios] = useState<string[]>([])
+  const [newConvenio, setNewConvenio] = useState('')
+  const [editingConvenioIndex, setEditingConvenioIndex] = useState<number | null>(null)
+  const [editingConvenioValue, setEditingConvenioValue] = useState('')
+  const [savingConvenios, setSavingConvenios] = useState(false)
+  const [isDeleteConvenioOpen, setIsDeleteConvenioOpen] = useState(false)
+  const [deletingConvenioIndex, setDeletingConvenioIndex] = useState<number | null>(null)
 
   useEffect(() => {
     checkAuthAndLoadClinic()
@@ -228,6 +236,13 @@ export default function SettingsPage() {
         setHorarioFuncionamento(clinicDataClean.horario_funcionamento)
       } else {
         setHorarioFuncionamento([])
+      }
+
+      // Initialize convenios if available
+      if (clinicDataClean.convenios) {
+        setConvenios(clinicDataClean.convenios)
+      } else {
+        setConvenios([])
       }
 
       // Carregar profissionais da clínica
@@ -511,6 +526,7 @@ export default function SettingsPage() {
           ia_ativa: formData.ia_ativa,
           tipo_calendario: formData.tipo_calendario,
           ...(clinicData.horario_funcionamento ? { horario_funcionamento: horarioFuncionamento } : {}),
+          convenios: convenios.filter(c => c.trim() !== ''),
         })
         .eq('id', clinicData.id)
 
@@ -687,6 +703,45 @@ export default function SettingsPage() {
       setFormData(clinicData)
       setSuccess("Alterações descartadas.")
       setTimeout(() => setSuccess(""), 2000)
+    }
+  }
+
+  const saveConvenios = async (updatedConvenios: string[]) => {
+    if (!clinicData) return
+    setSavingConvenios(true)
+    setError('')
+    setSuccess('')
+    try {
+      const filteredConvenios = updatedConvenios.filter(c => c.trim() !== '')
+
+      // Atualizar o prompt com os convênios
+      let currentPrompt = formData.prompt_ia ?? clinicData.prompt_ia ?? ''
+      if (filteredConvenios.length > 0) {
+        const conveniosString = filteredConvenios.map(c => `  - ${c}`).join('\n')
+        const pattern = /- \*\*Convênios Aceitos:\*\*\n(  - .+\n?)*/
+        if (pattern.test(currentPrompt)) {
+          currentPrompt = currentPrompt.replace(pattern, `- **Convênios Aceitos:**\n${conveniosString}\n`)
+        }
+      }
+
+      const { error: updateError } = await supabase
+        .from('clinicas')
+        .update({
+          convenios: filteredConvenios.length > 0 ? filteredConvenios : null,
+          prompt_ia: currentPrompt,
+        })
+        .eq('id', clinicData.id)
+      if (updateError) throw updateError
+      setConvenios(filteredConvenios)
+      setClinicData({ ...clinicData, convenios: filteredConvenios, prompt_ia: currentPrompt })
+      setFormData(prev => ({ ...prev, prompt_ia: currentPrompt }))
+      setSuccess('Convênios atualizados com sucesso!')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (error: any) {
+      logger.error('Erro ao salvar convênios:', error)
+      setError(error.message || 'Erro ao salvar convênios')
+    } finally {
+      setSavingConvenios(false)
     }
   }
 
@@ -1667,6 +1722,150 @@ export default function SettingsPage() {
           </div>
         </div >
 
+        {/* Convênios Editor */}
+        <div className="bg-white rounded-3xl p-3 sm:p-6 md:p-10 shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-600 to-teal-600" />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-8">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 flex-shrink-0">
+              <Heart className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 break-words">Convênios</h2>
+              <p className="text-slate-500 text-sm break-words">Gerencie os convênios aceitos pela clínica.</p>
+            </div>
+          </div>
+
+          {/* Add new convênio */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-6">
+            <Input
+              placeholder="Nome do convênio (ex: Unimed, Bradesco Saúde...)"
+              value={newConvenio}
+              onChange={(e) => setNewConvenio(e.target.value)}
+              onKeyDown={async (e) => {
+                if (e.key === 'Enter' && newConvenio.trim()) {
+                  const updated = [...convenios, newConvenio.trim()]
+                  setNewConvenio('')
+                  await saveConvenios(updated)
+                }
+              }}
+              className="rounded-xl border-slate-200 flex-1"
+            />
+            <Button
+              onClick={async () => {
+                if (newConvenio.trim()) {
+                  const updated = [...convenios, newConvenio.trim()]
+                  setNewConvenio('')
+                  await saveConvenios(updated)
+                }
+              }}
+              disabled={!newConvenio.trim() || savingConvenios}
+              className="h-10 px-6 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/20 font-semibold transition-all hover:scale-[1.02]"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {savingConvenios ? 'Adicionando...' : 'Adicionar'}
+            </Button>
+          </div>
+
+          {/* Convênios list */}
+          <div className="space-y-3">
+            {convenios.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <Heart className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">Nenhum convênio cadastrado</p>
+                <p className="text-xs mt-1">Adicione os convênios aceitos pela clínica</p>
+              </div>
+            ) : (
+              convenios.map((convenio, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-4 border border-slate-200 rounded-xl hover:border-emerald-200 transition-colors"
+                >
+                  {editingConvenioIndex === index ? (
+                    <div className="flex items-center gap-2 flex-1 mr-2">
+                      <Input
+                        value={editingConvenioValue}
+                        onChange={(e) => setEditingConvenioValue(e.target.value)}
+                        onKeyDown={async (e) => {
+                          if (e.key === 'Enter' && editingConvenioValue.trim()) {
+                            const updated = [...convenios]
+                            updated[index] = editingConvenioValue.trim()
+                            setEditingConvenioIndex(null)
+                            setEditingConvenioValue('')
+                            await saveConvenios(updated)
+                          } else if (e.key === 'Escape') {
+                            setEditingConvenioIndex(null)
+                            setEditingConvenioValue('')
+                          }
+                        }}
+                        className="rounded-xl border-slate-200 flex-1"
+                        autoFocus
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={async () => {
+                          if (editingConvenioValue.trim()) {
+                            const updated = [...convenios]
+                            updated[index] = editingConvenioValue.trim()
+                            setEditingConvenioIndex(null)
+                            setEditingConvenioValue('')
+                            await saveConvenios(updated)
+                          }
+                        }}
+                        className="hover:bg-emerald-50 rounded-lg text-emerald-600"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setEditingConvenioIndex(null)
+                          setEditingConvenioValue('')
+                        }}
+                        className="hover:bg-slate-100 rounded-lg text-slate-400"
+                      >
+                        <XCircle className="h-4 w-4 text-red-600" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                        <span className="font-medium text-slate-700">{convenio}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEditingConvenioIndex(index)
+                            setEditingConvenioValue(convenio)
+                          }}
+                          className="hover:bg-slate-100 rounded-lg text-slate-500 hover:text-emerald-700"
+                        >
+                          <Edit className="h-4 w-4 text-blue-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setDeletingConvenioIndex(index)
+                            setIsDeleteConvenioOpen(true)
+                          }}
+                          className="hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-600" />
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
         {/* Operating Hours Editor */}
         {
           clinicData?.horario_funcionamento && (
@@ -1866,6 +2065,46 @@ export default function SettingsPage() {
                 className="sm:mx-4 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20 font-semibold transition-all"
               >
                 {saving ? 'Excluindo...' : 'Sim, excluir'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Excluir Convênio */}
+        <Dialog open={isDeleteConvenioOpen} onOpenChange={setIsDeleteConvenioOpen}>
+          <DialogContent className="sm:max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+                Excluir Convênio
+              </DialogTitle>
+              <DialogDescription className="pt-2 text-slate-600">
+                Tem certeza que deseja remover o convênio{deletingConvenioIndex !== null ? ` "${convenios[deletingConvenioIndex]}"` : ''}? Esta ação não pode ser desfeita.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                onClick={() => {
+                  setIsDeleteConvenioOpen(false)
+                  setDeletingConvenioIndex(null)
+                }}
+                disabled={savingConvenios}
+                className="rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-500 transition-colors"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (deletingConvenioIndex === null) return
+                  const updated = convenios.filter((_, i) => i !== deletingConvenioIndex)
+                  setIsDeleteConvenioOpen(false)
+                  setDeletingConvenioIndex(null)
+                  await saveConvenios(updated)
+                }}
+                disabled={savingConvenios}
+                className="sm:mx-4 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20 font-semibold transition-all"
+              >
+                {savingConvenios ? 'Excluindo...' : 'Sim, excluir'}
               </Button>
             </DialogFooter>
           </DialogContent>
